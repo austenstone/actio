@@ -10,6 +10,7 @@ import {
   isObject,
   pushDiagnostic,
 } from "./helpers.js";
+import type { Pass } from "./registry.js";
 
 interface NormalizedFallback {
   steps: Step[];
@@ -110,3 +111,10 @@ export function fallbackPass(ctx: ParseContext): void {
     processJobFallback(ctx, job as Job, jobId);
   }
 }
+
+/** Wrap steps with try/catch before dynamic_matrix moves them between jobs. */
+export const fallback: Pass = {
+  name: "fallback",
+  runsAfter: ["fragments", "retry"],
+  apply: fallbackPass,
+};

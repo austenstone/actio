@@ -9,6 +9,7 @@ import {
   pushDiagnostic,
   slugify,
 } from "./helpers.js";
+import type { Pass } from "./registry.js";
 
 const DEFAULT_ATTEMPTS = 3;
 
@@ -168,3 +169,6 @@ export function retryPass(ctx: ParseContext): void {
     processStepRetries(j, jobId);
   }
 }
+
+/** Fan out retry attempts before fallback wraps the final attempt. */
+export const retry: Pass = { name: "retry", runsAfter: ["fragments"], apply: retryPass };

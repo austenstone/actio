@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { type Diagnostic, formatDiagnostic, transpile } from "@actio/core";
+import { type Diagnostic, type Pass, formatDiagnostic, transpile } from "@actio/core";
 import pc from "picocolors";
 import { glob } from "tinyglobby";
 
@@ -12,6 +12,8 @@ export interface BuildOptions {
   validate: boolean;
   header: boolean;
   cwd?: string;
+  /** Extra transform passes (from the config file) merged into the built-in pipeline. */
+  passes?: Pass[];
 }
 
 const DEFAULT_GLOBS = ["**/*.actio.yml"];
@@ -55,6 +57,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     fileName: file,
     header: opts.header,
     validate: opts.validate,
+    passes: opts.passes,
   });
 
   if (result.diagnostics.length > 0) {

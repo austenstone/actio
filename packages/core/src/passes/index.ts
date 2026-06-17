@@ -1,24 +1,32 @@
 import type { ParseContext } from "../parser.js";
-import { dynamicMatrixPass } from "./dynamicMatrix.js";
-import { fallbackPass } from "./fallback.js";
-import { fragmentsPass } from "./fragments.js";
-import { retryPass } from "./retry.js";
-
-export type Pass = (ctx: ParseContext) => void;
+import { dynamicMatrix } from "./dynamicMatrix.js";
+import { fallback } from "./fallback.js";
+import { fragments } from "./fragments.js";
+import { type Pass, PassRegistry, applyPasses } from "./registry.js";
+import { retry } from "./retry.js";
 
 /**
- * Ordered transform pipeline. Order matters:
- *  1. fragments  — splice reusable steps in first, so later passes see real steps.
- *  2. retry      — fan out steps before fallback, so fallback only applies to final attempt.
- *  3. fallback   — wrap steps with try/catch before they're moved between jobs.
- *  4. dynamic_matrix — split jobs and move the (already finalized) steps.
+ * The transforms Actio ships with. Order is derived from each pass's `runsAfter`
+ * (see registry.ts), not this array, so the effective pipeline is:
+ *   fragments → retry → fallback → dynamic_matrix
  */
-export const passes: Pass[] = [fragmentsPass, retryPass, fallbackPass, dynamicMatrixPass];
+export const builtinPasses: Pass[] = [fragments, retry, fallback, dynamicMatrix];
 
-export function runPasses(ctx: ParseContext): void {
-  for (const pass of passes) {
-    pass(ctx);
-  }
+/** Run a set of passes (defaults to the built-ins) in dependency order. */
+export function runPasses(ctx: ParseContext, passes: Pass[] = builtinPasses): void {
+  applyPasses(ctx, passes);
 }
 
-export { dynamicMatrixPass, fallbackPass, fragmentsPass, retryPass };
+/** A registry seeded with the built-in passes, ready for extra ones to be added. */
+export function createRegistry(extra: Pass[] = []): PassRegistry {
+  return new PassRegistry([...builtinPasses, ...extra]);
+}
+
+export {
+  type Pass,
+  type PassFn,
+  PassRegistry,
+  applyPasses,
+  sortPasses,
+} from "./registry.js";
+export { dynamicMatrix, fallback, fragments, retry };
