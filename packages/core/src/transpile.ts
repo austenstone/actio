@@ -1,7 +1,8 @@
 import type { Diagnostic } from "./diagnostics.js";
-import { emitYaml } from "./emit.js";
+import { emitYaml, generatedHeader } from "./emit.js";
 import { parseActio } from "./parser.js";
 import { type Pass, createRegistry, runPasses } from "./passes/index.js";
+import { type SourceMap, buildSourceMap, resolveGeneratedLine } from "./sourcemap.js";
 import { validateWorkflowYaml } from "./validate.js";
 
 export interface TranspileOptions {
@@ -13,6 +14,8 @@ export interface TranspileOptions {
   validate?: boolean;
   /** Extra transform passes merged into the built-in pipeline (ordered by `runsAfter`). */
   passes?: Pass[];
+  /** Produce a source map and remap schema diagnostics back to source. Default false. */
+  sourceMap?: boolean;
 }
 
 export interface TranspileResult {
@@ -21,6 +24,17 @@ export interface TranspileResult {
   /** Generated workflow YAML (always present, even if validation failed). */
   yaml: string;
   diagnostics: Diagnostic[];
+  /** Generated→source line map, present only when `sourceMap` is set. */
+  map?: SourceMap;
+}
+
+/** Rewrite a generated-line diagnostic range to its originating source range. */
+function remapDiagnostic(diagnostic: Diagnostic, map: SourceMap): Diagnostic {
+  if (!diagnostic.range) return diagnostic;
+  const origin = resolveGeneratedLine(map, diagnostic.range.start.line);
+  if (!origin) return diagnostic;
+  const start = { line: origin.line, col: origin.col };
+  return { ...diagnostic, range: { start, end: start } };
 }
 
 /** Compile a single `.actio.yml` source string into standard GitHub Actions YAML. */
@@ -39,13 +53,20 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
   const passes = options.passes?.length ? createRegistry(options.passes).list() : undefined;
   runPasses(ctx, passes);
 
-  const yaml = emitYaml(ctx.data, { header: options.header, fileName });
+  const body = emitYaml(ctx.data, { header: false });
+  const header = options.header === false ? "" : generatedHeader(fileName);
+  const yaml = header + body;
+
+  const map = options.sourceMap
+    ? buildSourceMap(ctx, body, { headerLines: header ? header.split("\n").length - 1 : 0 })
+    : undefined;
 
   const diagnostics: Diagnostic[] = [...ctx.diagnostics];
   if (options.validate !== false) {
-    diagnostics.push(...validateWorkflowYaml(yaml, fileName));
+    const schema = validateWorkflowYaml(yaml, fileName);
+    diagnostics.push(...(map ? schema.map((d) => remapDiagnostic(d, map)) : schema));
   }
 
   const ok = !diagnostics.some((d) => d.severity === "error");
-  return { ok, yaml, diagnostics };
+  return { ok, yaml, diagnostics, map };
 }

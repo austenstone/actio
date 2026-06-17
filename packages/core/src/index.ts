@@ -56,5 +56,12 @@ export {
   actioSchemaJson,
   actioSchemaPath,
 } from "./schema.js";
+export {
+  type BuildSourceMapOptions,
+  type SourceMap,
+  type SourceMapping,
+  buildSourceMap,
+  resolveGeneratedLine,
+} from "./sourcemap.js";
 export { type TranspileOptions, type TranspileResult, transpile } from "./transpile.js";
 export { validateWorkflowYaml } from "./validate.js";

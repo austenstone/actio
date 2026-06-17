@@ -72,6 +72,7 @@ export function resolveBuildOptions(args: {
     stdout: passed("--stdout"),
     validate: passed("--no-validate") ? false : (config.validate ?? true),
     header: passed("--no-header") ? false : (config.header ?? true),
+    sourceMap: passed("--no-source-map") ? false : (config.sourceMap ?? true),
     passes: config.passes,
   };
 
