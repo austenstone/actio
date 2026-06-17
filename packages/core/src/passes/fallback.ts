@@ -15,15 +15,7 @@ interface NormalizedFallback {
   recover: boolean;
 }
 
-function normalizeStepFallback(fb: unknown): NormalizedFallback {
-  if (Array.isArray(fb)) return { steps: fb, recover: false };
-  if (isObject(fb)) {
-    return { steps: asArray((fb as Step).steps), recover: Boolean((fb as Step).recover) };
-  }
-  return { steps: [], recover: false };
-}
-
-function normalizeJobFallback(fb: unknown): NormalizedFallback {
+function normalizeFallback(fb: unknown): NormalizedFallback {
   if (Array.isArray(fb)) return { steps: fb, recover: false };
   if (isObject(fb)) {
     return { steps: asArray((fb as Step).steps), recover: Boolean((fb as Step).recover) };
@@ -43,7 +35,7 @@ function processStepFallbacks(ctx: ParseContext, jobId: string, job: Job): void 
   const used = collectUsedStepIds(job.steps);
   transformSteps(ctx, jobId, job, (step, idx) => {
     if (!isObject(step) || step.fallback == null) return [step];
-    const { steps: fbSteps, recover } = normalizeStepFallback(step.fallback);
+    const { steps: fbSteps, recover } = normalizeFallback(step.fallback);
     delete step.fallback;
     if (fbSteps.length === 0) return [step];
 
@@ -66,7 +58,7 @@ function processStepFallbacks(ctx: ParseContext, jobId: string, job: Job): void 
 /** Expand a job-level `fallback:` block into notify steps gated on `failure()`. */
 function processJobFallback(ctx: ParseContext, job: Job, jobId: string): void {
   if (job.fallback == null) return;
-  const { steps: fbSteps, recover } = normalizeJobFallback(job.fallback);
+  const { steps: fbSteps, recover } = normalizeFallback(job.fallback);
   delete job.fallback;
   if (recover) {
     pushDiagnostic(

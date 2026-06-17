@@ -99,9 +99,12 @@ export const runWatch = async (
       return;
     }
     flushing = true;
+    // Snapshot and drain synchronously so files saved during the await below
+    // stay queued for the next flush instead of being cleared out from under us.
+    const captured = [...pending];
+    for (const f of captured) pending.delete(f);
     const discovered = new Set(await discover(patterns, cwd));
-    const files = [...pending].filter((f) => discovered.has(f));
-    pending.clear();
+    const files = captured.filter((f) => discovered.has(f));
     if (files.length > 0) await rebuild(files.sort(), false);
     flushing = false;
   };

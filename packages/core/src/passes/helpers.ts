@@ -31,8 +31,14 @@ export function looksLikePath(script: string): boolean {
 
 function stripExprWrapper(cond: string): string {
   const t = cond.trim();
-  const m = t.match(/^\$\{\{\s*(.*?)\s*\}\}$/s);
-  return m ? m[1].trim() : t;
+  if (t.startsWith("${{") && t.endsWith("}}")) {
+    const inner = t.slice(3, -2);
+    // Only unwrap a self-contained single expression. A lazy regex would span
+    // interior delimiters (`${{ a }} && ${{ b }}` -> `a }} && ${{ b`), corrupting
+    // multi-wrapper conditions; bail and leave them for validation to flag.
+    if (!inner.includes("${{") && !inner.includes("}}")) return inner.trim();
+  }
+  return t;
 }
 
 function needsParens(expr: string): boolean {

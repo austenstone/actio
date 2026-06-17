@@ -37,11 +37,15 @@ export async function loadActioConfig(cwd: string = process.cwd()): Promise<Load
   if (!filepath) return null;
 
   let config: ActioConfig;
-  if (filepath.endsWith(".json")) {
-    config = JSON.parse(readFileSync(filepath, "utf8")) as ActioConfig;
-  } else {
-    const jiti = createJiti(import.meta.url);
-    config = await jiti.import<ActioConfig>(filepath, { default: true });
+  try {
+    if (filepath.endsWith(".json")) {
+      config = JSON.parse(readFileSync(filepath, "utf8")) as ActioConfig;
+    } else {
+      const jiti = createJiti(import.meta.url);
+      config = await jiti.import<ActioConfig>(filepath, { default: true });
+    }
+  } catch (err) {
+    throw new Error(`Failed to load ${path.relative(cwd, filepath)}: ${(err as Error).message}`);
   }
 
   if (typeof config !== "object" || config === null) {
