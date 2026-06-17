@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type BuildOptions, runBuild } from "./build.js";
+import { type BuildOptions, ciAnnotationsEnabled, runBuild } from "./build.js";
 
 const INPUT = [
   "name: CI",
@@ -83,5 +83,20 @@ describe("runBuild source maps", () => {
     await mkdir(join(dir, "out"), { recursive: true });
     await writeFile(join(dir, "out", "ci.yml.map"), "{}\n", "utf8");
     expect(await runBuild([], options(dir, { check: true }))).toBe(1);
+  });
+});
+
+describe("ciAnnotationsEnabled", () => {
+  it("is true under GitHub Actions outside the test runner", () => {
+    expect(ciAnnotationsEnabled({ GITHUB_ACTIONS: "true" })).toBe(true);
+  });
+
+  it("is false when not in GitHub Actions", () => {
+    expect(ciAnnotationsEnabled({})).toBe(false);
+    expect(ciAnnotationsEnabled({ GITHUB_ACTIONS: "false" })).toBe(false);
+  });
+
+  it("is suppressed under Vitest so fixture diagnostics never leak as annotations", () => {
+    expect(ciAnnotationsEnabled({ GITHUB_ACTIONS: "true", VITEST: "true" })).toBe(false);
   });
 });

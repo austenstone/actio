@@ -44,8 +44,18 @@ export async function discover(patterns: string[], cwd: string): Promise<string[
   return expanded.sort();
 }
 
+/**
+ * Build-time diagnostic annotations should only surface from a real CLI run in
+ * CI — never from the test suite, which exercises intentionally-broken fixtures
+ * (Vitest sets `VITEST`, so their diagnostics would otherwise leak as real
+ * annotations on the run).
+ */
+export function ciAnnotationsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.GITHUB_ACTIONS === "true" && env.VITEST !== "true";
+}
+
 export function printDiagnostics(diags: Diagnostic[], source: string): void {
-  const ci = process.env.GITHUB_ACTIONS === "true";
+  const ci = ciAnnotationsEnabled();
   for (const d of diags) {
     // In CI, emit a workflow command so the diagnostic highlights inline on the
     // originating .actio.yml source line (schema/syntax errors are the useful ones).
