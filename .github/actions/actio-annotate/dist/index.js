@@ -31262,6 +31262,8 @@ async function run() {
   const octokit = getOctokit(token);
   const { owner, repo } = context2.repo;
   const runId = context2.runId;
+  const sha = context2.sha;
+  const serverUrl = process.env.GITHUB_SERVER_URL ?? "https://github.com";
   const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
   const explicitPath = getInput("workflow-file");
   const workflowPath = explicitPath || workflowPathFromRef(process.env.GITHUB_WORKFLOW_REF ?? "", `${owner}/${repo}`);
@@ -31287,7 +31289,9 @@ async function run() {
     const dedupe = `${loc.file}:${loc.line}:${loc.col}`;
     if (seen.has(dedupe)) return;
     seen.add(dedupe);
-    error(message, {
+    const permalink = `${serverUrl}/${owner}/${repo}/blob/${sha}/${loc.file}#L${loc.line}`;
+    error(`${message}
+${permalink}`, {
       file: loc.file,
       startLine: loc.line,
       startColumn: loc.col,

@@ -62,6 +62,8 @@ async function run(): Promise<void> {
   const octokit = github.getOctokit(token);
   const { owner, repo } = github.context.repo;
   const runId = github.context.runId;
+  const sha = github.context.sha;
+  const serverUrl = process.env.GITHUB_SERVER_URL ?? "https://github.com";
   const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
 
   const explicitPath = core.getInput("workflow-file");
@@ -92,7 +94,8 @@ async function run(): Promise<void> {
     const dedupe = `${loc.file}:${loc.line}:${loc.col}`;
     if (seen.has(dedupe)) return;
     seen.add(dedupe);
-    core.error(message, {
+    const permalink = `${serverUrl}/${owner}/${repo}/blob/${sha}/${loc.file}#L${loc.line}`;
+    core.error(`${message}\n${permalink}`, {
       file: loc.file,
       startLine: loc.line,
       startColumn: loc.col,
