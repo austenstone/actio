@@ -121,6 +121,133 @@ jobs:
     expect(first.id).toBe("actio_eval");
   });
 
+  it("wraps a multi-line inline script in a group so the whole block feeds jq", () => {
+    const { doc } = build(`name: x
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      script: |
+        a=1
+        echo "[$a]"
+    steps:
+      - run: echo hi
+`);
+    const evalStep = doc.jobs.actio_setup_test.steps.find(
+      (s: { id?: string }) => s.id === "actio_eval",
+    );
+    expect(evalStep.run).toContain("    a=1");
+    expect(evalStep.run).toContain('    echo "[$a]"');
+    expect(evalStep.run).toContain("  } | jq -c .");
+    // The old bug: a dangling `| jq` on its own line (pipe with no left command).
+    expect(/\n\s*\| jq/.test(evalStep.run)).toBe(false);
+  });
+
+  it("keeps single-line inline scripts piped inline with no group", () => {
+    const { doc } = build(`name: x
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      script: echo '["a","b"]'
+    steps:
+      - run: echo hi
+`);
+    const evalStep = doc.jobs.actio_setup_test.steps.find(
+      (s: { id?: string }) => s.id === "actio_eval",
+    );
+    expect(evalStep.run).toContain(`echo '["a","b"]' | jq -c .`);
+    expect(evalStep.run).not.toContain("  } | jq -c .");
+  });
+
+  it("emits PowerShell plumbing for shell: pwsh", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      shell: pwsh
+      script: |
+        $d = Get-ChildItem -Directory packages | ForEach-Object { $_.Name }
+        $d | ConvertTo-Json -Compress
+    steps:
+      - run: echo hi
+`);
+    expect(errors).toEqual([]);
+    const evalStep = doc.jobs.actio_setup_test.steps.find(
+      (s: { id?: string }) => s.id === "actio_eval",
+    );
+    expect(evalStep.shell).toBe("pwsh");
+    expect(evalStep.run).toContain("$actioOut = & {");
+    expect(evalStep.run).toContain("[System.IO.File]::AppendAllText($env:GITHUB_OUTPUT");
+    expect(evalStep.run).toContain("UTF8Encoding $false");
+    // No bash plumbing leaked in.
+    expect(evalStep.run).not.toContain("jq -c .");
+    expect(evalStep.run).not.toContain('>> "$GITHUB_OUTPUT"');
+  });
+
+  it("emits Python plumbing for shell: python", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      shell: python
+      script: |
+        import json, pathlib
+        print(json.dumps([p.name for p in pathlib.Path("packages").iterdir()]))
+    steps:
+      - run: echo hi
+`);
+    expect(errors).toEqual([]);
+    const evalStep = doc.jobs.actio_setup_test.steps.find(
+      (s: { id?: string }) => s.id === "actio_eval",
+    );
+    expect(evalStep.shell).toBe("python");
+    expect(evalStep.run).toContain("contextlib.redirect_stdout(_actio_buf)");
+    expect(evalStep.run).toContain('os.environ["GITHUB_OUTPUT"]');
+    // User script is captured inside the redirect block (indented 4 spaces).
+    expect(evalStep.run).toContain("    import json, pathlib");
+    expect(evalStep.run).not.toContain("jq -c .");
+  });
+
+  it("errors on an unsupported shell", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      shell: cmd
+      script: echo ["a"]
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => /shell "cmd" is not supported/.test(d.message))).toBe(true);
+  });
+
+  it("warns that compact is ignored for non-POSIX shells", () => {
+    const { result } = build(`name: x
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      shell: pwsh
+      compact: true
+      script: '"[1]"'
+    steps:
+      - run: echo hi
+`);
+    const warns = result.diagnostics.filter((d) => d.severity === "warning");
+    expect(warns.some((d) => /compact.*only applies to bash\/sh/.test(d.message))).toBe(true);
+  });
+
   it("supports raw (alias-less) matrix mode", () => {
     const { doc } = build(`name: x
 on: [push]

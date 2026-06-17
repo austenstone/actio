@@ -27,15 +27,91 @@ function resolveRunsOn(dm: DM, job: Job): unknown {
   return "ubuntu-latest";
 }
 
-function buildEvalRun(script: string, compact: boolean): string {
-  const pipe = compact ? " | jq -c ." : "";
+type ShellFamily = "posix" | "pwsh" | "python" | "unsupported";
+
+/** Map a GitHub Actions `shell:` value to the plumbing we know how to emit. */
+function shellFamily(shell: string | undefined): ShellFamily {
+  if (!shell) return "posix";
+  switch (shell.trim().toLowerCase()) {
+    case "bash":
+    case "sh":
+      return "posix";
+    case "pwsh":
+    case "powershell":
+      return "pwsh";
+    case "python":
+      return "python";
+    default:
+      return "unsupported";
+  }
+}
+
+/**
+ * bash/sh: a brace group streams the script's combined stdout into the heredoc
+ * body, so a multi-line script emits the matrix JSON (not just its last line).
+ * `compact` pipes that stdout through `jq -c .` to normalize to one line.
+ */
+function posixEvalRun(lines: string[], compact: boolean): string {
+  let evalBlock: string[];
+  if (!compact) {
+    evalBlock = lines.map((l) => `  ${l}`);
+  } else if (lines.length === 1) {
+    evalBlock = [`  ${lines[0]} | jq -c .`];
+  } else {
+    evalBlock = ["  {", ...lines.map((l) => `    ${l}`), "  } | jq -c ."];
+  }
   return [
     "{",
     "  echo 'matrix<<ACTIO_EOF'",
-    `  ${script}${pipe}`,
+    ...evalBlock,
     "  echo ACTIO_EOF",
     '} >> "$GITHUB_OUTPUT"',
   ].join("\n");
+}
+
+/**
+ * pwsh/powershell: capture the script's pipeline output, then append the
+ * multi-line GHA output via .NET so it stays BOM-free on both PowerShell Core
+ * and Windows PowerShell (`>>` / `Out-File` would add a BOM or UTF-16 on
+ * Desktop and corrupt `$GITHUB_OUTPUT`).
+ */
+function pwshEvalRun(lines: string[]): string {
+  return [
+    "$actioOut = & {",
+    ...lines.map((l) => `  ${l}`),
+    "}",
+    "$actioBody = ($actioOut | Out-String).TrimEnd()",
+    '[System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "matrix<<ACTIO_EOF`n$actioBody`nACTIO_EOF`n", (New-Object System.Text.UTF8Encoding $false))',
+  ].join("\n");
+}
+
+/** python: capture stdout, then append the multi-line output BOM-free. */
+function pythonEvalRun(lines: string[]): string {
+  return [
+    "import os, io, contextlib",
+    "_actio_buf = io.StringIO()",
+    "with contextlib.redirect_stdout(_actio_buf):",
+    ...lines.map((l) => `    ${l}`),
+    'with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as _actio_fh:',
+    '    _actio_fh.write("matrix<<ACTIO_EOF\\n" + _actio_buf.getvalue().rstrip("\\n") + "\\nACTIO_EOF\\n")',
+  ].join("\n");
+}
+
+/**
+ * Build the `run:` for the setup job's eval step. The user's `script` runs under
+ * the chosen `shell` (like Actions), and Actio supplies shell-matching plumbing
+ * to publish its stdout as the `matrix` output.
+ */
+function buildEvalRun(script: string, compact: boolean, family: ShellFamily): string {
+  const lines = script.replace(/\n+$/, "").split("\n");
+  switch (family) {
+    case "pwsh":
+      return pwshEvalRun(lines);
+    case "python":
+      return pythonEvalRun(lines);
+    default:
+      return posixEvalRun(lines, compact);
+  }
 }
 
 function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefined {
@@ -51,8 +127,29 @@ function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefi
   }
 
   const checkout = typeof dm.checkout === "boolean" ? dm.checkout : looksLikePath(script);
-  const compact = dm.compact !== false;
   const shell = opt<string>(dm, "shell");
+  const family = shellFamily(shell);
+  if (family === "unsupported") {
+    pushDiagnostic(
+      ctx,
+      "error",
+      `Job "${jobId}": dynamic_matrix shell "${shell}" is not supported; use bash, sh, pwsh, powershell, or python`,
+      ["jobs", jobId, "dynamic_matrix", "shell"],
+    );
+    return undefined;
+  }
+
+  // `compact` (jq) is a POSIX-only convenience. Other shells emit the script's
+  // raw stdout as a multi-line output, which `fromJSON` parses fine.
+  const compact = family === "posix" && dm.compact !== false;
+  if (dm.compact === true && family !== "posix") {
+    pushDiagnostic(
+      ctx,
+      "warning",
+      `Job "${jobId}": dynamic_matrix "compact" only applies to bash/sh; "${shell}" emits the script's raw output instead`,
+      ["jobs", jobId, "dynamic_matrix", "compact"],
+    );
+  }
 
   const steps: Step[] = [];
   if (checkout) steps.push(deriveNode(ctx, job, { uses: "actions/checkout@v4" }));
@@ -62,7 +159,7 @@ function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefi
   const evalStep: Step = deriveNode(ctx, job, {
     name: "Evaluate dynamic matrix",
     id: "actio_eval",
-    run: buildEvalRun(script, compact),
+    run: buildEvalRun(script, compact, family),
   });
   if (shell) evalStep.shell = shell;
   steps.push(evalStep);

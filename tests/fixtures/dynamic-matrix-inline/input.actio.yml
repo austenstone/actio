@@ -1,0 +1,13 @@
+name: Inline Dynamic Matrix
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      alias: pkg
+      checkout: true
+      script: |
+        dirs=$(ls -d packages/*/ | xargs -n1 basename)
+        jq -cn '$ARGS.positional' --args $dirs
+    steps:
+      - run: npm test --workspace ${{ matrix.pkg }}

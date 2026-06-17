@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../../../packages/core/schema/actio.schema.json
+name: dynamic-matrix-pwsh
+on: [push]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    dynamic_matrix:
+      shell: pwsh
+      alias: pkg
+      checkout: true
+      script: |
+        $names = Get-ChildItem -Directory packages | ForEach-Object { $_.Name }
+        $names | ConvertTo-Json -Compress
+    steps:
+      - run: echo "building ${{ matrix.pkg }}"

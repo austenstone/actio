@@ -200,7 +200,11 @@
         },
         "shell": {
           "type": "string",
-          "description": "Shell used to run `script` in the setup job."
+          "description": "Shell that runs `script` in the setup job, like a step's `shell`. Supported: bash, sh, pwsh, powershell, python. Actio emits matching plumbing to publish the matrix output; other shells (e.g. cmd) are rejected."
+        },
+        "compact": {
+          "type": "boolean",
+          "description": "Pipe the script's stdout through `jq -c .` to normalize the matrix JSON to one line. POSIX-only (bash/sh); ignored for pwsh/powershell/python, which emit raw multi-line output that `fromJSON` parses fine. Defaults to true."
         },
         "checkout": {
           "type": "boolean",

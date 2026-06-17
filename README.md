@@ -203,7 +203,26 @@ jobs:
 
 Options: `script` (required), `alias` (wrap a scalar array under `matrix.<alias>`;
 omit for raw `{include:[...]}` mode), `checkout` (default `true` when `script` is
-a local path), `runs-on`, `shell`, `fail-fast` (default `false`), `id`.
+a local path), `runs-on`, `shell`, `compact` (default `true`), `fail-fast` (default
+`false`), `id`.
+
+`script` can be a path **or** an inline command — single- or multi-line. Inline
+scripts skip the auto-checkout (set `checkout: true` if yours reads the repo):
+
+```yaml
+dynamic_matrix:
+  alias: pkg
+  checkout: true
+  script: |
+    ls -d packages/*/ | xargs -n1 basename | jq -Rcn '[inputs]'
+```
+
+`shell:` works like a step's `shell` and picks the interpreter for `script`.
+Supported: `bash`/`sh` (heredoc + `jq`), `pwsh`/`powershell` (captured pipeline
+output, BOM-free), and `python` (captured stdout). Actio emits matching plumbing
+to publish the matrix output, so a PowerShell or Python generator just prints its
+JSON. `compact` (jq) is bash/sh-only; other shells emit raw multi-line JSON, which
+`fromJSON()` parses fine.
 
 ### 4. `fallback`
 
