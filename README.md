@@ -363,6 +363,31 @@ Now `actio build` runs `stampEnv` as part of the pipeline — no fork of core
 required. Pass names must be unique (Actio throws on a collision with a
 built-in or another custom pass).
 
+> **Traversing jobs and steps?** Prefer the typed-IR **visitor helpers** —
+> `workflow`, `visitJobs`, `visitSteps`, `transformSteps`, all exported from
+> `@actio/core` — over poking `ctx.data` by hand. They give you typed nodes and
+> handle the awkward shape-checking for you. (These land with the typed-IR PR; on
+> older versions, fall back to walking `ctx.data` as above.)
+
+```ts
+// Preferred form once the typed-IR API is available.
+import { defineConfig, transformSteps, type Pass } from "@actio/core";
+
+// Pin every actions/checkout to a specific SHA.
+const pinCheckout: Pass = {
+  name: "pin-checkout",
+  runsAfter: ["fragments"],
+  apply: (ctx) =>
+    transformSteps(ctx, (step) =>
+      step.uses?.startsWith("actions/checkout@")
+        ? { ...step, uses: "actions/checkout@<sha>" }
+        : step,
+    ),
+};
+
+export default defineConfig({ passes: [pinCheckout] });
+```
+
 ## How it works
 
 ```
