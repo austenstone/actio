@@ -251,6 +251,7 @@ so the job can continue.
 actio build [...files]   Compile .actio.yml files into GitHub Actions workflows
 actio check [...files]   Verify generated workflows are up to date (= build --check)
 actio init [file]        Scaffold a starter .actio.yml file
+actio schema             Print the Actio JSON Schema (--out <file> to save locally)
 ```
 
 `build` options:
@@ -262,6 +263,25 @@ actio init [file]        Scaffold a starter .actio.yml file
 | `--stdout` | Write generated YAML to stdout instead of files |
 | `--no-validate` | Skip schema validation of generated output |
 | `--no-header` | Omit the generated-by-Actio banner |
+
+## Editor support
+
+Actio ships a JSON Schema for `.actio.yml`, so the [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) (which bundles `yaml-language-server`) gives you autocomplete, hover docs, and validation for the macro keywords — no custom language server required.
+
+Add this modeline to the top of any `.actio.yml` file (`actio init` adds it for you):
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/austenstone/actio/main/packages/core/schema/actio.schema.json
+```
+
+Prefer a pinned local copy? Write one and point the modeline at it:
+
+```bash
+actio schema --out .actio.schema.json
+# then: # yaml-language-server: $schema=./.actio.schema.json
+```
+
+The schema is also exported from `@actio/core` (`actioSchema()`, `actioSchemaPath`, `ACTIO_SCHEMA_URL`, `SCHEMA_MODELINE`).
 
 ## How it works
 

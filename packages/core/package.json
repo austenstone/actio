@@ -12,7 +12,7 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "schema"],
   "engines": {
     "node": ">=20"
   },

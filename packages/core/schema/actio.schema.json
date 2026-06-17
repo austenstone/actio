@@ -1,0 +1,217 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/austenstone/actio/main/packages/core/schema/actio.schema.json",
+  "title": "Actio workflow (.actio.yml)",
+  "description": "Source language for the Actio transpiler: a GitHub Actions workflow plus Actio macro keywords (fragments/inject, retry, dynamic_matrix, fallback) that compile into standard workflow YAML. Unknown GitHub Actions keys pass through unchanged. See https://github.com/austenstone/actio.",
+  "type": "object",
+  "required": ["on", "jobs"],
+  "additionalProperties": true,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Workflow name shown in the GitHub Actions UI."
+    },
+    "run-name": {
+      "type": "string",
+      "description": "Name for runs generated from this workflow."
+    },
+    "on": {
+      "description": "Events that trigger the workflow. See https://docs.github.com/actions/using-workflows/events-that-trigger-workflows.",
+      "anyOf": [{ "type": "string" }, { "type": "array" }, { "type": "object" }]
+    },
+    "permissions": {
+      "description": "GITHUB_TOKEN permissions granted to the workflow.",
+      "anyOf": [{ "type": "string", "enum": ["read-all", "write-all", "{}"] }, { "type": "object" }]
+    },
+    "env": {
+      "type": "object",
+      "description": "Workflow-level environment variables."
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Default settings applied to all jobs."
+    },
+    "concurrency": {
+      "description": "Limit concurrent runs of this workflow.",
+      "anyOf": [{ "type": "string" }, { "type": "object" }]
+    },
+    "fragments": {
+      "type": "object",
+      "description": "Actio macro. Reusable, named lists of steps. Splice a fragment into a job with `- inject: <name>`. The `fragments` key is stripped from the generated workflow.",
+      "additionalProperties": {
+        "type": "array",
+        "description": "An ordered list of steps to inject wherever this fragment is referenced.",
+        "items": { "$ref": "#/definitions/step" }
+      }
+    },
+    "jobs": {
+      "type": "object",
+      "description": "Map of job id to job definition.",
+      "additionalProperties": { "$ref": "#/definitions/job" }
+    }
+  },
+  "definitions": {
+    "step": {
+      "type": "object",
+      "description": "A workflow step. Unknown keys are allowed (GitHub Actions passthrough).",
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string", "description": "Display name for the step." },
+        "id": { "type": "string", "description": "Unique identifier referenced via `steps.<id>`." },
+        "if": {
+          "type": ["string", "boolean", "number"],
+          "description": "Conditional that determines whether the step runs."
+        },
+        "uses": { "type": "string", "description": "Action to run, e.g. `actions/checkout@v4`." },
+        "run": { "type": "string", "description": "Command(s) to run in the shell." },
+        "shell": { "type": "string", "description": "Shell to use for `run`." },
+        "with": { "type": "object", "description": "Input parameters for the `uses` action." },
+        "env": { "type": "object", "description": "Environment variables for this step." },
+        "working-directory": { "type": "string", "description": "Working directory for `run`." },
+        "continue-on-error": {
+          "type": ["boolean", "string"],
+          "description": "Prevent a failing step from failing the job."
+        },
+        "timeout-minutes": {
+          "type": "number",
+          "description": "Max minutes before the step is cancelled."
+        },
+        "inject": {
+          "type": "string",
+          "description": "Actio macro. Splice in the steps of the named fragment (defined under top-level `fragments:`) at this position. Replaced inline by `actio build`."
+        },
+        "retry": { "$ref": "#/definitions/retry" },
+        "fallback": { "$ref": "#/definitions/fallback" }
+      }
+    },
+    "job": {
+      "type": "object",
+      "description": "A workflow job. Unknown keys are allowed (GitHub Actions passthrough).",
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string", "description": "Display name for the job." },
+        "runs-on": {
+          "description": "Runner that executes the job, e.g. `ubuntu-latest`.",
+          "anyOf": [{ "type": "string" }, { "type": "array" }, { "type": "object" }]
+        },
+        "needs": {
+          "description": "Jobs that must complete before this one runs.",
+          "anyOf": [{ "type": "string" }, { "type": "array" }]
+        },
+        "if": {
+          "type": ["string", "boolean", "number"],
+          "description": "Conditional that determines whether the job runs."
+        },
+        "permissions": {
+          "description": "GITHUB_TOKEN permissions for this job.",
+          "anyOf": [{ "type": "string" }, { "type": "object" }]
+        },
+        "env": { "type": "object", "description": "Environment variables for this job." },
+        "strategy": { "type": "object", "description": "Matrix / fail-fast strategy." },
+        "outputs": { "type": "object", "description": "Outputs published for downstream jobs." },
+        "steps": {
+          "type": "array",
+          "description": "Sequence of tasks for the job.",
+          "items": { "$ref": "#/definitions/step" }
+        },
+        "dynamic_matrix": { "$ref": "#/definitions/dynamicMatrix" },
+        "fallback": { "$ref": "#/definitions/fallback" }
+      }
+    },
+    "retry": {
+      "title": "retry (Actio macro)",
+      "description": "Actio macro. Retry a flaky step with optional backoff; expands into a chain of conditional attempts where attempt N runs only if attempt N-1 failed. Shorthand `retry: 3` is the same as `retry: { attempts: 3 }`.",
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 2,
+          "description": "Number of attempts (minimum 2)."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attempts"],
+          "properties": {
+            "attempts": {
+              "type": "integer",
+              "minimum": 2,
+              "description": "Number of attempts (minimum 2)."
+            },
+            "delay": {
+              "description": "Backoff between attempts: a duration like \"10s\", \"2m\", \"1h\", or a number of seconds. Injects `sleep` steps between attempts.",
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhSMH]?\\s*$",
+                  "examples": ["10s", "2m", "1h"]
+                },
+                { "type": "number", "exclusiveMinimum": 0 }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "fallback": {
+      "title": "fallback (Actio macro)",
+      "description": "Actio macro. A native try/catch. Default (notify): the fallback runs on failure via `if: failure()` but the job still fails. With `recover: true` the guarded step gets `continue-on-error: true` and the fallback keys off `outcome`, so the job can pass.",
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "Fallback steps (notify mode). The job still fails.",
+          "items": { "$ref": "#/definitions/step" }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["steps"],
+          "properties": {
+            "steps": {
+              "type": "array",
+              "description": "Steps to run when the guarded step or job fails.",
+              "items": { "$ref": "#/definitions/step" }
+            },
+            "recover": {
+              "type": "boolean",
+              "description": "When true, swallow the guarded failure (continue-on-error) so the job can continue. Step-level only; ignored on job-level fallback."
+            }
+          }
+        }
+      ]
+    },
+    "dynamicMatrix": {
+      "title": "dynamic_matrix (Actio macro)",
+      "type": "object",
+      "description": "Actio macro. Build a matrix at runtime: `script` prints a JSON array (or `{include:[...]}`) to stdout. Actio generates a setup job that publishes the JSON and wires this job to consume it via `fromJSON()` with a fail-fast:false default and an empty-matrix guard.",
+      "required": ["script"],
+      "additionalProperties": true,
+      "properties": {
+        "script": {
+          "type": "string",
+          "description": "Command or local script path that prints a JSON array (or `{\"include\":[...]}`) to stdout."
+        },
+        "alias": {
+          "type": "string",
+          "description": "Wrap a scalar JSON array under `matrix.<alias>` (referenced as `${{ matrix.<alias> }}`). Omit for raw `{include:[...]}` mode."
+        },
+        "runs-on": {
+          "description": "Runner for the generated setup job. Defaults to the job's `runs-on`, else `ubuntu-latest`.",
+          "anyOf": [{ "type": "string" }, { "type": "array" }, { "type": "object" }]
+        },
+        "shell": {
+          "type": "string",
+          "description": "Shell used to run `script` in the setup job."
+        },
+        "checkout": {
+          "type": "boolean",
+          "description": "Check out the repository in the setup job. Defaults to true when `script` is a local path."
+        },
+        "fail-fast": {
+          "type": "boolean",
+          "description": "Value for `strategy.fail-fast` on the matrix job. Defaults to false."
+        },
+        "id": { "type": "string", "description": "Override the generated setup job id." }
+      }
+    }
+  }
+}
