@@ -17,19 +17,19 @@ export interface BuildOptions {
 const DEFAULT_GLOBS = ["**/*.actio.yml"];
 const IGNORE = ["**/node_modules/**", "**/dist/**", "**/.git/**"];
 
-function outputPathFor(inputFile: string, outDir: string): string {
+export function outputPathFor(inputFile: string, outDir: string): string {
   const base = path.basename(inputFile).replace(/\.actio\.yml$/, ".yml");
   return path.join(outDir, base);
 }
 
-async function discover(patterns: string[], cwd: string): Promise<string[]> {
+export async function discover(patterns: string[], cwd: string): Promise<string[]> {
   const globs = patterns.length > 0 ? patterns : DEFAULT_GLOBS;
   // Allow passing explicit file paths as well as globs.
   const expanded = await glob(globs, { cwd, ignore: IGNORE, dot: false, absolute: false });
   return expanded.sort();
 }
 
-function printDiagnostics(diags: Diagnostic[], source: string): void {
+export function printDiagnostics(diags: Diagnostic[], source: string): void {
   for (const d of diags) {
     const text = formatDiagnostic(d, source);
     const colored = d.severity === "error" ? colorizeError(text) : pc.yellow(text);
@@ -41,14 +41,14 @@ function colorizeError(text: string): string {
   return text.replace(/\berror\b/, pc.red("error"));
 }
 
-interface FileResult {
+export interface FileResult {
   file: string;
   wrote: boolean;
   drift: boolean;
   errored: boolean;
 }
 
-async function buildOne(file: string, cwd: string, opts: BuildOptions): Promise<FileResult> {
+export async function buildOne(file: string, cwd: string, opts: BuildOptions): Promise<FileResult> {
   const abs = path.resolve(cwd, file);
   const source = await readFile(abs, "utf8");
   const result = transpile(source, {
