@@ -1,5 +1,6 @@
 import type { ParseContext } from "../parser.js";
 import { type Step, asArray, clone, isObject, pushDiagnostic } from "./helpers.js";
+import type { Pass } from "./registry.js";
 
 type FragmentMap = Record<string, Step[]>;
 
@@ -100,3 +101,6 @@ export function fragmentsPass(ctx: ParseContext): void {
   }
   delete ctx.data.fragments;
 }
+
+/** Splice reusable `inject:` steps in first, so later passes see real steps. */
+export const fragments: Pass = { name: "fragments", apply: fragmentsPass };

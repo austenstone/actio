@@ -9,6 +9,7 @@ import {
   mergeNeeds,
   pushDiagnostic,
 } from "./helpers.js";
+import type { Pass } from "./registry.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: dynamic config object
 type DM = Record<string, any>;
@@ -140,3 +141,10 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
   }
   ctx.data.jobs = rebuilt;
 }
+
+/** Split jobs and move the (already finalized) steps. Runs last. */
+export const dynamicMatrix: Pass = {
+  name: "dynamic_matrix",
+  runsAfter: ["fragments", "retry", "fallback"],
+  apply: dynamicMatrixPass,
+};

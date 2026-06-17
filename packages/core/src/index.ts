@@ -16,7 +16,20 @@ export {
   parseActio,
   rangeOfPath,
 } from "./parser.js";
-export { type Pass, passes, runPasses } from "./passes/index.js";
+export {
+  type Pass,
+  type PassFn,
+  PassRegistry,
+  applyPasses,
+  builtinPasses,
+  createRegistry,
+  dynamicMatrix,
+  fallback,
+  fragments,
+  retry,
+  runPasses,
+  sortPasses,
+} from "./passes/index.js";
 export {
   ACTIO_SCHEMA_URL,
   SCHEMA_MODELINE,
