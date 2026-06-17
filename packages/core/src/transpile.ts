@@ -1,7 +1,7 @@
 import type { Diagnostic } from "./diagnostics.js";
 import { emitYaml } from "./emit.js";
 import { parseActio } from "./parser.js";
-import { runPasses } from "./passes/index.js";
+import { type Pass, createRegistry, runPasses } from "./passes/index.js";
 import { validateWorkflowYaml } from "./validate.js";
 
 export interface TranspileOptions {
@@ -11,6 +11,8 @@ export interface TranspileOptions {
   header?: boolean;
   /** Validate generated YAML against GitHub's workflow schema. Default true. */
   validate?: boolean;
+  /** Extra transform passes merged into the built-in pipeline (ordered by `runsAfter`). */
+  passes?: Pass[];
 }
 
 export interface TranspileResult {
@@ -32,7 +34,10 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
     return { ok: false, yaml: "", diagnostics: ctx.diagnostics };
   }
 
-  runPasses(ctx);
+  // Merge any caller-supplied passes into the built-in pipeline; ordering is
+  // resolved by the registry from each pass's `runsAfter`.
+  const passes = options.passes?.length ? createRegistry(options.passes).list() : undefined;
+  runPasses(ctx, passes);
 
   const yaml = emitYaml(ctx.data, { header: options.header, fileName });
 

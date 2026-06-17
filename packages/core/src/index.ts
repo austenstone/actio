@@ -1,3 +1,4 @@
+export { type ActioConfig, defineConfig } from "./config.js";
 export {
   type Diagnostic,
   type DiagnosticSource,
