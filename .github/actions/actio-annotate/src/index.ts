@@ -96,7 +96,7 @@ async function run(): Promise<void> {
       file: loc.file,
       startLine: loc.line,
       startColumn: loc.col,
-      title: "Actio: workflow step failed",
+      title: "actio (runtime)",
     });
   };
 
