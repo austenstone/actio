@@ -30,6 +30,7 @@ const baseOpts = (cwd: string): BuildOptions => ({
   validate: true,
   header: false,
   sourceMap: false,
+  annotate: false,
   cwd,
 });
 

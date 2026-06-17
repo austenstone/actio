@@ -24,6 +24,7 @@ function options(cwd: string, overrides: Partial<BuildOptions> = {}): BuildOptio
     validate: true,
     header: true,
     sourceMap: true,
+    annotate: false,
     cwd,
     ...overrides,
   };

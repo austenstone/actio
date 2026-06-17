@@ -298,6 +298,7 @@ actio schema             Print the Actio JSON Schema (--out <file> to save local
 | `--no-validate` | Skip schema validation of generated output |
 | `--no-header` | Omit the generated-by-Actio banner |
 | `--no-source-map` | Do not write a `.yml.map` source map beside each workflow |
+| `--no-annotate` | Do not inject the `actio-annotate` runtime failure-mapping job |
 
 ## Source maps
 
@@ -338,6 +339,41 @@ the CLI are independent of how provenance is sourced.
 The library exposes this too: `transpile(source, { sourceMap: true })` returns a
 `map` field, and with it on, schema-validation diagnostics are remapped back to
 source ranges so code frames line up with your `.actio.yml`.
+
+### Runtime annotations
+
+The source map is only half the story — it also powers failures **in a live
+Actions run**. When source maps are on, `build` appends a small `actio-annotate`
+job at the bottom of every workflow (opt out with `--no-annotate`, or
+`annotate: false` in config):
+
+```yaml
+actio-annotate:
+  name: Actio annotate
+  runs-on: ubuntu-latest
+  needs: [build, workflows]   # every real job
+  if: failure()
+  permissions: { contents: read, actions: read }
+  steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/actio-annotate
+      with: { token: ${{ github.token }} }
+```
+
+When any job fails, that job runs
+[`.github/actions/actio-annotate`](.github/actions/actio-annotate) — a tiny
+bundled TypeScript action. It reads the run's jobs via the API, matches each
+failed step back to its generated path, **prefix-matches the `.yml.map`** (step
+entries are sparse leaves like `jobs.build.steps.2.run`), and emits
+`::error file=…,line=…::` workflow commands. The result: a failed step lights up
+on the exact line of the `.actio.yml` **you** wrote, not the compiled YAML. It
+never fails the run itself — reporting that breaks would only add noise.
+
+Injection is gated on source maps (it needs them to resolve lines); requesting
+`annotate` without a source map logs a warning and skips. The compiler stays
+dumb — a single [`annotate` pass](packages/core/src/passes/annotate.ts) just
+pushes the job — and the action carries all the runtime smarts, with no
+dependency on `@actio/core` so its bundle stays lean.
 
 ### Watch mode
 
@@ -399,6 +435,8 @@ authoring and autocompletion.
 | `validate` | `boolean` | Validate generated YAML against GitHub's schema |
 | `header` | `boolean` | Prepend the generated-by-Actio banner |
 | `files` / `include` | `string[]` | Default glob patterns when no files are passed on the CLI |
+| `sourceMap` | `boolean` | Write a `.yml.map` source map beside each workflow (default `true`) |
+| `annotate` | `boolean` | Inject the `actio-annotate` runtime failure-mapping job (default `true`; needs `sourceMap`) |
 | `passes` | `Pass[]` | Custom transform passes, merged into the built-in pipeline |
 
 ### Precedence

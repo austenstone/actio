@@ -161,4 +161,17 @@ describe("resolveBuildOptions precedence", () => {
     const { options } = resolveBuildOptions({ ...base, config: { passes: [addEnv] } });
     expect(options.passes).toEqual([addEnv]);
   });
+
+  it("defaults annotate on and lets --no-annotate turn it off", () => {
+    expect(resolveBuildOptions({ ...base, config: {} }).options.annotate).toBe(true);
+    expect(resolveBuildOptions({ ...base, config: { annotate: false } }).options.annotate).toBe(
+      false,
+    );
+    const off = resolveBuildOptions({
+      ...base,
+      argv: ["build", "--no-annotate"],
+      config: { annotate: true },
+    });
+    expect(off.options.annotate).toBe(false);
+  });
 });
