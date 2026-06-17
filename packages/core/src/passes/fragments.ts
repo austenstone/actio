@@ -1,5 +1,6 @@
+import { type Job, type Step, cloneNode, visitJobs } from "../ir.js";
 import type { ParseContext } from "../parser.js";
-import { type Step, asArray, clone, isObject, pushDiagnostic } from "./helpers.js";
+import { asArray, isObject, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
 type FragmentMap = Record<string, Step[]>;
@@ -50,8 +51,8 @@ function expandList(
         pushDiagnostic(ctx, "error", `Fragment cycle detected: ${[...stack, name].join(" -> ")}`);
         continue;
       }
-      const expanded = expandList(clone(fragments[name]), ctx, fragments, [...stack, name]);
-      out.push(...expanded);
+      const copies = fragments[name].map((s) => cloneNode(ctx, s));
+      out.push(...expandList(copies, ctx, fragments, [...stack, name]));
     } else {
       if (isObject(step) && step.fallback != null) {
         expandFallbackInPlace(step, ctx, fragments, stack);
@@ -64,8 +65,7 @@ function expandList(
 
 /** Expand inject entries that live inside a step- or job-level `fallback` block. */
 function expandFallbackInPlace(
-  // biome-ignore lint/suspicious/noExplicitAny: dynamic container
-  container: Record<string, any>,
+  container: Step | Job,
   ctx: ParseContext,
   fragments: FragmentMap,
   stack: string[],
@@ -85,20 +85,14 @@ function expandFallbackInPlace(
  */
 export function fragmentsPass(ctx: ParseContext): void {
   const fragments = getFragments(ctx);
-  const jobs = ctx.data.jobs;
-  if (isObject(jobs)) {
-    for (const job of Object.values(jobs)) {
-      if (!isObject(job)) continue;
-      // biome-ignore lint/suspicious/noExplicitAny: dynamic job
-      const j = job as Record<string, any>;
-      if (Array.isArray(j.steps)) {
-        j.steps = expandList(j.steps, ctx, fragments, []);
-      }
-      if (j.fallback != null) {
-        expandFallbackInPlace(j, ctx, fragments, []);
-      }
+  visitJobs(ctx, ({ job }) => {
+    if (Array.isArray(job.steps)) {
+      job.steps = expandList(job.steps, ctx, fragments, []);
     }
-  }
+    if (job.fallback != null) {
+      expandFallbackInPlace(job, ctx, fragments, []);
+    }
+  });
   delete ctx.data.fragments;
 }
 

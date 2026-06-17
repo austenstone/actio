@@ -418,6 +418,21 @@ adding a feature is: drop in a new file, declare what it runs after, register it
 `PassRegistry` (exported from `@actio/core`) lets external code add or remove
 passes without editing core.
 
+### Typed IR and provenance
+
+Passes operate on a small **typed IR** ([`packages/core/src/ir.ts`](packages/core/src/ir.ts))
+that wraps `ctx.data` rather than replacing it — the emitted YAML stays
+byte-for-byte identical. `workflow(ctx)`, `visitJobs`, `visitSteps`, and the
+in-place `transformSteps` fan-out helper give passes (and third-party plugins)
+typed `Job`/`Step` views instead of raw `Record<string, any>`.
+
+Every node can carry an **origin** — the source path/range it came from — held in
+a `WeakMap` side-table (`ctx.origins`) keyed by object identity, so it survives
+index shifts and never serializes. The visitor records origins on first sight;
+`cloneNode` and `deriveNode` propagate them so generated nodes (retry attempts and
+sleep steps, the `dynamic_matrix` setup job) map back to their macro source. This
+is the hook source maps build on. Look up an origin with `originOf(ctx, node)`.
+
 ## Packages
 
 | Package | Description |

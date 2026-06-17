@@ -11,6 +11,24 @@ export {
 } from "./diagnostics.js";
 export { type EmitOptions, emitYaml, generatedHeader } from "./emit.js";
 export {
+  type Job,
+  type JobView,
+  type Origin,
+  type Step,
+  type StepView,
+  type Workflow,
+  cloneNode,
+  deriveNode,
+  originOf,
+  recordOrigin,
+  seedOrigins,
+  setOrigin,
+  transformSteps,
+  visitJobs,
+  visitSteps,
+  workflow,
+} from "./ir.js";
+export {
   type ParseContext,
   type Path,
   type WorkflowData,

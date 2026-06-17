@@ -1,9 +1,7 @@
+import { type Job, type Step, cloneNode, deriveNode, transformSteps, visitJobs } from "../ir.js";
 import type { ParseContext } from "../parser.js";
 import {
-  type Job,
-  type Step,
   asArray,
-  clone,
   collectUsedStepIds,
   combineIf,
   ensureStepId,
@@ -40,40 +38,29 @@ function applyIf(step: Step, guard: string): Step {
 }
 
 /** Expand `fallback:` keys nested on individual steps into recover (try/catch) logic. */
-function processStepFallbacks(job: Job, jobId: string): void {
+function processStepFallbacks(ctx: ParseContext, jobId: string, job: Job): void {
   if (!Array.isArray(job.steps)) return;
   const used = collectUsedStepIds(job.steps);
-  const out: Step[] = [];
-  job.steps.forEach((step: Step, idx: number) => {
-    if (!isObject(step) || step.fallback == null) {
-      out.push(step);
-      return;
-    }
+  transformSteps(ctx, jobId, job, (step, idx) => {
+    if (!isObject(step) || step.fallback == null) return [step];
     const { steps: fbSteps, recover } = normalizeStepFallback(step.fallback);
     delete step.fallback;
-    if (fbSteps.length === 0) {
-      out.push(step);
-      return;
-    }
+    if (fbSteps.length === 0) return [step];
+
     const id = ensureStepId(step, used, `actio_${jobId}_step_${idx + 1}`);
-    if (recover) {
+    const guard = recover
+      ? `steps.${id}.outcome == 'failure'`
+      : `failure() && steps.${id}.conclusion == 'failure'`;
+    if (recover && step["continue-on-error"] === undefined) {
       // True try/catch: swallow the failure so the job can continue.
-      if (step["continue-on-error"] === undefined) step["continue-on-error"] = true;
-      out.push(step);
-      for (const f of fbSteps) {
-        out.push(applyIf(clone(f), `steps.${id}.outcome == 'failure'`));
-      }
-    } else {
-      // Notify/cleanup (default): the job still fails. `failure()` is required for
-      // the step to run at all after a failure; the conclusion check scopes it to
-      // this specific step.
-      out.push(step);
-      for (const f of fbSteps) {
-        out.push(applyIf(clone(f), `failure() && steps.${id}.conclusion == 'failure'`));
-      }
+      step["continue-on-error"] = true;
     }
+    const out: Step[] = [step];
+    for (const f of fbSteps) {
+      out.push(applyIf(deriveNode(ctx, step, cloneNode(ctx, f)), guard));
+    }
+    return out;
   });
-  job.steps = out;
 }
 
 /** Expand a job-level `fallback:` block into notify steps gated on `failure()`. */
@@ -91,7 +78,7 @@ function processJobFallback(ctx: ParseContext, job: Job, jobId: string): void {
   }
   if (!Array.isArray(job.steps)) job.steps = [];
   for (const f of fbSteps) {
-    job.steps.push(applyIf(clone(f), "failure()"));
+    job.steps.push(applyIf(deriveNode(ctx, job, cloneNode(ctx, f)), "failure()"));
   }
 }
 
@@ -103,13 +90,10 @@ function processJobFallback(ctx: ParseContext, job: Job, jobId: string): void {
  *   (the job still fails).
  */
 export function fallbackPass(ctx: ParseContext): void {
-  const jobs = ctx.data.jobs;
-  if (!isObject(jobs)) return;
-  for (const [jobId, job] of Object.entries(jobs)) {
-    if (!isObject(job)) continue;
-    processStepFallbacks(job as Job, jobId);
-    processJobFallback(ctx, job as Job, jobId);
-  }
+  visitJobs(ctx, ({ id: jobId, job }) => {
+    processStepFallbacks(ctx, jobId, job);
+    processJobFallback(ctx, job, jobId);
+  });
 }
 
 /** Wrap steps with try/catch before dynamic_matrix moves them between jobs. */

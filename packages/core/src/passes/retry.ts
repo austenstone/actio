@@ -1,14 +1,6 @@
+import { type Job, type Step, cloneNode, deriveNode, transformSteps, visitJobs } from "../ir.js";
 import type { ParseContext } from "../parser.js";
-import {
-  type Job,
-  type Step,
-  clone,
-  collectUsedStepIds,
-  combineIf,
-  isObject,
-  pushDiagnostic,
-  slugify,
-} from "./helpers.js";
+import { collectUsedStepIds, combineIf, isObject, pushDiagnostic, slugify } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
 const DEFAULT_ATTEMPTS = 3;
@@ -73,28 +65,22 @@ function formatSeconds(seconds: number): string {
 }
 
 /** Expand step-level `retry:` blocks into a chain of conditional attempts. */
-function processStepRetries(job: Job, jobId: string): void {
+function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
   if (!Array.isArray(job.steps)) return;
   const used = collectUsedStepIds(job.steps);
-  const out: Step[] = [];
 
-  job.steps.forEach((step: Step, idx: number) => {
-    if (!isObject(step) || step.retry == null) {
-      out.push(step);
-      return;
-    }
+  transformSteps(ctx, jobId, job, (step, idx) => {
+    if (!isObject(step) || step.retry == null) return [step];
     const cfg = normalizeRetry(step.retry);
     delete step.retry;
-    if (cfg == null) {
-      out.push(step);
-      return;
-    }
+    if (cfg == null) return [step];
 
     const label = stepLabel(step);
     const slug = slugify(label);
     const base = slug ? `step_${slug}` : `actio_${jobId}_step_${idx + 1}`;
     const originalIf = typeof step.if === "string" ? step.if : undefined;
     const { attempts, delaySeconds, delayLabel } = cfg;
+    const out: Step[] = [];
 
     let prevId: string | undefined;
     for (let n = 1; n <= attempts; n++) {
@@ -103,15 +89,15 @@ function processStepRetries(job: Job, jobId: string): void {
       const condition = combineIf(originalIf, guard);
 
       if (delaySeconds != null && prevId) {
-        const sleepStep: Step = {
+        const sleepStep: Step = deriveNode(ctx, step, {
           name: `Retry backoff (${delayLabel ?? `${delaySeconds}s`}) before attempt ${n}/${attempts}`,
           run: `sleep ${formatSeconds(delaySeconds)}`,
-        };
+        });
         if (condition) sleepStep.if = condition;
         out.push(sleepStep);
       }
 
-      const attempt = clone(step);
+      const attempt = cloneNode(ctx, step);
       attempt.name = `${label} (attempt ${n}/${attempts})`;
       let id = `${base}_attempt_${n}`;
       let dedupe = 2;
@@ -136,9 +122,8 @@ function processStepRetries(job: Job, jobId: string): void {
       out.push(attempt);
       prevId = id;
     }
+    return out;
   });
-
-  job.steps = out;
 }
 
 /**
@@ -152,22 +137,18 @@ function processStepRetries(job: Job, jobId: string): void {
  * fallback (preserved only on the final attempt) wires up normally.
  */
 export function retryPass(ctx: ParseContext): void {
-  const jobs = ctx.data.jobs;
-  if (!isObject(jobs)) return;
-  for (const [jobId, job] of Object.entries(jobs)) {
-    if (!isObject(job)) continue;
-    const j = job as Job;
-    if (j.retry != null) {
+  visitJobs(ctx, ({ id: jobId, job }) => {
+    if (job.retry != null) {
       pushDiagnostic(
         ctx,
         "warning",
         `Job "${jobId}": retry is only supported on steps, not jobs; ignoring`,
         ["jobs", jobId, "retry"],
       );
-      delete j.retry;
+      delete job.retry;
     }
-    processStepRetries(j, jobId);
-  }
+    processStepRetries(ctx, jobId, job);
+  });
 }
 
 /** Fan out retry attempts before fallback wraps the final attempt. */

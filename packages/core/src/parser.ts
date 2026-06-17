@@ -5,6 +5,19 @@ import type { Diagnostic, Range } from "./diagnostics.js";
 // biome-ignore lint/suspicious/noExplicitAny: the workflow model is dynamic by nature
 export type WorkflowData = Record<string, any>;
 
+export type Path = (string | number)[];
+
+/**
+ * Where an IR node came from in the original source. `path` indexes the parsed
+ * document and stays stable as passes mutate `ctx.data`, so it remains a valid
+ * argument to `rangeOfPath` even after a node is moved. This is the hook source
+ * maps build on.
+ */
+export interface Origin {
+  path: Path;
+  range?: Range;
+}
+
 export interface ParseContext {
   fileName: string;
   source: string;
@@ -13,9 +26,9 @@ export interface ParseContext {
   /** Mutable plain-JS model that passes transform. */
   data: WorkflowData;
   diagnostics: Diagnostic[];
+  /** Per-node provenance side-table; never serialized. Populated by the IR layer. */
+  origins: WeakMap<object, Origin>;
 }
-
-export type Path = (string | number)[];
 
 function offsetToPosition(lc: LineCounter, offset: number) {
   const { line, col } = lc.linePos(offset);
@@ -70,5 +83,5 @@ export function parseActio(source: string, fileName: string): ParseContext {
   }
 
   const data = (doc.toJS({ maxAliasCount: -1 }) ?? {}) as WorkflowData;
-  return { fileName, source, doc, lineCounter, data, diagnostics };
+  return { fileName, source, doc, lineCounter, data, diagnostics, origins: new WeakMap() };
 }
