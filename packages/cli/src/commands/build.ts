@@ -12,6 +12,8 @@ export interface BuildOptions {
   validate: boolean;
   header: boolean;
   sourceMap: boolean;
+  /** Inject the `actio-annotate` runtime failure-mapping job. Requires `sourceMap`. */
+  annotate: boolean;
   cwd?: string;
   /** Extra transform passes (from the config file) merged into the built-in pipeline. */
   passes?: Pass[];
@@ -64,6 +66,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     validate: opts.validate,
     passes: opts.passes,
     sourceMap: opts.sourceMap,
+    annotate: opts.annotate,
   });
 
   if (result.diagnostics.length > 0) {

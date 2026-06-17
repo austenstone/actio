@@ -83,6 +83,7 @@ export function resolveBuildOptions(args: {
     validate: passed("--no-validate") ? false : (config.validate ?? true),
     header: passed("--no-header") ? false : (config.header ?? true),
     sourceMap: passed("--no-source-map") ? false : (config.sourceMap ?? true),
+    annotate: passed("--no-annotate") ? false : (config.annotate ?? true),
     passes: config.passes,
   };
 

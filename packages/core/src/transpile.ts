@@ -1,6 +1,7 @@
 import type { Diagnostic } from "./diagnostics.js";
 import { emitYaml, generatedHeader } from "./emit.js";
 import { parseActio } from "./parser.js";
+import { annotate } from "./passes/annotate.js";
 import { createRegistry, type Pass, runPasses } from "./passes/index.js";
 import { buildSourceMap, resolveGeneratedLine, type SourceMap } from "./sourcemap.js";
 import { validateWorkflowYaml } from "./validate.js";
@@ -16,6 +17,11 @@ export interface TranspileOptions {
   passes?: Pass[];
   /** Produce a source map and remap schema diagnostics back to source. Default false. */
   sourceMap?: boolean;
+  /**
+   * Append the `actio-annotate` job that maps runtime failures back to source.
+   * Requires `sourceMap`; ignored (with a warning) without it. Default false.
+   */
+  annotate?: boolean;
 }
 
 export interface TranspileResult {
@@ -48,9 +54,26 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
     return { ok: false, yaml: "", diagnostics: ctx.diagnostics };
   }
 
+  // Annotation injection needs the source map to resolve failures at runtime.
+  const wantAnnotate = options.annotate === true;
+  const enableAnnotate = wantAnnotate && options.sourceMap === true;
+  if (wantAnnotate && !options.sourceMap) {
+    ctx.diagnostics.push({
+      severity: "warning",
+      source: "actio",
+      file: fileName,
+      message: "annotate requires sourceMap; skipping the actio-annotate job",
+    });
+  }
+
   // Merge any caller-supplied passes into the built-in pipeline; ordering is
   // resolved by the registry from each pass's `runsAfter`.
-  const passes = options.passes?.length ? createRegistry(options.passes).list() : undefined;
+  let passes: Pass[] | undefined;
+  if (options.passes?.length || enableAnnotate) {
+    const registry = createRegistry(options.passes ?? []);
+    if (enableAnnotate) registry.register(annotate);
+    passes = registry.list();
+  }
   runPasses(ctx, passes);
 
   const body = emitYaml(ctx.data, { header: false });

@@ -14,6 +14,12 @@ export interface ActioConfig {
   header?: boolean;
   /** Emit a sidecar `<name>.yml.map` source map next to each workflow. Default true. */
   sourceMap?: boolean;
+  /**
+   * Append an `actio-annotate` job that, on failure, maps the failed step back
+   * to its `.actio.yml` source line and emits workflow annotations. Requires the
+   * source map. Default true.
+   */
+  annotate?: boolean;
   /** Glob patterns of `.actio.yml` files to compile when none are passed on the CLI. */
   files?: string[];
   /** Alias for `files`. */

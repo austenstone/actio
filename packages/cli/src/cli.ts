@@ -67,6 +67,7 @@ cli
   .option("--no-validate", "Skip schema validation of generated workflows")
   .option("--no-header", "Omit the generated-by-Actio banner")
   .option("--no-source-map", "Do not write a .yml.map source map beside each workflow")
+  .option("--no-annotate", "Do not inject the actio-annotate runtime failure-mapping job")
   .action(async (files: string[], flags: CliBuildFlags) => {
     if (flags.watch) {
       await startWatch(files, flags);
@@ -98,6 +99,7 @@ cli
   .option("--no-validate", "Skip schema validation of generated workflows")
   .option("--no-header", "Omit the generated-by-Actio banner")
   .option("--no-source-map", "Ignore the .yml.map source map in the drift check")
+  .option("--no-annotate", "Do not inject the actio-annotate runtime failure-mapping job")
   .action(async (files: string[], flags: CliBuildFlags) => {
     const { patterns, options } = await resolveOptions(files, flags, true);
     process.exitCode = await runBuild(patterns, options);

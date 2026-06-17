@@ -22,6 +22,7 @@ export function createRegistry(extra: Pass[] = []): PassRegistry {
   return new PassRegistry([...builtinPasses, ...extra]);
 }
 
+export { ANNOTATE_ACTION, ANNOTATE_JOB_ID, annotate } from "./annotate.js";
 export {
   applyPasses,
   type Pass,

@@ -36,6 +36,9 @@ export {
   type WorkflowData,
 } from "./parser.js";
 export {
+  ANNOTATE_ACTION,
+  ANNOTATE_JOB_ID,
+  annotate,
   applyPasses,
   builtinPasses,
   createRegistry,
