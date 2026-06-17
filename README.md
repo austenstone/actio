@@ -294,6 +294,75 @@ actio schema --out .actio.schema.json
 
 The schema is also exported from `@actio/core` (`actioSchema()`, `actioSchemaPath`, `ACTIO_SCHEMA_URL`, `SCHEMA_MODELINE`).
 
+## Configuration
+
+For anything beyond flags — and to register **custom passes** — drop an
+`actio.config` file in your project. Actio auto-discovers it by walking up from
+the current directory, so it works from any subfolder. Supported formats:
+`actio.config.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs`, `.json` (TS/ESM are
+loaded at runtime via [jiti](https://github.com/unjs/jiti) — no build step).
+
+```ts
+// actio.config.ts
+import { defineConfig } from "@actio/core"; // also re-exported from "@actio/cli/config"
+
+export default defineConfig({
+  outDir: ".github/workflows",
+  validate: true,
+  header: true,
+  files: ["**/*.actio.yml"], // `include` is accepted as an alias
+  passes: [],                // custom transform passes (see below)
+});
+```
+
+`defineConfig()` is an identity helper — it exists purely for type-safe
+authoring and autocompletion.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `outDir` | `string` | Output directory for generated workflows |
+| `validate` | `boolean` | Validate generated YAML against GitHub's schema |
+| `header` | `boolean` | Prepend the generated-by-Actio banner |
+| `files` / `include` | `string[]` | Default glob patterns when no files are passed on the CLI |
+| `passes` | `Pass[]` | Custom transform passes, merged into the built-in pipeline |
+
+### Precedence
+
+Settings resolve **explicit CLI flag → config file → built-in default**, in that
+order. Passing `--out-dir build/` always wins over the config's `outDir`, which
+in turn wins over the `.github/workflows` default. Positional file globs on the
+CLI override `files`/`include` from the config.
+
+### Custom passes
+
+The `passes` field is the headline feature: a pass you supply is **merged** into
+the built-in pipeline (not replacing it), and the final order is still derived by
+topologically sorting every pass's `runsAfter` — so your pass slots in wherever
+its dependencies say it should. A pass is a `{ name, runsAfter?, apply }`
+descriptor; `apply(ctx)` mutates `ctx.data` (the parsed workflow object) in place.
+
+```ts
+// actio.config.ts
+import { defineConfig, type Pass } from "@actio/core";
+
+// Stamp a global env var onto every generated workflow.
+const stampEnv: Pass = {
+  name: "stamp-env",
+  runsAfter: ["fragments"],
+  apply: (ctx) => {
+    ctx.data.env = { BUILT_BY: "actio", ...(ctx.data.env as object) };
+  },
+};
+
+export default defineConfig({
+  passes: [stampEnv],
+});
+```
+
+Now `actio build` runs `stampEnv` as part of the pipeline — no fork of core
+required. Pass names must be unique (Actio throws on a collision with a
+built-in or another custom pass).
+
 ## How it works
 
 ```
