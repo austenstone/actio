@@ -1,0 +1,31 @@
+name: Monorepo CI
+on: [push]
+
+fragments:
+  setup_node_env:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+jobs:
+  test_changed_services:
+    runs-on: ubuntu-latest
+
+    dynamic_matrix:
+      script: ./scripts/get-changed-dirs.sh
+      alias: service
+
+    steps:
+      - inject: setup_node_env
+
+      - name: Run Tests
+        run: |
+          cd ${{ matrix.service }}
+          npm install && npm test
+
+        fallback:
+          - name: Alert Slack on Failure
+            uses: slackapi/slack-github-action@v1.24.0
+            with:
+              payload: '{"text":"Tests failed for ${{ matrix.service }}"}'

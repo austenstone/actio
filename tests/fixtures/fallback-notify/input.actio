@@ -1,0 +1,11 @@
+name: Fallback Notify
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy
+        run: ./deploy.sh
+        fallback:
+          - name: Notify
+            run: ./notify.sh failure

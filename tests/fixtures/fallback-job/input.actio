@@ -1,0 +1,11 @@
+name: Fallback Job
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        run: make build
+    fallback:
+      - name: Report failure
+        run: ./report.sh

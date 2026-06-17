@@ -1,0 +1,32 @@
+{
+  "name": "actio-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Actio — a transpiler that compiles a .actio YAML-superset into standard GitHub Actions workflows",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "npm run build -w @actio/core && npm run build -w @actio/cli",
+    "typecheck": "npm run typecheck -w @actio/core && npm run typecheck -w @actio/cli",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.10.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "allowScripts": {
+    "@biomejs/biome@1.9.4": true,
+    "esbuild@0.27.7": true,
+    "esbuild@0.21.5": true
+  }
+}

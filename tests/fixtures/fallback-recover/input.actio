@@ -1,0 +1,13 @@
+name: Fallback Recover
+on: [push]
+jobs:
+  flaky:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Flaky step
+        run: ./maybe-fails.sh
+        fallback:
+          recover: true
+          steps:
+            - name: Cleanup and continue
+              run: ./cleanup.sh

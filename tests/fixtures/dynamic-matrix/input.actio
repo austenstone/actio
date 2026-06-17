@@ -1,0 +1,10 @@
+name: Dynamic Matrix
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      script: ./scripts/list.sh
+      alias: shard
+    steps:
+      - run: ./run-shard.sh ${{ matrix.shard }}

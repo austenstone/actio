@@ -1,0 +1,31 @@
+{
+  "name": "@actio/core",
+  "version": "0.1.0",
+  "description": "Actio transpiler engine — compiles .actio (a GitHub Actions YAML superset) into standard workflow YAML",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@actions/workflow-parser": "^0.3.58",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

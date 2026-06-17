@@ -1,0 +1,28 @@
+{
+  "name": "@actio/cli",
+  "version": "0.1.0",
+  "description": "Actio CLI — compile .actio files into GitHub Actions workflows",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "actio": "dist/cli.js"
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@actio/core": "*",
+    "cac": "^6.7.14",
+    "picocolors": "^1.1.1",
+    "tinyglobby": "^0.2.10"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}
