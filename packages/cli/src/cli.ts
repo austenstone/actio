@@ -4,6 +4,7 @@ import { writeFile } from "node:fs/promises";
 import { cac } from "cac";
 import pc from "picocolors";
 import { runBuild } from "./commands/build.js";
+import { runSchema } from "./commands/schema.js";
 import { STARTER_ACTIO } from "./starter.js";
 
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
@@ -69,6 +70,13 @@ cli
     }
     await writeFile(file, STARTER_ACTIO, "utf8");
     process.stderr.write(`${pc.green("✓")} created ${file}\n`);
+  });
+
+cli
+  .command("schema", "Print the Actio JSON Schema (or write it locally with --out)")
+  .option("--out <file>", "Write the schema to a local file instead of stdout")
+  .action(async (flags: { out?: string }) => {
+    process.exitCode = await runSchema(flags.out);
   });
 
 cli.help();

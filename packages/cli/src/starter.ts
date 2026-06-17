@@ -1,4 +1,7 @@
-export const STARTER_ACTIO = `name: CI
+import { SCHEMA_MODELINE } from "@actio/core";
+
+export const STARTER_ACTIO = `${SCHEMA_MODELINE}
+name: CI
 on: [push]
 
 fragments:
