@@ -1,7 +1,7 @@
-import { LineCounter, type Node, isMap, isScalar, isSeq, parseDocument } from "yaml";
+import { isMap, isScalar, isSeq, LineCounter, type Node, parseDocument } from "yaml";
 import type { Position, Range } from "./diagnostics.js";
 import { originOf } from "./ir.js";
-import { type ParseContext, type Path, type WorkflowData, rangeOfPath } from "./parser.js";
+import { type ParseContext, type Path, rangeOfPath, type WorkflowData } from "./parser.js";
 
 /**
  * Source maps are reconstructed at emit time rather than threaded through the
@@ -64,7 +64,9 @@ function walk(node: Node | null, path: Path, lc: LineCounter, visit: Visitor): v
       walk(pair.value as Node | null, [...path, String(key.value)], lc, visit);
     }
   } else if (isSeq(node)) {
-    node.items.forEach((item, i) => walk(item as Node | null, [...path, i], lc, visit));
+    node.items.forEach((item, i) => {
+      walk(item as Node | null, [...path, i], lc, visit);
+    });
   }
 }
 

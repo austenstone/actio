@@ -2,7 +2,7 @@ import type { ParseContext } from "../parser.js";
 import { dynamicMatrix } from "./dynamicMatrix.js";
 import { fallback } from "./fallback.js";
 import { fragments } from "./fragments.js";
-import { type Pass, PassRegistry, applyPasses } from "./registry.js";
+import { applyPasses, type Pass, PassRegistry } from "./registry.js";
 import { retry } from "./retry.js";
 
 /**
@@ -23,10 +23,10 @@ export function createRegistry(extra: Pass[] = []): PassRegistry {
 }
 
 export {
+  applyPasses,
   type Pass,
   type PassFn,
   PassRegistry,
-  applyPasses,
   sortPasses,
 } from "./registry.js";
 export { dynamicMatrix, fallback, fragments, retry };

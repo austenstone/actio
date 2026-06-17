@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { BuildOptions } from "./build.js";
-import { type RebuildSummary, type WatchController, runWatch } from "./watch.js";
+import { type RebuildSummary, runWatch, type WatchController } from "./watch.js";
 
 const SOURCE_A = `name: CI
 on: [push]

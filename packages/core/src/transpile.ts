@@ -1,8 +1,8 @@
 import type { Diagnostic } from "./diagnostics.js";
 import { emitYaml, generatedHeader } from "./emit.js";
 import { parseActio } from "./parser.js";
-import { type Pass, createRegistry, runPasses } from "./passes/index.js";
-import { type SourceMap, buildSourceMap, resolveGeneratedLine } from "./sourcemap.js";
+import { createRegistry, type Pass, runPasses } from "./passes/index.js";
+import { buildSourceMap, resolveGeneratedLine, type SourceMap } from "./sourcemap.js";
 import { validateWorkflowYaml } from "./validate.js";
 
 export interface TranspileOptions {

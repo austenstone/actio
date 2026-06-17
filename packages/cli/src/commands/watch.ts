@@ -1,7 +1,7 @@
 import path from "node:path";
 import chokidar from "chokidar";
 import pc from "picocolors";
-import { type BuildOptions, type FileResult, buildOne, discover } from "./build.js";
+import { type BuildOptions, buildOne, discover, type FileResult } from "./build.js";
 
 export interface RebuildSummary {
   results: FileResult[];

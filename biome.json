@@ -1,19 +1,18 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
     "useIgnoreFile": true
   },
-  "organizeImports": {
-    "enabled": true
-  },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "suspicious": {
-        "noConsoleLog": "off"
+        "noConsole": { "level": "off", "options": { "allow": ["log"] } },
+        "noTemplateCurlyInString": "off"
       },
       "performance": {
         "noDelete": "off"
@@ -30,6 +29,6 @@
     "lineWidth": 100
   },
   "files": {
-    "ignore": ["dist", "node_modules", "coverage", "**/*.yml", "**/*.yaml"]
+    "includes": ["**", "!**/dist", "!**/node_modules", "!**/coverage", "!**/*.yml", "!**/*.yaml"]
   }
 }

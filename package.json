@@ -7,7 +7,9 @@
   "engines": {
     "node": ">=20"
   },
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build -w @actio/core && npm run build -w @actio/cli",
     "build:workflows": "node packages/cli/dist/cli.js build ci.actio.yml",
@@ -20,16 +22,18 @@
     "format": "biome format --write ."
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@types/node": "^22.10.0",
+    "@biomejs/biome": "^2.5.0",
+    "@types/node": "^25.9.3",
     "ajv": "^8.20.0",
-    "tsup": "^8.3.5",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
   },
   "allowScripts": {
-    "@biomejs/biome@1.9.4": true,
-    "esbuild@0.27.7": true,
-    "esbuild@0.21.5": true
+    "@biomejs/biome@2.5.0": true,
+    "esbuild@0.28.1": true
   }
 }

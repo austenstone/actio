@@ -1,4 +1,4 @@
-import { type Job, type Step, deriveNode } from "../ir.js";
+import { deriveNode, type Job, type Step } from "../ir.js";
 import type { ParseContext } from "../parser.js";
 import {
   asArray,

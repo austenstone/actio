@@ -12,7 +12,10 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "schema"],
+  "files": [
+    "dist",
+    "schema"
+  ],
   "engines": {
     "node": ">=20"
   },
@@ -22,10 +25,10 @@
   },
   "dependencies": {
     "@actions/workflow-parser": "^0.3.58",
-    "yaml": "^2.6.1"
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "tsup": "^8.3.5",
-    "typescript": "^5.7.2"
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3"
   }
 }

@@ -1,4 +1,4 @@
-import { type ToStringOptions, stringify } from "yaml";
+import { stringify, type ToStringOptions } from "yaml";
 import type { WorkflowData } from "./parser.js";
 
 export interface EmitOptions {

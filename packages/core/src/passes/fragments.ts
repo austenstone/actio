@@ -1,4 +1,4 @@
-import { type Job, type Step, cloneNode, visitJobs } from "../ir.js";
+import { cloneNode, type Job, type Step, visitJobs } from "../ir.js";
 import type { ParseContext } from "../parser.js";
 import { asArray, isObject, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { type Diagnostic, type Pass, formatDiagnostic, transpile } from "@actio/core";
+import { type Diagnostic, formatDiagnostic, type Pass, transpile } from "@actio/core";
 import pc from "picocolors";
 import { glob } from "tinyglobby";
 
