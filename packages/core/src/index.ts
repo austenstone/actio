@@ -21,6 +21,7 @@ export {
   deriveNode,
   originOf,
   recordOrigin,
+  seedOrigins,
   setOrigin,
   transformSteps,
   visitJobs,

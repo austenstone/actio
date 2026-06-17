@@ -1,3 +1,4 @@
+import { seedOrigins } from "../ir.js";
 import type { ParseContext } from "../parser.js";
 
 /** The transform a pass performs. Mutates `ctx.data` in place. */
@@ -48,6 +49,7 @@ export function sortPasses(passes: Pass[]): Pass[] {
 
 /** Sort the given passes, then run each against `ctx`. */
 export function applyPasses(ctx: ParseContext, passes: Pass[]): void {
+  seedOrigins(ctx);
   for (const pass of sortPasses(passes)) {
     pass.apply(ctx);
   }

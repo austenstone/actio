@@ -106,6 +106,38 @@ export function deriveNode<T extends object>(ctx: ParseContext, from: object, no
 
 // --- traversal ------------------------------------------------------------
 
+/**
+ * Pin origins for every original job, step and fragment step before any pass
+ * mutates the model. Origins are keyed by object identity, so once seeded they
+ * survive the index shifts that passes cause (splicing, fan-out, reordering) —
+ * a step that moves keeps pointing at its true source location. Idempotent.
+ */
+export function seedOrigins(ctx: ParseContext): void {
+  if (!ctx.data || !ctx.origins) return;
+  for (const [id, job] of Object.entries(jobsOf(ctx))) {
+    if (!isObject(job)) continue;
+    recordOrigin(ctx, job, ["jobs", id]);
+    const steps = (job as Job).steps;
+    if (Array.isArray(steps)) {
+      steps.forEach((step, i) => {
+        if (isObject(step)) recordOrigin(ctx, step, ["jobs", id, "steps", i]);
+      });
+    }
+  }
+  const frags = workflow(ctx).fragments;
+  if (isObject(frags)) {
+    for (const [name, value] of Object.entries(frags)) {
+      if (Array.isArray(value)) {
+        value.forEach((step, i) => {
+          if (isObject(step)) recordOrigin(ctx, step, ["fragments", name, i]);
+        });
+      } else if (isObject(value)) {
+        recordOrigin(ctx, value, ["fragments", name]);
+      }
+    }
+  }
+}
+
 export interface JobView {
   id: string;
   job: Job;
