@@ -29,6 +29,7 @@ const baseOpts = (cwd: string): BuildOptions => ({
   stdout: false,
   validate: true,
   header: false,
+  sourceMap: false,
   cwd,
 });
 

@@ -59,6 +59,7 @@ cli
   .option("-w, --watch", "Rebuild on change and keep running (like tsc --watch)")
   .option("--no-validate", "Skip schema validation of generated workflows")
   .option("--no-header", "Omit the generated-by-Actio banner")
+  .option("--no-source-map", "Do not write a .yml.map source map beside each workflow")
   .action(async (files: string[], flags: CliBuildFlags) => {
     if (flags.watch) {
       await startWatch(files, flags);
@@ -87,6 +88,7 @@ cli
   .option("--out-dir <dir>", "Output directory for generated workflows")
   .option("--no-validate", "Skip schema validation of generated workflows")
   .option("--no-header", "Omit the generated-by-Actio banner")
+  .option("--no-source-map", "Ignore the .yml.map source map in the drift check")
   .action(async (files: string[], flags: CliBuildFlags) => {
     const { patterns, options } = await resolveOptions(files, flags, true);
     process.exitCode = await runBuild(patterns, options);

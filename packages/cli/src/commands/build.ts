@@ -11,6 +11,7 @@ export interface BuildOptions {
   stdout: boolean;
   validate: boolean;
   header: boolean;
+  sourceMap: boolean;
   cwd?: string;
   /** Extra transform passes (from the config file) merged into the built-in pipeline. */
   passes?: Pass[];
@@ -22,6 +23,10 @@ const IGNORE = ["**/node_modules/**", "**/dist/**", "**/.git/**"];
 export function outputPathFor(inputFile: string, outDir: string): string {
   const base = path.basename(inputFile).replace(/\.actio\.yml$/, ".yml");
   return path.join(outDir, base);
+}
+
+function serializeMap(map: object): string {
+  return `${JSON.stringify(map, null, 2)}\n`;
 }
 
 export async function discover(patterns: string[], cwd: string): Promise<string[]> {
@@ -58,6 +63,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     header: opts.header,
     validate: opts.validate,
     passes: opts.passes,
+    sourceMap: opts.sourceMap,
   });
 
   if (result.diagnostics.length > 0) {
@@ -75,10 +81,16 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
   }
 
   const outPath = outputPathFor(file, path.resolve(cwd, opts.outDir));
+  const mapPath = `${outPath}.map`;
+  const mapText = result.map ? serializeMap(result.map) : null;
 
   if (opts.check) {
     const existing = existsSync(outPath) ? await readFile(outPath, "utf8") : null;
-    const drift = existing !== result.yaml;
+    let drift = existing !== result.yaml;
+    if (!drift && mapText !== null) {
+      const existingMap = existsSync(mapPath) ? await readFile(mapPath, "utf8") : null;
+      drift = existingMap !== mapText;
+    }
     if (drift) {
       process.stderr.write(
         `${pc.yellow("drift")}: ${pc.bold(path.relative(cwd, outPath))} is out of date with ${pc.bold(file)}\n`,
@@ -89,6 +101,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
 
   await mkdir(path.dirname(outPath), { recursive: true });
   await writeFile(outPath, result.yaml, "utf8");
+  if (mapText !== null) await writeFile(mapPath, mapText, "utf8");
   process.stderr.write(`${pc.green("✓")} ${file} ${pc.dim("→")} ${path.relative(cwd, outPath)}\n`);
   return { file, wrote: true, drift: false, errored: false };
 }
