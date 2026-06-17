@@ -15,6 +15,7 @@
     "typecheck": "npm run typecheck -w @actio/core && npm run typecheck -w @actio/cli",
     "test": "vitest run",
     "test:watch": "vitest",
+    "schema:build": "node packages/core/schema/build.mjs && biome format --write packages/core/schema/actio.schema.json",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write ."

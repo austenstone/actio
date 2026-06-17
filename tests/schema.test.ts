@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { actioSchema, transpile } from "@actio/core";
+import { actioSchema, actioSchemaPath, transpile } from "@actio/core";
 import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { STARTER_ACTIO } from "../packages/cli/src/starter.js";
+import { buildActioSchema } from "../packages/core/schema/build.mjs";
 
 const ajv = new Ajv({ strict: false, allErrors: true });
 const validate = ajv.compile(actioSchema());
@@ -68,5 +69,16 @@ jobs:
   it("starter still transpiles cleanly with the modeline present", () => {
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);
+  });
+
+  it("committed schema matches a fresh build (no drift)", () => {
+    const onDisk = JSON.parse(readFileSync(actioSchemaPath, "utf8"));
+    expect(onDisk).toEqual(buildActioSchema());
+  });
+
+  it("inherits the upstream GitHub workflow schema", () => {
+    const schema = actioSchema() as { definitions: Record<string, unknown> };
+    expect(schema.definitions).toHaveProperty("normalJob");
+    expect(schema.definitions).toHaveProperty("permissions");
   });
 });

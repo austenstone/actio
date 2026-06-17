@@ -283,6 +283,12 @@ actio schema --out .actio.schema.json
 
 The schema is also exported from `@actio/core` (`actioSchema()`, `actioSchemaPath`, `ACTIO_SCHEMA_URL`, `SCHEMA_MODELINE`).
 
+The schema **inherits** GitHub's official [workflow schema](https://json.schemastore.org/github-workflow.json) (from [SchemaStore](https://www.schemastore.org/), Apache-2.0) and layers the Actio macros on top, so you get full GitHub Actions validation _plus_ the macro keywords. It's built from two inputs — the vendored upstream (`packages/core/schema/github-workflow.json`) and the Actio overlay (`packages/core/schema/actio-macros.json`) — merged by `packages/core/schema/build.mjs`. Regenerate the shipped `actio.schema.json` with:
+
+```bash
+npm run schema:build
+```
+
 ## How it works
 
 ```
