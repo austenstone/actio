@@ -1,0 +1,16 @@
+name: "Actio Annotate"
+description: "On failure, map failed workflow steps back to their .actio.yml source and emit annotations."
+author: "actio"
+
+inputs:
+  token:
+    description: "GitHub token used to read the run's jobs via the REST API."
+    required: false
+    default: ${{ github.token }}
+  workflow-file:
+    description: "Repo-relative path to the generated workflow. Defaults to the workflow that is running."
+    required: false
+
+runs:
+  using: "node20"
+  main: "dist/index.js"

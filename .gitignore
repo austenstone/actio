@@ -4,3 +4,7 @@ dist/
 coverage/
 .DS_Store
 *.log
+
+# Bundled action dist must be committed so GitHub can run it without a build step.
+!.github/actions/**/dist/
+!.github/actions/**/dist/**
