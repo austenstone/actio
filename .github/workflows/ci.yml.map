@@ -1,9 +1,9 @@
 {
   "version": 1,
   "generator": "actio",
-  "file": "ci.yml",
+  "file": ".github/workflows/ci.yml",
   "sources": [
-    "ci.actio.yml"
+    ".github/workflows/ci.actio.yml"
   ],
   "mappings": [
     {
@@ -12,7 +12,7 @@
       },
       "source": 0,
       "original": {
-        "line": 1,
+        "line": 3,
         "col": 7
       },
       "path": "name"
@@ -23,7 +23,7 @@
       },
       "source": 0,
       "original": {
-        "line": 3,
+        "line": 5,
         "col": 3
       },
       "path": "on"
@@ -34,7 +34,7 @@
       },
       "source": 0,
       "original": {
-        "line": 4,
+        "line": 6,
         "col": 5
       },
       "path": "on.push"
@@ -45,7 +45,7 @@
       },
       "source": 0,
       "original": {
-        "line": 4,
+        "line": 6,
         "col": 16
       },
       "path": "on.push.branches.0"
@@ -56,7 +56,7 @@
       },
       "source": 0,
       "original": {
-        "line": 5,
+        "line": 7,
         "col": 16
       },
       "path": "on.pull_request"
@@ -67,7 +67,7 @@
       },
       "source": 0,
       "original": {
-        "line": 8,
+        "line": 10,
         "col": 13
       },
       "path": "permissions.contents"
@@ -78,7 +78,7 @@
       },
       "source": 0,
       "original": {
-        "line": 11,
+        "line": 13,
         "col": 10
       },
       "path": "concurrency.group"
@@ -89,7 +89,7 @@
       },
       "source": 0,
       "original": {
-        "line": 12,
+        "line": 14,
         "col": 23
       },
       "path": "concurrency.cancel-in-progress"
@@ -100,7 +100,7 @@
       },
       "source": 0,
       "original": {
-        "line": 24,
+        "line": 26,
         "col": 3
       },
       "path": "jobs"
@@ -111,7 +111,7 @@
       },
       "source": 0,
       "original": {
-        "line": 25,
+        "line": 27,
         "col": 14
       },
       "path": "jobs.build.runs-on"
@@ -122,7 +122,7 @@
       },
       "source": 0,
       "original": {
-        "line": 27,
+        "line": 29,
         "col": 18
       },
       "path": "jobs.build.strategy.fail-fast"
@@ -133,7 +133,7 @@
       },
       "source": 0,
       "original": {
-        "line": 29,
+        "line": 31,
         "col": 9
       },
       "path": "jobs.build.strategy.matrix"
@@ -144,7 +144,7 @@
       },
       "source": 0,
       "original": {
-        "line": 29,
+        "line": 31,
         "col": 24
       },
       "path": "jobs.build.strategy.matrix.node-version.0"
@@ -155,7 +155,7 @@
       },
       "source": 0,
       "original": {
-        "line": 29,
+        "line": 31,
         "col": 28
       },
       "path": "jobs.build.strategy.matrix.node-version.1"
@@ -166,7 +166,7 @@
       },
       "source": 0,
       "original": {
-        "line": 16,
+        "line": 18,
         "col": 13
       },
       "path": "jobs.build.steps.0.uses"
@@ -177,7 +177,7 @@
       },
       "source": 0,
       "original": {
-        "line": 17,
+        "line": 19,
         "col": 13
       },
       "path": "jobs.build.steps.1.uses"
@@ -188,7 +188,7 @@
       },
       "source": 0,
       "original": {
-        "line": 19,
+        "line": 21,
         "col": 23
       },
       "path": "jobs.build.steps.1.with.node-version"
@@ -199,7 +199,7 @@
       },
       "source": 0,
       "original": {
-        "line": 20,
+        "line": 22,
         "col": 16
       },
       "path": "jobs.build.steps.1.with.cache"
@@ -210,7 +210,7 @@
       },
       "source": 0,
       "original": {
-        "line": 21,
+        "line": 23,
         "col": 12
       },
       "path": "jobs.build.steps.2.run"
@@ -221,7 +221,7 @@
       },
       "source": 0,
       "original": {
-        "line": 32,
+        "line": 34,
         "col": 14
       },
       "path": "jobs.build.steps.3.run"
@@ -232,7 +232,7 @@
       },
       "source": 0,
       "original": {
-        "line": 33,
+        "line": 35,
         "col": 14
       },
       "path": "jobs.build.steps.4.run"
@@ -243,7 +243,7 @@
       },
       "source": 0,
       "original": {
-        "line": 34,
+        "line": 36,
         "col": 14
       },
       "path": "jobs.build.steps.5.run"
@@ -254,7 +254,7 @@
       },
       "source": 0,
       "original": {
-        "line": 35,
+        "line": 37,
         "col": 14
       },
       "path": "jobs.build.steps.6.run"
@@ -265,7 +265,7 @@
       },
       "source": 0,
       "original": {
-        "line": 38,
+        "line": 40,
         "col": 14
       },
       "path": "jobs.workflows.runs-on"
@@ -276,7 +276,7 @@
       },
       "source": 0,
       "original": {
-        "line": 40,
+        "line": 42,
         "col": 15
       },
       "path": "jobs.workflows.steps.0.uses"
@@ -287,7 +287,7 @@
       },
       "source": 0,
       "original": {
-        "line": 41,
+        "line": 43,
         "col": 15
       },
       "path": "jobs.workflows.steps.1.uses"
@@ -298,7 +298,7 @@
       },
       "source": 0,
       "original": {
-        "line": 43,
+        "line": 45,
         "col": 25
       },
       "path": "jobs.workflows.steps.1.with.node-version"
@@ -309,7 +309,7 @@
       },
       "source": 0,
       "original": {
-        "line": 44,
+        "line": 46,
         "col": 18
       },
       "path": "jobs.workflows.steps.1.with.cache"
@@ -320,7 +320,7 @@
       },
       "source": 0,
       "original": {
-        "line": 45,
+        "line": 47,
         "col": 14
       },
       "path": "jobs.workflows.steps.2.run"
@@ -331,7 +331,7 @@
       },
       "source": 0,
       "original": {
-        "line": 46,
+        "line": 48,
         "col": 14
       },
       "path": "jobs.workflows.steps.3.run"
@@ -342,7 +342,7 @@
       },
       "source": 0,
       "original": {
-        "line": 47,
+        "line": 49,
         "col": 15
       },
       "path": "jobs.workflows.steps.4.name"
@@ -353,7 +353,7 @@
       },
       "source": 0,
       "original": {
-        "line": 48,
+        "line": 50,
         "col": 14
       },
       "path": "jobs.workflows.steps.4.run"

@@ -13,14 +13,14 @@ function load(source: string) {
   return parse(source) as unknown;
 }
 
-const exampleSource = readFileSync(
-  fileURLToPath(new URL("../examples/ci.actio.yml", import.meta.url)),
+const ciSource = readFileSync(
+  fileURLToPath(new URL("../.github/workflows/ci.actio.yml", import.meta.url)),
   "utf8",
 );
 
 describe("actio json schema", () => {
-  it("validates the example workflow", () => {
-    expect(validate(load(exampleSource))).toBe(true);
+  it("validates the dogfooded CI workflow source", () => {
+    expect(validate(load(ciSource))).toBe(true);
   });
 
   it("validates the init starter (modeline ignored by yaml parse)", () => {
