@@ -60,10 +60,6 @@ function stepLabel(step: Step): string {
   return "step";
 }
 
-function formatSeconds(seconds: number): string {
-  return Number.isInteger(seconds) ? String(seconds) : String(seconds);
-}
-
 /** Expand step-level `retry:` blocks into a chain of conditional attempts. */
 function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
   if (!Array.isArray(job.steps)) return;
@@ -91,7 +87,7 @@ function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
       if (delaySeconds != null && prevId) {
         const sleepStep: Step = deriveNode(ctx, step, {
           name: `Retry backoff (${delayLabel ?? `${delaySeconds}s`}) before attempt ${n}/${attempts}`,
-          run: `sleep ${formatSeconds(delaySeconds)}`,
+          run: `sleep ${delaySeconds}`,
         });
         if (condition) sleepStep.if = condition;
         out.push(sleepStep);

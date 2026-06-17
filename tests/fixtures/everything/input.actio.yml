@@ -1,0 +1,41 @@
+name: Everything
+on:
+  push:
+    branches: [main]
+
+fragments:
+  setup:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: setup
+      - name: Install
+        run: npm ci
+        retry:
+          attempts: 3
+          delay: 5s
+      - name: Lint
+        run: npm run lint
+        fallback:
+          recover: true
+          steps:
+            - run: echo "lint failed, continuing"
+
+  test:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      script: ./scripts/shards.sh
+      alias: shard
+    steps:
+      - inject: setup
+      - name: Test shard
+        run: ./scripts/test.sh ${{ matrix.shard }}
+    fallback:
+      - name: Report failure
+        run: ./scripts/report.sh

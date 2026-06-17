@@ -121,7 +121,31 @@ export async function runBuild(patterns: string[], opts: BuildOptions): Promise<
   }
 
   const results: FileResult[] = [];
+  // GitHub workflows must live flat in one directory, so two sources sharing a
+  // basename would silently overwrite each other. Detect and fail loudly instead.
+  const collided = new Set<string>();
+  if (!opts.stdout) {
+    const byOutput = new Map<string, string[]>();
+    for (const file of files) {
+      const out = outputPathFor(file, opts.outDir);
+      const group = byOutput.get(out);
+      if (group) group.push(file);
+      else byOutput.set(out, [file]);
+    }
+    for (const [out, group] of byOutput) {
+      if (group.length < 2) continue;
+      process.stderr.write(
+        `${pc.red("error")}: ${group.join(", ")} all map to ${pc.bold(out)}; rename to avoid overwrite\n`,
+      );
+      for (const f of group) collided.add(f);
+    }
+  }
+
   for (const file of files) {
+    if (collided.has(file)) {
+      results.push({ file, wrote: false, drift: false, errored: true });
+      continue;
+    }
     try {
       results.push(await buildOne(file, cwd, opts));
     } catch (err) {

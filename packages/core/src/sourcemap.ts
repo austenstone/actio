@@ -78,21 +78,51 @@ function nodeAt(data: WorkflowData, path: Path): unknown {
   return cur;
 }
 
+function pathsEqual(a: Path, b: Path): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 /**
  * THE resolution seam, wired to the typed IR's provenance side-table. The
  * generated-body walk yields re-parsed AST nodes (fresh identities), so we index
  * back into the live `ctx.data` by the node's final path to recover the object
- * the IR seeded an origin for. `originOf` returns the true *pre-move* source
- * range for nodes a pass relocated (fragment-injected / retry-fanned steps, the
- * `dynamic_matrix` setup job). Un-origined nodes — top-level keys, job scalars —
- * fall back to their range at the final path, exact because they never move.
- * Truly-synthetic nodes resolve to neither and stay unmapped.
+ * the IR seeded an origin for.
+ *
+ * Resolution is layered so a *moved* node maps to its true source, not the
+ * source that happens to sit at its new path:
+ *  1. Exact origin — a job/step/fragment the IR seeded. Authoritative even after
+ *     a pass relocated it (fragment-injected / retry-fanned steps, the
+ *     `dynamic_matrix` setup job).
+ *  2. Descendant of an origin-bearing node — scalar leaves (`uses`/`run`) and
+ *     un-origined objects. Resolve against the nearest origin ancestor: if that
+ *     ancestor stayed put, the generated path is also the source path; if it
+ *     moved, rebase the trailing subpath onto the ancestor's true source path
+ *     before resolving (so a mid-list inject's leaves don't bind to the wrong
+ *     neighbouring step). `rangeOfPath` reads the untouched `ctx.doc`, so the
+ *     rebased source path still resolves even after a pass mutated `ctx.data`.
+ *  3. No origin ancestor — a top-level/static key that never moves; resolve at
+ *     the final path. Truly-synthetic nodes resolve to neither and stay unmapped.
  */
 function makeResolveOrigin(ctx: ParseContext): (path: Path) => Range | undefined {
   return (path) => {
     const live = nodeAt(ctx.data, path);
-    const origin = live !== null && typeof live === "object" ? originOf(ctx, live) : undefined;
-    return origin?.range ?? rangeOfPath(ctx, path);
+    if (live !== null && typeof live === "object") {
+      const origin = originOf(ctx, live);
+      if (origin) return origin.range;
+    }
+    for (let depth = path.length - 1; depth >= 1; depth--) {
+      const ancestor = nodeAt(ctx.data, path.slice(0, depth));
+      if (ancestor === null || typeof ancestor !== "object") continue;
+      const origin = originOf(ctx, ancestor);
+      if (!origin) continue;
+      if (pathsEqual(origin.path, path.slice(0, depth))) return rangeOfPath(ctx, path);
+      return rangeOfPath(ctx, [...origin.path, ...path.slice(depth)]) ?? origin.range;
+    }
+    return rangeOfPath(ctx, path);
   };
 }
 

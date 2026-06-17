@@ -19,6 +19,12 @@ describe("combineIf", () => {
   it("parenthesizes operands containing ||", () => {
     expect(combineIf("failure()", "a || b")).toBe("failure() && (a || b)");
   });
+  it("leaves a condition with multiple ${{ }} wrappers intact (no corruption)", () => {
+    // A lazy single-wrapper regex would span the interior delimiters and mangle
+    // this into `github.event_name == 'push' }} && ${{ success()`.
+    const multi = "${{ github.event_name == 'push' }} && ${{ success() }}";
+    expect(combineIf(multi)).toBe(multi);
+  });
 });
 
 describe("looksLikePath", () => {

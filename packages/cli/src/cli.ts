@@ -6,7 +6,7 @@ import pc from "picocolors";
 import { type BuildOptions, runBuild } from "./commands/build.js";
 import { runSchema } from "./commands/schema.js";
 import { runWatch } from "./commands/watch.js";
-import { loadActioConfig, resolveBuildOptions } from "./config.js";
+import { type LoadedConfig, loadActioConfig, resolveBuildOptions } from "./config.js";
 import { STARTER_ACTIO } from "./starter.js";
 
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
@@ -30,7 +30,13 @@ async function resolveOptions(
   flags: CliBuildFlags,
   forceCheck: boolean,
 ): Promise<{ patterns: string[]; options: BuildOptions }> {
-  const loaded = await loadActioConfig();
+  let loaded: LoadedConfig | null = null;
+  try {
+    loaded = await loadActioConfig();
+  } catch (err) {
+    process.stderr.write(`${pc.red("error")}: ${(err as Error).message}\n`);
+    process.exit(1);
+  }
   return resolveBuildOptions({
     files,
     flags,

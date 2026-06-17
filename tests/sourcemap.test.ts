@@ -130,4 +130,37 @@ describe("source map", () => {
     // Remapped, it points at the source `- frobnicate:` line.
     expect(schema.some((d) => d.range?.start.line === 7)).toBe(true);
   });
+
+  it("remaps a mid-list inject's leaf scalars to the fragment, not the wrong neighbour", () => {
+    // The injected steps land between two real steps, so the generated path of an
+    // injected leaf (e.g. steps[2].run) collides with a *different* real source
+    // step that happens to share the key. A path-only resolver would bind the
+    // injected `echo setup-b` line to `echo last` (source 13); provenance must win.
+    const src = [
+      "name: Mid", // 1
+      "on: [push]", // 2
+      "fragments:", // 3
+      "  setup:", // 4
+      "    - run: echo setup-a", // 5
+      "    - run: echo setup-b", // 6
+      "jobs:", // 7
+      "  build:", // 8
+      "    runs-on: ubuntu-latest", // 9
+      "    steps:", // 10
+      "      - run: echo first", // 11
+      "      - inject: setup", // 12
+      "      - run: echo last", // 13
+      "",
+    ].join("\n");
+
+    const { yaml, map } = transpile(src, { fileName: "mid.actio.yml", sourceMap: true });
+    const m = map as SourceMap;
+    expect(sourceLineOf(m, genLineOf(yaml, "echo first"))).toBe(11);
+    expect(sourceLineOf(m, genLineOf(yaml, "echo setup-a"))).toBe(5);
+    // The bug: this line mapped to 13 (the trailing real step) under a path-only
+    // resolver because steps[2].run resolves there in the original document.
+    expect(sourceLineOf(m, genLineOf(yaml, "echo setup-b"))).toBe(6);
+    expect(sourceLineOf(m, genLineOf(yaml, "echo setup-b"))).not.toBe(13);
+    expect(sourceLineOf(m, genLineOf(yaml, "echo last"))).toBe(13);
+  });
 });
