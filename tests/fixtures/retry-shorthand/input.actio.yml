@@ -1,0 +1,10 @@
+name: Retry Shorthand
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Flaky
+        run: ./flaky.sh
+        retry: 2

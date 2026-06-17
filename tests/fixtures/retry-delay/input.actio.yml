@@ -1,0 +1,14 @@
+name: Retry Delay
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        retry:
+          attempts: 3
+          delay: 10s
+        with:
+          apiToken: ${{ secrets.CF_TOKEN }}
