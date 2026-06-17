@@ -1,7 +1,6 @@
+import { type Job, type Step, deriveNode } from "../ir.js";
 import type { ParseContext } from "../parser.js";
 import {
-  type Job,
-  type Step,
   asArray,
   combineIf,
   isObject,
@@ -40,7 +39,7 @@ function buildEvalRun(script: string, compact: boolean): string {
 }
 
 function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefined {
-  const dm: DM = job.dynamic_matrix;
+  const dm = job.dynamic_matrix as DM;
   const script = opt<string>(dm, "script", "run");
   if (typeof script !== "string" || script.trim() === "") {
     pushDiagnostic(ctx, "error", `Job "${jobId}": dynamic_matrix requires a "script" string`, [
@@ -56,30 +55,30 @@ function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefi
   const shell = opt<string>(dm, "shell");
 
   const steps: Step[] = [];
-  if (checkout) steps.push({ uses: "actions/checkout@v4" });
+  if (checkout) steps.push(deriveNode(ctx, job, { uses: "actions/checkout@v4" }));
   for (const s of asArray<Step>(opt<Step | Step[]>(dm, "before", "setup_steps"))) {
-    steps.push(s);
+    steps.push(isObject(s) ? deriveNode(ctx, job, s) : s);
   }
-  const evalStep: Step = {
+  const evalStep: Step = deriveNode(ctx, job, {
     name: "Evaluate dynamic matrix",
     id: "actio_eval",
     run: buildEvalRun(script, compact),
-  };
+  });
   if (shell) evalStep.shell = shell;
   steps.push(evalStep);
 
-  const setup: Job = {
+  const setup: Job = deriveNode(ctx, job, {
     "runs-on": resolveRunsOn(dm, job),
     outputs: { matrix: "${{ steps.actio_eval.outputs.matrix }}" },
     steps,
-  };
+  });
   // Carry permissions/env through to the setup job when the script may need them.
   if (job.permissions !== undefined) setup.permissions = job.permissions;
   return setup;
 }
 
 function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId: string): void {
-  const dm: DM = job.dynamic_matrix;
+  const dm = job.dynamic_matrix as DM;
   const alias = opt<string>(dm, "alias", "as");
   const matrixExpr = `\${{ fromJSON(needs.${setupId}.outputs.matrix) }}`;
 
