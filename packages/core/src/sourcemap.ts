@@ -10,9 +10,12 @@ import type { ParseContext, Path } from "./parser.js";
  *
  * Instead we index the original document by path + value, re-parse the emitted
  * YAML for line numbers, and match generated nodes back to source positions.
- * `buildSourceMap` is the single seam: when the IR exposes explicit per-node
- * origin metadata, swap the heuristic resolver here for an IR lookup without
- * touching `transpile`, the CLI, or the map format.
+ *
+ * `makeResolveOrigin(ctx)` is the single upgrade seam: it returns the lone
+ * `(node, path) => Range | undefined` function `buildSourceMap` resolves
+ * through. When the typed IR lands its provenance side-table, that factory body
+ * becomes `originOf(ctx, nodeAt(ctx.data, path))?.range ?? rangeOfPath(ctx, path)`
+ * and the heuristic index helpers below are deleted — nothing else changes.
  */
 
 export interface SourceMapping {
@@ -123,6 +126,12 @@ function sharedPrefix(a: Path, b: Path): number {
 }
 
 /**
+ * THE upgrade seam. Returns the lone resolver `buildSourceMap` calls. Today it
+ * matches generated nodes back to source ranges heuristically; swapping to IR
+ * provenance means replacing only this factory's body (and deleting the
+ * `indexSource`/`containerHash`/`sharedPrefix` helpers) with an `originOf`
+ * lookup. `buildSourceMap` and the map format are untouched by that swap.
+ *
  * Containers resolve by value identity first: a transform can move a node to a
  * path that a *different* source node already occupies (e.g. a fragment step
  * lands on `steps.0`, where the source had `- inject:`), so matching on path
@@ -130,24 +139,27 @@ function sharedPrefix(a: Path, b: Path): number {
  * tiebreak picks the true origin, and naturally degrades to the exact path when
  * the value is unique. Scalars can't be hashed safely, so they use path only.
  */
-function resolve(node: Node, path: Path, index: ReturnType<typeof indexSource>): Range | undefined {
-  const hash = containerHash(node);
-  if (hash !== undefined) {
-    const candidates = index.byHash.get(hash);
-    if (candidates && candidates.length > 0) {
-      let best = candidates[0];
-      let bestScore = -1;
-      for (const candidate of candidates) {
-        const score = sharedPrefix(candidate.path, path);
-        if (score > bestScore) {
-          bestScore = score;
-          best = candidate;
+function makeResolveOrigin(ctx: ParseContext): (node: Node, path: Path) => Range | undefined {
+  const index = indexSource(ctx);
+  return (node, path) => {
+    const hash = containerHash(node);
+    if (hash !== undefined) {
+      const candidates = index.byHash.get(hash);
+      if (candidates && candidates.length > 0) {
+        let best = candidates[0];
+        let bestScore = -1;
+        for (const candidate of candidates) {
+          const score = sharedPrefix(candidate.path, path);
+          if (score > bestScore) {
+            bestScore = score;
+            best = candidate;
+          }
         }
+        return best.range;
       }
-      return best.range;
     }
-  }
-  return index.byPath.get(pathKey(path));
+    return index.byPath.get(pathKey(path));
+  };
 }
 
 /** Reconstruct a line-level source map from the original document and the
@@ -157,7 +169,7 @@ export function buildSourceMap(
   body: string,
   options: BuildSourceMapOptions,
 ): SourceMap {
-  const index = indexSource(ctx);
+  const resolveOrigin = makeResolveOrigin(ctx);
 
   const lc = new LineCounter();
   const generated = parseDocument(body, { lineCounter: lc });
@@ -166,7 +178,7 @@ export function buildSourceMap(
   walk(generated.contents as Node | null, [], lc, (node, path) => {
     const line = startLine(node, lc);
     if (line === undefined) return;
-    const range = resolve(node, path, index);
+    const range = resolveOrigin(node, path);
     if (!range) return;
     const genLine = options.headerLines + line;
     const existing = perLine.get(genLine);
