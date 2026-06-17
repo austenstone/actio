@@ -5,6 +5,7 @@ export {
   type DiagnosticSource,
   formatDiagnostic,
   formatDiagnostics,
+  formatGithubAnnotation,
   type Position,
   type Range,
   type Severity,

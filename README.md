@@ -340,6 +340,24 @@ The library exposes this too: `transpile(source, { sourceMap: true })` returns a
 `map` field, and with it on, schema-validation diagnostics are remapped back to
 source ranges so code frames line up with your `.actio.yml`.
 
+### Build-time annotations
+
+Invalid syntax and schema errors are the failures worth catching early, and
+they already know their source position. When `build`/`check` runs **inside
+GitHub Actions** (`GITHUB_ACTIONS=true`), every diagnostic is also emitted as a
+`::error file=…,line=…,col=…::` workflow command, so a bad `.actio.yml` lights up
+**inline on the exact line you wrote** — no extra job, no runtime, no config:
+
+```text
+::error file=.github/actio/ci.actio.yml,line=8,col=26,title=actio (schema)::Unexpected value 'not-a-number'
+```
+
+This is automatic and always on in CI (it's just a reporter format — same code
+frame you see locally, also surfaced as an annotation). Locally you still get the
+colored code frame on stderr. The formatter is
+[`formatGithubAnnotation`](packages/core/src/diagnostics.ts), exported from
+`@actio/core` if you want to wire it into your own tooling.
+
 ### Runtime annotations
 
 The source map is only half the story — it also powers failures **in a live

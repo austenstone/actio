@@ -1,7 +1,13 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { type Diagnostic, formatDiagnostic, type Pass, transpile } from "@actio/core";
+import {
+  type Diagnostic,
+  formatDiagnostic,
+  formatGithubAnnotation,
+  type Pass,
+  transpile,
+} from "@actio/core";
 import pc from "picocolors";
 import { glob } from "tinyglobby";
 
@@ -39,7 +45,11 @@ export async function discover(patterns: string[], cwd: string): Promise<string[
 }
 
 export function printDiagnostics(diags: Diagnostic[], source: string): void {
+  const ci = process.env.GITHUB_ACTIONS === "true";
   for (const d of diags) {
+    // In CI, emit a workflow command so the diagnostic highlights inline on the
+    // originating .actio.yml source line (schema/syntax errors are the useful ones).
+    if (ci) process.stderr.write(`${formatGithubAnnotation(d)}\n`);
     const text = formatDiagnostic(d, source);
     const colored = d.severity === "error" ? colorizeError(text) : pc.yellow(text);
     process.stderr.write(`${colored}\n\n`);

@@ -61,6 +61,35 @@ export function formatDiagnostic(d: Diagnostic, source?: string): string {
   return `${head}${frame ? `\n${frame}` : ""}${hint}`;
 }
 
+/** Escape data for a workflow command body (`::cmd::<data>`). */
+function escapeData(s: string): string {
+  return s.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+}
+
+/** Escape a workflow command property value (`file=...`, `title=...`). */
+function escapeProperty(s: string): string {
+  return escapeData(s).replace(/:/g, "%3A").replace(/,/g, "%2C");
+}
+
+/**
+ * Render a diagnostic as a GitHub Actions workflow command so it surfaces as an
+ * inline annotation on the originating `.actio.yml` source line. Relies on the
+ * diagnostic's range already being source-mapped (see `transpile`'s `sourceMap`).
+ */
+export function formatGithubAnnotation(d: Diagnostic): string {
+  const cmd = d.severity === "error" ? "error" : "warning";
+  const props: string[] = [];
+  if (d.file) props.push(`file=${escapeProperty(d.file)}`);
+  if (d.range) {
+    props.push(`line=${d.range.start.line}`, `col=${d.range.start.col}`);
+    const multi = d.range.end.line !== d.range.start.line || d.range.end.col !== d.range.start.col;
+    if (multi) props.push(`endLine=${d.range.end.line}`, `endColumn=${d.range.end.col}`);
+  }
+  props.push(`title=${escapeProperty(`actio (${d.source})`)}`);
+  const message = d.hint ? `${d.message}\n\nhint: ${d.hint}` : d.message;
+  return `::${cmd} ${props.join(",")}::${escapeData(message)}`;
+}
+
 function codeFrame(source: string, range: Range): string {
   const lines = source.split(/\r?\n/);
   const lineNo = range.start.line;
