@@ -1,21 +1,18 @@
 import { LineCounter, type Node, isMap, isScalar, isSeq, parseDocument } from "yaml";
 import type { Position, Range } from "./diagnostics.js";
-import type { ParseContext, Path } from "./parser.js";
+import { originOf } from "./ir.js";
+import { type ParseContext, type Path, type WorkflowData, rangeOfPath } from "./parser.js";
 
 /**
  * Source maps are reconstructed at emit time rather than threaded through the
- * passes. Passes mutate a plain-JS `ctx.data` and clone via `structuredClone`,
- * which drops any origin tags — so tagging would need invasive hot-path changes
- * and would duplicate the provenance mechanism the typed IR is meant to own.
+ * passes. Provenance lives in the typed IR's `ctx.origins` side-table: passes
+ * pin each original job/step/fragment's origin before mutating, and carry it
+ * onto clones/derived nodes, so a node that a macro moves still points at its
+ * true source. We never re-derive provenance here — we re-parse the emitted body
+ * for line numbers and resolve each node through the IR.
  *
- * Instead we index the original document by path + value, re-parse the emitted
- * YAML for line numbers, and match generated nodes back to source positions.
- *
- * `makeResolveOrigin(ctx)` is the single upgrade seam: it returns the lone
- * `(node, path) => Range | undefined` function `buildSourceMap` resolves
- * through. When the typed IR lands its provenance side-table, that factory body
- * becomes `originOf(ctx, nodeAt(ctx.data, path))?.range ?? rangeOfPath(ctx, path)`
- * and the heuristic index helpers below are deleted — nothing else changes.
+ * `makeResolveOrigin(ctx)` is the single resolution seam: it returns the lone
+ * `(path) => Range | undefined` function `buildSourceMap` resolves through.
  */
 
 export interface SourceMapping {
@@ -45,12 +42,6 @@ export interface BuildSourceMapOptions {
   headerLines: number;
 }
 
-const PATH_SEP = "\u0000";
-
-function pathKey(path: Path): string {
-  return path.join(PATH_SEP);
-}
-
 function pathDotted(path: Path): string {
   return path.map((p) => String(p)).join(".");
 }
@@ -59,26 +50,6 @@ function startLine(node: Node, lc: LineCounter): number | undefined {
   const range = (node as { range?: [number, number, number] }).range;
   if (!range) return undefined;
   return lc.linePos(range[0]).line;
-}
-
-function nodeRange(node: Node, lc: LineCounter): Range | undefined {
-  const range = (node as { range?: [number, number, number] }).range;
-  if (!range) return undefined;
-  const [start, , end] = range;
-  return { start: lc.linePos(start), end: lc.linePos(end) };
-}
-
-/** Hash containers by value so moved/cloned nodes still resolve. Scalars are
- * skipped — bare values collide too readily to map confidently. */
-function containerHash(node: Node): string | undefined {
-  if (isMap(node) || isSeq(node)) {
-    try {
-      return JSON.stringify(node.toJSON());
-    } catch {
-      return undefined;
-    }
-  }
-  return undefined;
 }
 
 type Visitor = (node: Node, path: Path) => void;
@@ -97,68 +68,31 @@ function walk(node: Node | null, path: Path, lc: LineCounter, visit: Visitor): v
   }
 }
 
-interface SourceEntry {
-  path: Path;
-  range: Range;
-}
-
-function indexSource(ctx: ParseContext) {
-  const byPath = new Map<string, Range>();
-  const byHash = new Map<string, SourceEntry[]>();
-  walk(ctx.doc.contents as Node | null, [], ctx.lineCounter, (node, path) => {
-    const range = nodeRange(node, ctx.lineCounter);
-    if (!range) return;
-    byPath.set(pathKey(path), range);
-    const hash = containerHash(node);
-    if (hash !== undefined) {
-      const list = byHash.get(hash) ?? [];
-      list.push({ path, range });
-      byHash.set(hash, list);
-    }
-  });
-  return { byPath, byHash };
-}
-
-function sharedPrefix(a: Path, b: Path): number {
-  let n = 0;
-  while (n < a.length && n < b.length && String(a[n]) === String(b[n])) n++;
-  return n;
+/** Resolve the live `ctx.data` node addressed by a final-document `path`. */
+function nodeAt(data: WorkflowData, path: Path): unknown {
+  let cur: unknown = data;
+  for (const key of path) {
+    if (cur === null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<string | number, unknown>)[key as string | number];
+  }
+  return cur;
 }
 
 /**
- * THE upgrade seam. Returns the lone resolver `buildSourceMap` calls. Today it
- * matches generated nodes back to source ranges heuristically; swapping to IR
- * provenance means replacing only this factory's body (and deleting the
- * `indexSource`/`containerHash`/`sharedPrefix` helpers) with an `originOf`
- * lookup. `buildSourceMap` and the map format are untouched by that swap.
- *
- * Containers resolve by value identity first: a transform can move a node to a
- * path that a *different* source node already occupies (e.g. a fragment step
- * lands on `steps.0`, where the source had `- inject:`), so matching on path
- * alone would point at the wrong line. Value-hash with a nearest-path-prefix
- * tiebreak picks the true origin, and naturally degrades to the exact path when
- * the value is unique. Scalars can't be hashed safely, so they use path only.
+ * THE resolution seam, wired to the typed IR's provenance side-table. The
+ * generated-body walk yields re-parsed AST nodes (fresh identities), so we index
+ * back into the live `ctx.data` by the node's final path to recover the object
+ * the IR seeded an origin for. `originOf` returns the true *pre-move* source
+ * range for nodes a pass relocated (fragment-injected / retry-fanned steps, the
+ * `dynamic_matrix` setup job). Un-origined nodes — top-level keys, job scalars —
+ * fall back to their range at the final path, exact because they never move.
+ * Truly-synthetic nodes resolve to neither and stay unmapped.
  */
-function makeResolveOrigin(ctx: ParseContext): (node: Node, path: Path) => Range | undefined {
-  const index = indexSource(ctx);
-  return (node, path) => {
-    const hash = containerHash(node);
-    if (hash !== undefined) {
-      const candidates = index.byHash.get(hash);
-      if (candidates && candidates.length > 0) {
-        let best = candidates[0];
-        let bestScore = -1;
-        for (const candidate of candidates) {
-          const score = sharedPrefix(candidate.path, path);
-          if (score > bestScore) {
-            bestScore = score;
-            best = candidate;
-          }
-        }
-        return best.range;
-      }
-    }
-    return index.byPath.get(pathKey(path));
+function makeResolveOrigin(ctx: ParseContext): (path: Path) => Range | undefined {
+  return (path) => {
+    const live = nodeAt(ctx.data, path);
+    const origin = live !== null && typeof live === "object" ? originOf(ctx, live) : undefined;
+    return origin?.range ?? rangeOfPath(ctx, path);
   };
 }
 
@@ -178,7 +112,7 @@ export function buildSourceMap(
   walk(generated.contents as Node | null, [], lc, (node, path) => {
     const line = startLine(node, lc);
     if (line === undefined) return;
-    const range = resolveOrigin(node, path);
+    const range = resolveOrigin(path);
     if (!range) return;
     const genLine = options.headerLines + line;
     const existing = perLine.get(genLine);

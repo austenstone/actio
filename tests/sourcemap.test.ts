@@ -65,6 +65,10 @@ describe("source map", () => {
     // origin is the fragment definition at source line 5 — not the `- inject:`
     // line (source 13) that occupies that path in the source.
     expect(sourceLineOf(m, genLineOf(yaml, "actions/checkout@v4"))).toBe(5);
+    // Origin-driven, not path-driven: the `rangeOfPath` fallback for the final
+    // path jobs.test.steps.0 would resolve to the `- inject:` line (13). The IR
+    // origin must win, proving the swap consumes provenance over geometry.
+    expect(sourceLineOf(m, genLineOf(yaml, "actions/checkout@v4"))).not.toBe(13);
     expect(sourceLineOf(m, genLineOf(yaml, "actions/setup-node@v4"))).toBe(6);
     // The trailing `- run: npm test` step moved from source index 1 (line 14).
     expect(sourceLineOf(m, genLineOf(yaml, "run: npm test"))).toBe(14);

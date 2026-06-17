@@ -291,14 +291,17 @@ no inline comments — the generated YAML stays byte-for-byte unchanged):
 ```
 
 Mappings are **reconstructed at emit time** rather than threaded through the
-passes: the original document is indexed by path and by value, the emitted YAML
-is re-parsed for line numbers, and each generated node is matched back to its
-source — by exact path for untouched nodes, and by value identity for nodes a
-macro moved (e.g. a fragment-injected step). Genuinely generated lines (the
-banner, `dynamic_matrix` plumbing) are simply left unmapped. `buildSourceMap`
-(in [`packages/core/src/sourcemap.ts`](packages/core/src/sourcemap.ts)) is the
-single seam: when the typed IR lands explicit per-node provenance, swap the
-heuristic resolver there without touching the format, `transpile`, or the CLI.
+passes: the emitted YAML is re-parsed for generated line numbers, and each node
+is resolved back to its source through the typed IR's provenance side-table.
+`originOf` returns a node's **true source range even after a macro moved it** (a
+fragment-injected step, a retry-fanned attempt, the `dynamic_matrix` setup job),
+because the IR pins each origin before mutation and carries it across clones.
+Nodes the IR never tracks (top-level keys, job scalars) fall back to their range
+at the final path — exact, since they never move — and genuinely synthetic lines
+(the banner, eval plumbing) are simply left unmapped. `buildSourceMap` (in
+[`packages/core/src/sourcemap.ts`](packages/core/src/sourcemap.ts)) resolves
+every node through one `makeResolveOrigin` seam, so the format, `transpile`, and
+the CLI are independent of how provenance is sourced.
 
 The library exposes this too: `transpile(source, { sourceMap: true })` returns a
 `map` field, and with it on, schema-validation diagnostics are remapped back to
