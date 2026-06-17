@@ -18,6 +18,6 @@ jobs:
       - run: echo "this step passes"
       - name: Intentional failure
         run: |
-          echo "about to fail on purpose, look up at the source 👆"
+          echo "this fails on purpose so the annotation lands on line 19 👆"
           exit 1
       - run: echo "this step never runs"
