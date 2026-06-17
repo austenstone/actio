@@ -12,8 +12,8 @@
   ],
   "scripts": {
     "build": "npm run build -w @actio/core && npm run build -w @actio/cli",
-    "build:workflows": "node packages/cli/dist/cli.js build .github/workflows/ci.actio.yml",
-    "check:workflows": "node packages/cli/dist/cli.js check .github/workflows/ci.actio.yml",
+    "build:workflows": "node packages/cli/dist/cli.js build .github/workflows/src/ci.actio.yml",
+    "check:workflows": "node packages/cli/dist/cli.js check .github/workflows/src/ci.actio.yml",
     "typecheck": "npm run typecheck -w @actio/core && npm run typecheck -w @actio/cli",
     "test": "vitest run",
     "test:watch": "vitest",
