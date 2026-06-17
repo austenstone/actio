@@ -5,6 +5,7 @@ import { cac } from "cac";
 import pc from "picocolors";
 import { runBuild } from "./commands/build.js";
 import { runSchema } from "./commands/schema.js";
+import { runWatch } from "./commands/watch.js";
 import { STARTER_ACTIO } from "./starter.js";
 
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
@@ -17,6 +18,7 @@ interface CliBuildFlags {
   stdout?: boolean;
   validate: boolean;
   header: boolean;
+  watch?: boolean;
 }
 
 const cli = cac("actio");
@@ -31,6 +33,16 @@ function buildOptions(flags: CliBuildFlags, check: boolean) {
   };
 }
 
+async function startWatch(files: string[], flags: CliBuildFlags) {
+  const controller = await runWatch(files, buildOptions(flags, false));
+  const shutdown = async () => {
+    await controller.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", () => void shutdown());
+  process.on("SIGTERM", () => void shutdown());
+}
+
 cli
   .command("build [...files]", "Compile .actio.yml files into GitHub Actions workflows")
   .option("--out-dir <dir>", "Output directory for generated workflows", {
@@ -38,11 +50,27 @@ cli
   })
   .option("--check", "Verify generated output is up to date without writing (CI drift check)")
   .option("--stdout", "Write generated YAML to stdout instead of files")
+  .option("-w, --watch", "Rebuild on change and keep running (like tsc --watch)")
   .option("--no-validate", "Skip schema validation of generated workflows")
   .option("--no-header", "Omit the generated-by-Actio banner")
   .action(async (files: string[], flags: CliBuildFlags) => {
+    if (flags.watch) {
+      await startWatch(files, flags);
+      return;
+    }
     const code = await runBuild(files, buildOptions(flags, false));
     process.exitCode = code;
+  });
+
+cli
+  .command("watch [...files]", "Watch .actio.yml files and rebuild workflows on change")
+  .option("--out-dir <dir>", "Output directory for generated workflows", {
+    default: ".github/workflows",
+  })
+  .option("--no-validate", "Skip schema validation of generated workflows")
+  .option("--no-header", "Omit the generated-by-Actio banner")
+  .action(async (files: string[], flags: CliBuildFlags) => {
+    await startWatch(files, flags);
   });
 
 cli

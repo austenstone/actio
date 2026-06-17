@@ -249,6 +249,7 @@ so the job can continue.
 
 ```
 actio build [...files]   Compile .actio.yml files into GitHub Actions workflows
+actio watch [...files]   Watch .actio.yml files and rebuild on change
 actio check [...files]   Verify generated workflows are up to date (= build --check)
 actio init [file]        Scaffold a starter .actio.yml file
 actio schema             Print the Actio JSON Schema (--out <file> to save locally)
@@ -261,8 +262,18 @@ actio schema             Print the Actio JSON Schema (--out <file> to save local
 | `--out-dir <dir>` | Output directory (default `.github/workflows`) |
 | `--check` | Verify output is up to date without writing (CI drift check) |
 | `--stdout` | Write generated YAML to stdout instead of files |
+| `-w, --watch` | Rebuild on change and keep running (like `tsc --watch`) |
 | `--no-validate` | Skip schema validation of generated output |
 | `--no-header` | Omit the generated-by-Actio banner |
+
+### Watch mode
+
+`actio build --watch` (or the standalone `actio watch`) does a full build, then
+watches your `.actio.yml` files — and the surrounding directories, so brand-new
+files are picked up too — and rebuilds the changed file on save. Saves are
+debounced, each rebuild prints a timestamped summary, and a transpile error is
+reported without ever stopping the watcher (exit code stays `0`). Press `Ctrl+C`
+to stop.
 
 ## Editor support
 
