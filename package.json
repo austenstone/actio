@@ -2,7 +2,7 @@
   "name": "actio-monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "Actio — a transpiler that compiles a .actio YAML-superset into standard GitHub Actions workflows",
+  "description": "Actio — a transpiler that compiles a .actio.yml YAML-superset into standard GitHub Actions workflows",
   "type": "module",
   "engines": {
     "node": ">=20"

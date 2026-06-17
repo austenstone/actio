@@ -31,7 +31,7 @@ function buildOptions(flags: CliBuildFlags, check: boolean) {
 }
 
 cli
-  .command("build [...files]", "Compile .actio files into GitHub Actions workflows")
+  .command("build [...files]", "Compile .actio.yml files into GitHub Actions workflows")
   .option("--out-dir <dir>", "Output directory for generated workflows", {
     default: ".github/workflows",
   })
@@ -59,7 +59,7 @@ cli
     process.exitCode = code;
   });
 
-cli.command("init [file]", "Scaffold a starter .actio file").action(async (file = "ci.actio") => {
+cli.command("init [file]", "Scaffold a starter .actio.yml file").action(async (file = "ci.actio.yml") => {
   if (existsSync(file)) {
     process.stderr.write(`${pc.yellow("warning")}: ${file} already exists; not overwriting\n`);
     process.exitCode = 1;

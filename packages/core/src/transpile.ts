@@ -21,7 +21,7 @@ export interface TranspileResult {
   diagnostics: Diagnostic[];
 }
 
-/** Compile a single `.actio` source string into standard GitHub Actions YAML. */
+/** Compile a single `.actio.yml` source string into standard GitHub Actions YAML. */
 export function transpile(source: string, options: TranspileOptions = {}): TranspileResult {
   const fileName = options.fileName ?? "<input>";
   const ctx = parseActio(source, fileName);

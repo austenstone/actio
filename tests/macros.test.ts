@@ -4,7 +4,7 @@ import { parse } from "yaml";
 
 /** Transpile and parse the generated YAML back to a JS object for assertions. */
 function build(source: string) {
-  const result = transpile(source, { fileName: "t.actio" });
+  const result = transpile(source, { fileName: "t.actio.yml" });
   const errors = result.diagnostics.filter((d) => d.severity === "error");
   return { result, errors, doc: result.ok ? parse(result.yaml) : undefined };
 }

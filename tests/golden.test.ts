@@ -16,9 +16,9 @@ function fixtureNames(): string[] {
 describe("golden fixtures", () => {
   for (const name of fixtureNames()) {
     it(`transpiles ${name} to its expected output`, () => {
-      const input = readFileSync(join(fixturesDir, name, "input.actio"), "utf8");
+      const input = readFileSync(join(fixturesDir, name, "input.actio.yml"), "utf8");
       const expected = readFileSync(join(fixturesDir, name, "expected.yml"), "utf8");
-      const result = transpile(input, { fileName: "input.actio" });
+      const result = transpile(input, { fileName: "input.actio.yml" });
 
       // Every fixture must produce a schema-valid workflow with no errors.
       const errors = result.diagnostics.filter((d) => d.severity === "error");

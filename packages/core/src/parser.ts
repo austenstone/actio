@@ -39,7 +39,7 @@ export function rangeOfPath(ctx: ParseContext, path: Path): Range | undefined {
   return undefined;
 }
 
-/** Parse `.actio` source into a transform context. YAML syntax errors land in `diagnostics`. */
+/** Parse `.actio.yml` source into a transform context. YAML syntax errors land in `diagnostics`. */
 export function parseActio(source: string, fileName: string): ParseContext {
   const lineCounter = new LineCounter();
   const doc = parseDocument(source, { lineCounter, keepSourceTokens: true });

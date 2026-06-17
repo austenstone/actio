@@ -14,11 +14,11 @@ export interface BuildOptions {
   cwd?: string;
 }
 
-const DEFAULT_GLOBS = ["**/*.actio"];
+const DEFAULT_GLOBS = ["**/*.actio.yml"];
 const IGNORE = ["**/node_modules/**", "**/dist/**", "**/.git/**"];
 
 function outputPathFor(inputFile: string, outDir: string): string {
-  const base = path.basename(inputFile).replace(/\.actio$/, ".yml");
+  const base = path.basename(inputFile).replace(/\.actio\.yml$/, ".yml");
   return path.join(outDir, base);
 }
 
@@ -97,7 +97,7 @@ export async function runBuild(patterns: string[], opts: BuildOptions): Promise<
 
   if (files.length === 0) {
     process.stderr.write(
-      `${pc.yellow("warning")}: no .actio files found${
+      `${pc.yellow("warning")}: no .actio.yml files found${
         patterns.length ? ` for: ${patterns.join(", ")}` : ""
       }\n`,
     );

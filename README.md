@@ -1,12 +1,12 @@
 # Actio
 
-> A transpiler that compiles a clean `.actio` source into the verbose GitHub Actions YAML you'd otherwise hand-write.
+> A transpiler that compiles a clean `.actio.yml` source into the verbose GitHub Actions YAML you'd otherwise hand-write.
 
 Writing **dynamic** GitHub Actions workflows in raw YAML is painful. Actio adds a
 small set of macro keywords — [`fragments`](#1-fragments--inject),
 [`dynamic_matrix`](#2-dynamic_matrix), and [`fallback`](#3-fallback) — that
 expand into the boilerplate GitHub requires. Everything else is passthrough, so a
-macro-free `.actio` file is just a normal workflow.
+macro-free `.actio.yml` file is just a normal workflow.
 
 Inspired by [Buildkite](https://buildkite.com/docs/pipelines/configure/dynamic-pipelines)'s
 runtime `pipeline upload`. GitHub Actions can't inject steps at runtime — but we
@@ -39,9 +39,9 @@ Requires Node ≥ 20.
 
 ```bash
 # scaffold a starter source file
-npx actio init ci.actio
+npx actio init ci.actio.yml
 
-# compile *.actio → .github/workflows/*.yml
+# compile *.actio.yml → .github/workflows/*.yml
 npx actio build
 
 # CI drift check (fails if generated output is stale)
@@ -55,7 +55,7 @@ npx actio check
 Define reusable step blocks at the top of the file; splice them in with
 `- inject: <name>`.
 
-**`.actio`**
+**`.actio.yml`**
 ```yaml
 name: Fragments
 on: [push]
@@ -91,7 +91,7 @@ jobs:
 The headline feature. A job-level block whose `script` prints a JSON array (or
 `{include:[...]}`); Actio generates the setup job + wiring.
 
-**`.actio`**
+**`.actio.yml`**
 ```yaml
 jobs:
   test:
@@ -144,7 +144,7 @@ A native try/catch. Attach `fallback:` to a step (or a job).
 **Default = notify** (the error is *not* swallowed; fallback runs via
 `if: failure()`, the job still fails):
 
-**`.actio`**
+**`.actio.yml`**
 ```yaml
 jobs:
   deploy:
@@ -180,9 +180,9 @@ so the job can continue.
 ## CLI
 
 ```
-actio build [...files]   Compile .actio files into GitHub Actions workflows
+actio build [...files]   Compile .actio.yml files into GitHub Actions workflows
 actio check [...files]   Verify generated workflows are up to date (= build --check)
-actio init [file]        Scaffold a starter .actio file
+actio init [file]        Scaffold a starter .actio.yml file
 ```
 
 `build` options:
@@ -199,7 +199,7 @@ actio init [file]        Scaffold a starter .actio file
 
 ```
 actio build [globs]
-  discover .actio files
+  discover .actio.yml files
   per file:
     1. parse with eemeli `yaml` (comment- and position-preserving)
     2. run ordered transform passes: fragments → fallback → dynamic_matrix
@@ -237,7 +237,7 @@ npm run typecheck  # tsc --noEmit
 ```
 
 Golden fixtures live in [`tests/fixtures/<case>/`](tests/fixtures) as
-`input.actio` + `expected.yml`. Every `expected.yml` must pass
+`input.actio.yml` + `expected.yml`. Every `expected.yml` must pass
 `@actions/workflow-parser` — we only ever assert on legal workflows.
 
 ## License
