@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/austenstone/actio/main/packages/core/schema/actio.schema.json
+
+name: Annotate Demo
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/actio/annotate-demo.actio.yml
+      - .github/workflows/annotate-demo.yml
+
+permissions:
+  contents: read
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "this step passes"
+      - name: Intentional failure
+        run: |
+          echo "about to fail on purpose, look up at the source 👆"
+          exit 1
+      - run: echo "this step never runs"
