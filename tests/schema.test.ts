@@ -14,7 +14,7 @@ function load(source: string) {
 }
 
 const ciSource = readFileSync(
-  fileURLToPath(new URL("../.github/workflows/src/ci.actio.yml", import.meta.url)),
+  fileURLToPath(new URL("../.github/actio/ci.actio.yml", import.meta.url)),
   "utf8",
 );
 

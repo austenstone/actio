@@ -32,9 +32,15 @@ function findConfigFile(cwd: string): string | null {
  * when none is found. JSON is parsed directly; everything else (TS/ESM/CJS) is
  * evaluated through jiti so config authors can use TypeScript with no build step.
  */
-export async function loadActioConfig(cwd: string = process.cwd()): Promise<LoadedConfig | null> {
-  const filepath = findConfigFile(cwd);
+export async function loadActioConfig(
+  cwd: string = process.cwd(),
+  explicitPath?: string,
+): Promise<LoadedConfig | null> {
+  const filepath = explicitPath ? path.resolve(cwd, explicitPath) : findConfigFile(cwd);
   if (!filepath) return null;
+  if (explicitPath && !existsSync(filepath)) {
+    throw new Error(`Config file not found: ${path.relative(cwd, filepath)}`);
+  }
 
   let config: ActioConfig;
   try {

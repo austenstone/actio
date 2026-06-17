@@ -99,6 +99,18 @@ describe("loadActioConfig discovery", () => {
     tmpDirs.push(dir);
     expect(await loadActioConfig(dir)).toBeNull();
   });
+
+  it("loads an explicit config path that discovery would never reach", async () => {
+    const dir = fixture({ "nested/actio.config.json": JSON.stringify({ outDir: "explicit" }) });
+    const loaded = await loadActioConfig(dir, "nested/actio.config.json");
+    expect(loaded?.config.outDir).toBe("explicit");
+  });
+
+  it("throws when an explicit config path is missing", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "actio-missing-"));
+    tmpDirs.push(dir);
+    await expect(loadActioConfig(dir, "nope.config.ts")).rejects.toThrow(/not found/);
+  });
 });
 
 describe("resolveBuildOptions precedence", () => {

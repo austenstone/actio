@@ -1,9 +1,9 @@
 {
   "version": 1,
   "generator": "actio",
-  "file": ".github/workflows/src/ci.yml",
+  "file": ".github/actio/ci.yml",
   "sources": [
-    ".github/workflows/src/ci.actio.yml"
+    ".github/actio/ci.actio.yml"
   ],
   "mappings": [
     {

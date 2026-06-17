@@ -13,6 +13,7 @@ const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url),
 };
 
 interface CliBuildFlags {
+  config?: string;
   outDir?: string;
   check?: boolean;
   stdout?: boolean;
@@ -31,7 +32,7 @@ async function resolveOptions(
 ): Promise<{ patterns: string[]; options: BuildOptions }> {
   let loaded: LoadedConfig | null = null;
   try {
-    loaded = await loadActioConfig();
+    loaded = await loadActioConfig(process.cwd(), flags.config);
   } catch (err) {
     process.stderr.write(`${pc.red("error")}: ${(err as Error).message}\n`);
     process.exit(1);
@@ -58,6 +59,7 @@ async function startWatch(files: string[], flags: CliBuildFlags) {
 
 cli
   .command("build [...files]", "Compile .actio.yml files into GitHub Actions workflows")
+  .option("--config <file>", "Path to an actio config file (overrides auto-discovery)")
   .option("--out-dir <dir>", "Output directory for generated workflows")
   .option("--check", "Verify generated output is up to date without writing (CI drift check)")
   .option("--stdout", "Write generated YAML to stdout instead of files")
@@ -76,6 +78,7 @@ cli
 
 cli
   .command("watch [...files]", "Watch .actio.yml files and rebuild workflows on change")
+  .option("--config <file>", "Path to an actio config file (overrides auto-discovery)")
   .option("--out-dir <dir>", "Output directory for generated workflows", {
     default: ".github/workflows",
   })
@@ -90,6 +93,7 @@ cli
     "check [...files]",
     "Verify generated workflows are up to date (alias for build --check)",
   )
+  .option("--config <file>", "Path to an actio config file (overrides auto-discovery)")
   .option("--out-dir <dir>", "Output directory for generated workflows")
   .option("--no-validate", "Skip schema validation of generated workflows")
   .option("--no-header", "Omit the generated-by-Actio banner")

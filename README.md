@@ -50,6 +50,18 @@ npx actio build
 npx actio check
 ```
 
+**Recommended layout:** keep sources in `.github/actio/` and compile them into
+`.github/workflows/` — the directory GitHub actually reads. Sources nested
+outside `.github/workflows/` won't be mistaken for real workflows. Think of
+`.github/workflows/` as your `dist`:
+
+```
+.github/
+  actio/        # source: *.actio.yml (+ actio.config.ts)
+  workflows/    # generated: *.yml (committed, GitHub runs these)
+```
+
+
 ## Macros
 
 ### 1. `fragments` + `inject`
@@ -278,6 +290,7 @@ actio schema             Print the Actio JSON Schema (--out <file> to save local
 
 | Flag | Description |
 | --- | --- |
+| `--config <file>` | Path to an actio config file (overrides auto-discovery) |
 | `--out-dir <dir>` | Output directory (default `.github/workflows`) |
 | `--check` | Verify output is up to date without writing (CI drift check) |
 | `--stdout` | Write generated YAML to stdout instead of files |
@@ -358,7 +371,9 @@ The schema is also exported from `@actio/core` (`actioSchema()`, `actioSchemaPat
 
 For anything beyond flags — and to register **custom passes** — drop an
 `actio.config` file in your project. Actio auto-discovers it by walking up from
-the current directory, so it works from any subfolder. Supported formats:
+the current directory, so it works from any subfolder. Point at a specific file
+with `--config <file>` to skip discovery (handy when the config lives somewhere
+discovery won't reach, like alongside your sources). Supported formats:
 `actio.config.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs`, `.json` (TS/ESM are
 loaded at runtime via [jiti](https://github.com/unjs/jiti) — no build step).
 
