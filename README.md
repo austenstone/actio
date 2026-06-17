@@ -4,9 +4,10 @@
 
 Writing **dynamic** GitHub Actions workflows in raw YAML is painful. Actio adds a
 small set of macro keywords — [`fragments`](#1-fragments--inject),
-[`dynamic_matrix`](#2-dynamic_matrix), and [`fallback`](#3-fallback) — that
-expand into the boilerplate GitHub requires. Everything else is passthrough, so a
-macro-free `.actio.yml` file is just a normal workflow.
+[`retry`](#2-retry), [`dynamic_matrix`](#3-dynamic_matrix), and
+[`fallback`](#4-fallback) — that expand into the boilerplate GitHub requires.
+Everything else is passthrough, so a macro-free `.actio.yml` file is just a normal
+workflow.
 
 Inspired by [Buildkite](https://buildkite.com/docs/pipelines/configure/dynamic-pipelines)'s
 runtime `pipeline upload`. GitHub Actions can't inject steps at runtime — but we
@@ -18,6 +19,7 @@ runtime `pipeline upload`. GitHub Actions can't inject steps at runtime — but 
 | --- | --- |
 | Dynamic matrix needs a hand-built setup job that prints JSON to `$GITHUB_OUTPUT`, consumed downstream via `fromJSON()`, with escaping and empty-guard gotchas | `dynamic_matrix: { script, alias }` |
 | Reusing 3 steps forces a separate [composite action](https://docs.github.com/en/actions/sharing-automations/creating-actions/creating-a-composite-action) or [reusable workflow](https://docs.github.com/en/actions/sharing-automations/reusing-workflows) file | in-file `fragments` + `inject` |
+| Retrying flaky steps requires bash loops or third-party actions | `retry: { attempts, delay }` |
 | try/catch means smearing `if: failure()` / `continue-on-error` across steps | `fallback:` block |
 
 Prior art ([`github-actions-workflow-ts`](https://github.com/emmanuelnk/github-actions-workflow-ts),
@@ -86,7 +88,73 @@ jobs:
       - run: npm test
 ```
 
-### 2. `dynamic_matrix`
+### 2. `retry`
+
+Retry flaky steps with automatic backoff. Works with both `run:` and `uses:` steps.
+
+**`.actio.yml`**
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to production
+        uses: cloudflare/wrangler-action@v3
+        retry:
+          attempts: 3
+          delay: 10s
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+```
+
+**generated `.yml`** — fans out into conditional attempts, each gated on prior failure:
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to production (attempt 1/3)
+        uses: cloudflare/wrangler-action@v3
+        id: step_deploy_to_production_attempt_1
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+      - name: Retry backoff (10s) before attempt 2/3
+        run: sleep 10
+        if: steps.step_deploy_to_production_attempt_1.outcome == 'failure'
+      - name: Deploy to production (attempt 2/3)
+        uses: cloudflare/wrangler-action@v3
+        id: step_deploy_to_production_attempt_2
+        if: steps.step_deploy_to_production_attempt_1.outcome == 'failure'
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+      - name: Retry backoff (10s) before attempt 3/3
+        run: sleep 10
+        if: steps.step_deploy_to_production_attempt_2.outcome == 'failure'
+      - name: Deploy to production (attempt 3/3)
+        uses: cloudflare/wrangler-action@v3
+        id: step_deploy_to_production_attempt_3
+        if: steps.step_deploy_to_production_attempt_2.outcome == 'failure'
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+```
+
+How it works:
+- Each attempt but the last gets `continue-on-error: true` so failure doesn't stop the job
+- Attempt N runs only when attempt N-1 had `outcome == 'failure'`
+- A success at any attempt short-circuits the rest; all-fail fails the job on the final attempt
+- Each attempt gets a unique ID and auto-names as `"<step> (attempt N/max)"`
+
+Options:
+- `attempts` (required): number of times to retry (minimum 2)
+- `delay` (optional): backoff between attempts, e.g., `"10s"`, `"2m"`, `"1h"` (injects `sleep` steps)
+
+Shorthand: `retry: 3` is the same as `retry: { attempts: 3 }`
+
+### 3. `dynamic_matrix`
 
 The headline feature. A job-level block whose `script` prints a JSON array (or
 `{include:[...]}`); Actio generates the setup job + wiring.
@@ -137,7 +205,7 @@ Options: `script` (required), `alias` (wrap a scalar array under `matrix.<alias>
 omit for raw `{include:[...]}` mode), `checkout` (default `true` when `script` is
 a local path), `runs-on`, `shell`, `fail-fast` (default `false`), `id`.
 
-### 3. `fallback`
+### 4. `fallback`
 
 A native try/catch. Attach `fallback:` to a step (or a job).
 
