@@ -59,15 +59,17 @@ cli
     process.exitCode = code;
   });
 
-cli.command("init [file]", "Scaffold a starter .actio.yml file").action(async (file = "ci.actio.yml") => {
-  if (existsSync(file)) {
-    process.stderr.write(`${pc.yellow("warning")}: ${file} already exists; not overwriting\n`);
-    process.exitCode = 1;
-    return;
-  }
-  await writeFile(file, STARTER_ACTIO, "utf8");
-  process.stderr.write(`${pc.green("✓")} created ${file}\n`);
-});
+cli
+  .command("init [file]", "Scaffold a starter .actio.yml file")
+  .action(async (file = "ci.actio.yml") => {
+    if (existsSync(file)) {
+      process.stderr.write(`${pc.yellow("warning")}: ${file} already exists; not overwriting\n`);
+      process.exitCode = 1;
+      return;
+    }
+    await writeFile(file, STARTER_ACTIO, "utf8");
+    process.stderr.write(`${pc.green("✓")} created ${file}\n`);
+  });
 
 cli.help();
 cli.version(pkg.version);
