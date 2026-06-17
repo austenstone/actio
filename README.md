@@ -366,8 +366,9 @@ built-in or another custom pass).
 > **Traversing jobs and steps?** Prefer the typed-IR **visitor helpers** —
 > `workflow`, `visitJobs`, `visitSteps`, `transformSteps`, all exported from
 > `@actio/core` — over poking `ctx.data` by hand. They give you typed nodes and
-> handle the awkward shape-checking for you. (These land with the typed-IR PR; on
-> older versions, fall back to walking `ctx.data` as above.)
+> handle the awkward shape-checking for you. (These land with the
+> [typed-IR PR (#10)](https://github.com/austenstone/actio/pull/10); on older
+> versions, fall back to walking `ctx.data` as above.)
 
 ```ts
 // Preferred form once the typed-IR API is available.
