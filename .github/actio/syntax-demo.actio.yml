@@ -1,0 +1,12 @@
+# Demo: a deliberately-invalid value so actio's build-time validation
+# annotates the exact source line in CI. `timeout-minutes` expects a
+# number — the quoted string below is a classic typo.
+name: Syntax Demo
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Say hi
+        run: echo "hello from actio"
+        timeout-minutes: "not-a-number"
