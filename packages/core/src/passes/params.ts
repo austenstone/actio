@@ -19,7 +19,8 @@ const PARAM_TYPES: ReadonlySet<ParamType> = new Set([
   "steps",
 ]);
 
-const PARAM_DEFINITION_KEYS = new Set(["type", "default", "values"]);
+const PARAM_DEFINITION_BASE_KEYS = new Set(["type", "default"]);
+const PARAM_DEFINITION_ENUM_KEYS = new Set([...PARAM_DEFINITION_BASE_KEYS, "values"]);
 
 const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
 
@@ -89,7 +90,13 @@ const collectParamSymbol = (
     return undefined;
   }
 
-  const unknownKeys = Object.keys(rawDefinition).filter((key) => !PARAM_DEFINITION_KEYS.has(key));
+  const typeRaw = rawDefinition.type;
+  const allowedKeys =
+    typeof typeRaw === "string" && typeRaw === "enum"
+      ? PARAM_DEFINITION_ENUM_KEYS
+      : PARAM_DEFINITION_BASE_KEYS;
+
+  const unknownKeys = Object.keys(rawDefinition).filter((key) => !allowedKeys.has(key));
   if (unknownKeys.length > 0) {
     for (const key of unknownKeys) {
       pushDiagnostic(
@@ -105,7 +112,6 @@ const collectParamSymbol = (
     return undefined;
   }
 
-  const typeRaw = rawDefinition.type;
   if (typeof typeRaw !== "string" || !PARAM_TYPES.has(typeRaw as ParamType)) {
     pushDiagnostic(
       ctx,

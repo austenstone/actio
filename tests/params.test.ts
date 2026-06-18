@@ -400,6 +400,26 @@ jobs:
     ).toBe(true);
   });
 
+  it("errors when non-enum param definitions include values", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+    values: [dev, prod]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+`);
+
+    expect(
+      errors.some((diagnostic) => diagnostic.message.includes("[param-definition-key-unknown]")),
+    ).toBe(true);
+  });
+
   it("errors when a scalar param is used in a steps position", () => {
     const errors = errorsFor(`name: x
 on: [push]
