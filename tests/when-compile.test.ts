@@ -18,6 +18,22 @@ function transpileResult(source: string) {
 }
 
 describe("when_compile diagnostics", () => {
+  it("pins the canonical runtime root allow-list", () => {
+    expect([...RUNTIME_CONTEXT_ROOTS]).toEqual([
+      "github",
+      "needs",
+      "steps",
+      "secrets",
+      "env",
+      "inputs",
+      "vars",
+      "runner",
+      "job",
+      "matrix",
+      "strategy",
+    ]);
+  });
+
   it("errors on runtime roots inside structural expressions (E1)", () => {
     const errors = transpileErrors(`name: x
 on: [push]
