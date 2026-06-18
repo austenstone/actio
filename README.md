@@ -2,6 +2,8 @@
 
 > A transpiler that compiles a clean `.actio.yml` source into the verbose GitHub Actions YAML you'd otherwise hand-write.
 
+📖 **[Read the documentation →](https://austenstone.github.io/actio)**
+
 Writing **dynamic** GitHub Actions workflows in raw YAML is painful. Actio adds a
 small set of macro keywords — [`params`](#1-params-typed-compile-time-inputs),
 [`fragments`](#2-fragments--inject), [`retry`](#3-retry),
