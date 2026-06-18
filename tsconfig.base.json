@@ -15,7 +15,7 @@
     "ignoreDeprecations": "6.0",
     "types": ["node"],
     "verbatimModuleSyntax": false,
-    "noUncheckedIndexedAccess": false,
+    "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true
   }

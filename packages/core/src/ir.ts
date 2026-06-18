@@ -27,8 +27,7 @@ export interface Step {
   inject?: string;
   retry?: unknown;
   fallback?: unknown;
-  // biome-ignore lint/suspicious/noExplicitAny: passthrough GHA keys stay dynamic
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface Job {
@@ -43,8 +42,7 @@ export interface Job {
   retry?: unknown;
   fallback?: unknown;
   dynamic_matrix?: unknown;
-  // biome-ignore lint/suspicious/noExplicitAny: passthrough GHA keys stay dynamic
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface Workflow {
@@ -52,8 +50,7 @@ export interface Workflow {
   on?: unknown;
   jobs?: Record<string, Job>;
   fragments?: Record<string, Step | Step[]>;
-  // biome-ignore lint/suspicious/noExplicitAny: passthrough GHA keys stay dynamic
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /** Typed view of the workflow model passes transform. */

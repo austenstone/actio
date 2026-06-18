@@ -1,10 +1,8 @@
 import type { Diagnostic, Range } from "../diagnostics.js";
+import type { Job, Step } from "../ir.js";
 import { type ParseContext, type Path, rangeOfPath } from "../parser.js";
 
-// biome-ignore lint/suspicious/noExplicitAny: workflow nodes are dynamic
-export type Step = Record<string, any>;
-// biome-ignore lint/suspicious/noExplicitAny: workflow nodes are dynamic
-export type Job = Record<string, any>;
+export type { Job, Step };
 
 export function clone<T>(value: T): T {
   return structuredClone(value);
@@ -17,6 +15,10 @@ export function isObject(v: unknown): v is Record<string, unknown> {
 export function asArray<T>(v: T | T[] | undefined | null): T[] {
   if (v == null) return [];
   return Array.isArray(v) ? v : [v];
+}
+
+export function asStepArray(value: unknown): Step[] {
+  return asArray(value).filter(isObject);
 }
 
 /** Heuristic: does this script reference look like a local file (vs an inline command)? */
@@ -63,7 +65,7 @@ export function combineIf(...conditions: (string | boolean | number | undefined 
     .filter((c) => c != null && !(typeof c === "string" && c.trim().length === 0))
     .map((c) => stripExprWrapper(String(c)));
   if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0];
+  if (parts.length === 1) return parts[0] ?? "";
   return parts.map((p) => (needsParens(p) ? `(${p})` : p)).join(" && ");
 }
 

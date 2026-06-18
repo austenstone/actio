@@ -71,7 +71,9 @@ export function matchStepIndex(
   const target = norm(apiStepName);
   if (target.length === 0) return undefined;
   for (let i = 0; i < steps.length; i++) {
-    const derived = norm(defaultStepName(steps[i]));
+    const step = steps[i];
+    if (!step) continue;
+    const derived = norm(defaultStepName(step));
     if (derived.length === 0) continue;
     if (target === derived || target.startsWith(derived) || derived.startsWith(target)) {
       return i;

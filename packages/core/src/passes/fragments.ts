@@ -1,6 +1,6 @@
 import { cloneNode, type Job, type Step, visitJobs } from "../ir.js";
 import type { ParseContext } from "../parser.js";
-import { asArray, isObject, pushDiagnostic } from "./helpers.js";
+import { asStepArray, isObject, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
 type FragmentMap = Record<string, Step[]>;
@@ -10,7 +10,7 @@ function getFragments(ctx: ParseContext): FragmentMap {
   const out: FragmentMap = {};
   if (isObject(frags)) {
     for (const [name, steps] of Object.entries(frags)) {
-      out[name] = asArray(steps as Step | Step[]);
+      out[name] = asStepArray(steps);
     }
   }
   return out;
@@ -51,7 +51,7 @@ function expandList(
         pushDiagnostic(ctx, "error", `Fragment cycle detected: ${[...stack, name].join(" -> ")}`);
         continue;
       }
-      const copies = fragments[name].map((s) => cloneNode(ctx, s));
+      const copies = (fragments[name] ?? []).map((s) => cloneNode(ctx, s));
       out.push(...expandList(copies, ctx, fragments, [...stack, name]));
     } else {
       if (isObject(step) && step.fallback != null) {
@@ -72,9 +72,9 @@ function expandFallbackInPlace(
 ): void {
   const fb = container.fallback;
   if (Array.isArray(fb)) {
-    container.fallback = expandList(fb, ctx, fragments, stack);
-  } else if (isObject(fb) && Array.isArray((fb as Step).steps)) {
-    (fb as Step).steps = expandList((fb as Step).steps, ctx, fragments, stack);
+    container.fallback = expandList(asStepArray(fb), ctx, fragments, stack);
+  } else if (isObject(fb) && Array.isArray(fb.steps)) {
+    fb.steps = expandList(asStepArray(fb.steps), ctx, fragments, stack);
   }
 }
 

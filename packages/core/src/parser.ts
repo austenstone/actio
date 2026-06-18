@@ -2,8 +2,7 @@ import { type Document, LineCounter, parseDocument } from "yaml";
 import type { Diagnostic, Range } from "./diagnostics.js";
 
 /** Plain-JS workflow model. Intentionally loose — we only type macro-relevant bits at use sites. */
-// biome-ignore lint/suspicious/noExplicitAny: the workflow model is dynamic by nature
-export type WorkflowData = Record<string, any>;
+export type WorkflowData = Record<string, unknown>;
 
 export type Path = (string | number)[];
 
