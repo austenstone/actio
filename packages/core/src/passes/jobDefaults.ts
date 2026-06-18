@@ -1,6 +1,6 @@
 import { type Job, visitJobs } from "../ir.js";
 import type { ParseContext } from "../parser.js";
-import { combineIf, isObject, pushDiagnostic } from "./helpers.js";
+import { clone, combineIf, isObject, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
 const JOB_DEFAULT_KEYS = [
@@ -16,16 +16,11 @@ const JOB_DEFAULT_KEYS = [
   "defaults",
 ] as const;
 
-const EXECUTOR_KEYS = [
-  "permissions",
-  "concurrency",
-  "timeout-minutes",
-  "runs-on",
-  "env",
-  "container",
-  "services",
-  "defaults",
-] as const;
+type JobDefaultKey = (typeof JOB_DEFAULT_KEYS)[number];
+
+const EXECUTOR_KEYS = JOB_DEFAULT_KEYS.filter(
+  (key): key is Exclude<JobDefaultKey, "if"> => key !== "if",
+);
 
 const CALL_JOB_DEFAULT_KEYS = new Set<string>(["if", "permissions", "concurrency", "strategy"]);
 const REPLACE_ON_PRESENCE_KEYS = new Set(["permissions", "concurrency"]);
@@ -57,14 +52,9 @@ export const JOB_DEFAULTS_SAFE_SUBSET = new Set<string>([
 ]);
 
 type ExecutorKey = (typeof EXECUTOR_KEYS)[number];
-type JobDefaultKey = (typeof JOB_DEFAULT_KEYS)[number];
 type InlinePresence = Record<JobDefaultKey | ExecutorKey, boolean>;
 
 const EXECUTOR_KEY_SET = new Set<string>(EXECUTOR_KEYS);
-
-function clone<T>(value: T): T {
-  return structuredClone(value);
-}
 
 function asMap(value: unknown): Record<string, unknown> | undefined {
   return isObject(value) ? value : undefined;
@@ -159,19 +149,11 @@ export function applyExecutor(
   executor: Record<string, unknown>,
   inlineKeys: Partial<Record<JobDefaultKey | ExecutorKey, boolean>> = {},
 ): void {
+  const writableJob = job as Record<string, unknown>;
   for (const [key, incoming] of Object.entries(executor)) {
     if (!isExecutorKey(key)) continue;
     if (incoming === undefined || inlineKeys[key]) continue;
-    const current = job[key];
-    if (REPLACE_ON_PRESENCE_KEYS.has(key) || REPLACE_KEYS.has(key)) {
-      job[key] = clone(incoming) as Job[ExecutorKey];
-      continue;
-    }
-    if (isObject(current) && isObject(incoming)) {
-      job[key] = deepMerge(current, incoming) as Job[ExecutorKey];
-      continue;
-    }
-    job[key] = clone(incoming) as Job[ExecutorKey];
+    writableJob[key] = mergeExecutorValue(key, writableJob[key], incoming);
   }
 }
 

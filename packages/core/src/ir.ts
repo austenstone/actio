@@ -45,11 +45,11 @@ export interface Job {
   needs?: string | string[];
   if?: string | boolean | number;
   steps?: Step[];
-  strategy?: unknown;
+  strategy?: Record<string, unknown>;
   permissions?: unknown;
   concurrency?: unknown;
   outputs?: Record<string, unknown>;
-  env?: unknown;
+  env?: Record<string, unknown>;
   container?: unknown;
   services?: unknown;
   defaults?: unknown;
