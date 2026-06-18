@@ -3,9 +3,10 @@
 > A transpiler that compiles a clean `.actio.yml` source into the verbose GitHub Actions YAML you'd otherwise hand-write.
 
 Writing **dynamic** GitHub Actions workflows in raw YAML is painful. Actio adds a
-small set of macro keywords — [`fragments`](#1-fragments--inject),
-[`retry`](#2-retry), [`dynamic_matrix`](#3-dynamic_matrix), and
-[`fallback`](#4-fallback) — that expand into the boilerplate GitHub requires.
+small set of macro keywords — [`params`](#1-params-typed-compile-time-inputs),
+[`fragments`](#2-fragments--inject), [`retry`](#3-retry),
+[`dynamic_matrix`](#4-dynamic_matrix), and [`fallback`](#5-fallback) — that
+expand into the boilerplate GitHub requires.
 Everything else is passthrough, so a macro-free `.actio.yml` file is just a normal
 workflow.
 
@@ -21,6 +22,7 @@ runtime `pipeline upload`. GitHub Actions can't inject steps at runtime — but 
 | Reusing 3 steps forces a separate [composite action](https://docs.github.com/en/actions/sharing-automations/creating-actions/creating-a-composite-action) or [reusable workflow](https://docs.github.com/en/actions/sharing-automations/reusing-workflows) file | in-file `fragments` + `inject` |
 | Retrying flaky steps requires bash loops or third-party actions | `retry: { attempts, delay }` |
 | try/catch means smearing `if: failure()` / `continue-on-error` across steps | `fallback:` block |
+| Compile-time constants and structured defaults are hard to keep typed in plain YAML | top-level `params:` + `{{ params.* }}` |
 
 Prior art ([`github-actions-workflow-ts`](https://github.com/emmanuelnk/github-actions-workflow-ts),
 [`github-actions-wac`](https://github.com/webiny/github-actions-wac),
@@ -64,7 +66,45 @@ outside `.github/workflows/` won't be mistaken for real workflows. Think of
 
 ## Macros
 
-### 1. `fragments` + `inject`
+### 1. `params` (typed compile-time inputs)
+
+Define compile-time parameters once, then interpolate them with `{{ params.x }}`
+for scalars or `{{ toJSON(params.x) }}` for objects/lists.
+
+**`.actio.yml`**
+```yaml
+name: Deploy
+on: [push]
+params:
+  env:
+    type: enum
+    values: [dev, staging, prod]
+    default: staging
+  retries:
+    type: number
+    default: 3
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "env={{ params.env }} retries={{ params.retries }}"
+```
+
+**generated `.yml`** — `params` is stripped and literals are fully resolved:
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "env=staging retries=3"
+```
+
+Token rules:
+- `{{ ... }}` is compile-time interpolation
+- `${{ ... }}` is GitHub runtime passthrough (except reserved roots handled by other macros)
+- `${{ params.* }}` is invalid (`params` are compile-time-only)
+
+### 2. `fragments` + `inject`
 
 Define reusable step blocks at the top of the file; splice them in with
 `- inject: <name>`.
@@ -100,7 +140,7 @@ jobs:
       - run: npm test
 ```
 
-### 2. `retry`
+### 3. `retry`
 
 Retry flaky steps with automatic backoff. Works with both `run:` and `uses:` steps.
 
@@ -166,7 +206,7 @@ Options:
 
 Shorthand: `retry: 3` is the same as `retry: { attempts: 3 }`
 
-### 3. `dynamic_matrix`
+### 4. `dynamic_matrix`
 
 The headline feature. A job-level block whose `script` prints a JSON array (or
 `{include:[...]}`); Actio generates the setup job + wiring.
@@ -236,7 +276,7 @@ to publish the matrix output, so a PowerShell or Python generator just prints it
 JSON. `compact` (jq) is bash/sh-only; other shells emit raw multi-line JSON, which
 `fromJSON()` parses fine.
 
-### 4. `fallback`
+### 5. `fallback`
 
 A native try/catch. Attach `fallback:` to a step (or a job).
 
@@ -550,6 +590,8 @@ derived by topologically sorting each pass's `runsAfter`, not hand-maintained, s
 adding a feature is: drop in a new file, declare what it runs after, register it.
 `PassRegistry` (exported from `actio-core`) lets external code add or remove
 passes without editing core.
+
+Built-in pass order today: `params → fragments → retry → fallback → dynamic_matrix`.
 
 ### Typed IR and provenance
 

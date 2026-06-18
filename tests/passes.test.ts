@@ -42,6 +42,7 @@ describe("sortPasses", () => {
 
   it("resolves the built-in pipeline to the documented order", () => {
     expect(sortPasses(builtinPasses).map((p) => p.name)).toEqual([
+      "params",
       "fragments",
       "retry",
       "fallback",
@@ -64,6 +65,7 @@ describe("PassRegistry", () => {
     const registry = new PassRegistry(builtinPasses);
     registry.register(recorder("post", ["dynamic_matrix"], log));
     expect(registry.list().map((p) => p.name)).toEqual([
+      "params",
       "fragments",
       "retry",
       "fallback",
