@@ -74,6 +74,10 @@ function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
     const label = stepLabel(step);
     const slug = slugify(label);
     const base = slug ? `step_${slug}` : `actio_${jobId}_step_${idx + 1}`;
+    // Preserve a user-supplied `id`: the final attempt reclaims it so downstream
+    // `steps.<id>` references (outputs, outcome) still resolve to the real result.
+    const userId = typeof step.id === "string" && step.id.trim() ? step.id.trim() : undefined;
+    if (userId) used.delete(userId);
     // Preserve a falsy boolean/number `if` (e.g. `if: false` / `if: 0`) — both
     // are valid "never run" gates that must survive onto the first attempt.
     const originalIf =
@@ -103,9 +107,14 @@ function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
 
       const attempt = cloneNode(ctx, step);
       attempt.name = `${label} (attempt ${n}/${attempts})`;
-      let id = `${base}_attempt_${n}`;
-      let dedupe = 2;
-      while (used.has(id)) id = `${base}_attempt_${n}_${dedupe++}`;
+      let id: string;
+      if (isLast && userId) {
+        id = userId;
+      } else {
+        id = `${base}_attempt_${n}`;
+        let dedupe = 2;
+        while (used.has(id)) id = `${base}_attempt_${n}_${dedupe++}`;
+      }
       used.add(id);
       attempt.id = id;
 
