@@ -732,7 +732,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - id: gen
-        run: echo "list=[1,2]" >> "\$GITHUB_OUTPUT"
+        run: echo "list=[1,2]" >> "$GITHUB_OUTPUT"
   test:
     runs-on: ubuntu-latest
     needs: setup

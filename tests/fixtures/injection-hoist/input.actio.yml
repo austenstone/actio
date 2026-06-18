@@ -1,0 +1,10 @@
+name: Injection Hoist
+on: [push]
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Greet untrusted title
+        run: echo "Issue title is ${{ github.event.issue.title }}"
+      - name: Trusted sha stays inline
+        run: echo "Building ${{ github.sha }}"

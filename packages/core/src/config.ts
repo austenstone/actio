@@ -24,6 +24,13 @@ export interface ActioConfig {
   annotate?: boolean;
   /** Glob patterns of `.actio.yml` files to compile when none are passed on the CLI. */
   files?: string[];
+  /**
+   * Default mode for the injection-hoist macro that auto-defuses `${{ }}`
+   * script-injection in `run:` bodies. `fix` (default) hoists untrusted
+   * interpolations into env vars; `warn`/`error` only diagnose; `off` disables.
+   * An in-document `injectionHoist:` key (root/job/step) overrides this.
+   */
+  injectionHoist?: "fix" | "warn" | "error" | "off";
   /** Alias for `files`. */
   include?: string[];
   /** Extra transform passes merged into the built-in pipeline (ordered by `runsAfter`). */

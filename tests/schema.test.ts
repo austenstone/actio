@@ -298,6 +298,33 @@ jobs:
     expect(validate(doc)).toBe(false);
   });
 
+  it("accepts injectionHoist mode at root, job, and step level with opt-outs", () => {
+    const doc = load(`on: [push]
+injectionHoist: warn
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    injectionHoist: fix
+    steps:
+      - run: echo "\${{ github.event.issue.title }}"
+        injectionHoist: error
+        unsafe: false
+        trust: github.event.issue.title
+        force: [github.sha]`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects an unknown injectionHoist mode", () => {
+    const doc = load(`on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        injectionHoist: nope`);
+    expect(validate(doc)).toBe(false);
+  });
+
   it("starter still transpiles cleanly with the modeline present", () => {
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);

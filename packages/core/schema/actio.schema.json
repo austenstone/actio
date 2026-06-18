@@ -645,6 +645,45 @@
         },
         "fallback": {
           "$ref": "#/definitions/fallback"
+        },
+        "injectionHoist": {
+          "$ref": "#/definitions/injectionHoistMode"
+        },
+        "unsafe": {
+          "type": "boolean",
+          "title": "unsafe (Actio macro)",
+          "description": "Actio macro. Opt this step out of injection-hoist entirely (equivalent to `injectionHoist: off`). Untrusted `${{ }}` interpolations in `run:` are left inline. Stripped from generated workflow YAML.",
+          "markdownDescription": "**Actio macro**: opt out of injection-hoist for this step.\n\nEquivalent to `injectionHoist: off`. Untrusted `${{ }}` interpolations in the `run:` body are left inline instead of being hoisted into env vars."
+        },
+        "trust": {
+          "title": "trust (Actio macro)",
+          "description": "Actio macro. Expression path(s) injection-hoist should treat as trusted (never hoist) for this step, e.g. `github.event.issue.title`. Stripped from generated workflow YAML.",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "force": {
+          "title": "force (Actio macro)",
+          "description": "Actio macro. Expression path(s) injection-hoist should always hoist for this step even if normally trusted, e.g. `github.sha`. Stripped from generated workflow YAML.",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
         }
       },
       "patternProperties": {
@@ -1058,6 +1097,9 @@
         "fallback": {
           "$ref": "#/definitions/fallback"
         },
+        "injectionHoist": {
+          "$ref": "#/definitions/injectionHoistMode"
+        },
         "executor": {
           "description": "Actio macro. Name (or ordered list of names) from top-level `executors:`. Expanded during compile and stripped from output.",
           "oneOf": [
@@ -1225,6 +1267,17 @@
         }
       ],
       "additionalProperties": false
+    },
+    "injectionHoistMode": {
+      "title": "injectionHoist (Actio macro)",
+      "description": "Actio macro. Mode for the injection-hoist pass that auto-defuses `${{ }}` script-injection in `run:` bodies. `fix` (default) hoists untrusted interpolations into env vars and rewrites the body to a quoted shell var; `warn`/`error` only diagnose; `off` disables. Settable at root, job, or step level (most specific wins). Stripped from generated workflow YAML.",
+      "markdownDescription": "**Actio macro**: control injection-hoist.\n\nAuto-defuses `${{ }}` script-injection in `run:` bodies by hoisting untrusted interpolations (e.g. `github.event.*`, `github.head_ref`) into generated `env:` vars and rewriting the body to reference a quoted shell variable.\n\n- `fix` (default): hoist and rewrite silently.\n- `warn`: diagnose only, leave inline.\n- `error`: error only, leave inline.\n- `off`: disable for this scope.\n\nSettable at root, job, or step level; the most specific wins.",
+      "enum": [
+        "fix",
+        "warn",
+        "error",
+        "off"
+      ]
     },
     "actioParam": {
       "title": "params.<name> (Actio macro)",
@@ -2826,6 +2879,9 @@
       "additionalProperties": {
         "$ref": "#/definitions/executorDefinition"
       }
+    },
+    "injectionHoist": {
+      "$ref": "#/definitions/injectionHoistMode"
     }
   },
   "required": [

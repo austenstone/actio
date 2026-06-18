@@ -58,6 +58,7 @@ export {
   fallback,
   forEach,
   fragments,
+  injectionHoist,
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,
   type Pass,
