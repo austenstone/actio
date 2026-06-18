@@ -41,13 +41,20 @@ export interface Step {
 
 export interface Job {
   "runs-on"?: unknown;
+  "timeout-minutes"?: unknown;
   needs?: string | string[];
   if?: string | boolean | number;
   steps?: Step[];
-  strategy?: Record<string, unknown>;
+  strategy?: unknown;
   permissions?: unknown;
+  concurrency?: unknown;
   outputs?: Record<string, unknown>;
-  env?: Record<string, unknown>;
+  env?: unknown;
+  container?: unknown;
+  services?: unknown;
+  defaults?: unknown;
+  uses?: string;
+  executor?: unknown;
   retry?: unknown;
   fallback?: unknown;
   dynamic_matrix?: unknown;

@@ -19,6 +19,15 @@
       "type": "object",
       "description": "Actio macro. Typed compile-time parameters. References are resolved with `{{ params.<name> }}` or `{{ toJSON(params.<name>) }}` and stripped from emitted workflow YAML.",
       "additionalProperties": { "$ref": "#/definitions/actioParam" }
+    },
+    "job_defaults": {
+      "$ref": "#/definitions/jobDefaults",
+      "description": "Actio macro. Default job-level settings merged into jobs at compile time. Stripped from generated workflow YAML."
+    },
+    "executors": {
+      "type": "object",
+      "description": "Actio macro. Named runner/container/service presets referenced by `jobs.<id>.executor`. Stripped from generated workflow YAML.",
+      "additionalProperties": { "$ref": "#/definitions/executorDefinition" }
     }
   },
   "patchDefinitions": {
@@ -36,7 +45,11 @@
     "normalJob": {
       "properties": {
         "dynamic_matrix": { "$ref": "#/definitions/dynamicMatrix" },
-        "fallback": { "$ref": "#/definitions/fallback" }
+        "fallback": { "$ref": "#/definitions/fallback" },
+        "executor": {
+          "type": "string",
+          "description": "Actio macro. Name of an entry under top-level `executors:`. Expanded during compile and stripped from output."
+        }
       }
     }
   },
@@ -129,6 +142,20 @@
           "type": "array",
           "items": { "$ref": "#/definitions/step" }
         }
+      }
+    },
+    "jobDefaults": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "executorDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runs-on": { "$ref": "#/definitions/normalJob/properties/runs-on" },
+        "container": { "$ref": "#/definitions/normalJob/properties/container" },
+        "services": { "$ref": "#/definitions/normalJob/properties/services" },
+        "env": { "$ref": "#/definitions/env" }
       }
     },
     "retry": {

@@ -52,6 +52,7 @@ export {
   dynamicMatrix,
   fallback,
   fragments,
+  jobDefaults,
   type Pass,
   type PassFn,
   PassRegistry,

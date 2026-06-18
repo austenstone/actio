@@ -20,6 +20,10 @@ describe("formatGithubAnnotation", () => {
     expect(formatGithubAnnotation({ ...base, severity: "warning" })).toMatch(/^::warning /);
   });
 
+  it("uses ::notice for info diagnostics", () => {
+    expect(formatGithubAnnotation({ ...base, severity: "info" })).toMatch(/^::notice /);
+  });
+
   it("includes endLine/endColumn for multi-position ranges", () => {
     const d = { ...base, range: { start: { line: 2, col: 1 }, end: { line: 3, col: 5 } } };
     expect(formatGithubAnnotation(d)).toContain("line=2,col=1,endLine=3,endColumn=5");

@@ -341,3 +341,158 @@ jobs:
     expect(doc.on.push.branches).toEqual(["main"]);
   });
 });
+
+describe("job_defaults + executors", () => {
+  it("partitions uses jobs and reports skipped runner defaults", () => {
+    const { result, errors, doc } = build(`name: x
+on: [push]
+job_defaults:
+  if: github.ref == 'refs/heads/main'
+  permissions:
+    contents: read
+  strategy:
+    matrix:
+      node: [20]
+  concurrency:
+    group: ci
+  runs-on: ubuntu-latest
+  env:
+    CI: "true"
+jobs:
+  call:
+    uses: org/repo/.github/workflows/reuse.yml@main
+    if: success()
+`);
+    expect(errors).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(doc.jobs.call.uses).toBe("org/repo/.github/workflows/reuse.yml@main");
+    expect(doc.jobs.call["runs-on"]).toBeUndefined();
+    expect(doc.jobs.call.env).toBeUndefined();
+    expect(doc.jobs.call.if).toBe("github.ref == 'refs/heads/main' && success()");
+    expect(doc.jobs.call.permissions).toEqual({ contents: "read" });
+    expect(doc.jobs.call.strategy).toEqual({ matrix: { node: [20] } });
+    expect(doc.jobs.call.concurrency).toEqual({ group: "ci" });
+
+    const infos = result.diagnostics.filter((d) => d.severity === "info");
+    expect(infos.some((d) => d.message.includes("job-defaults-uses-skipped"))).toBe(true);
+  });
+
+  it("errors on unknown executor names", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+executors:
+  gpu:
+    runs-on: [self-hosted, gpu]
+jobs:
+  train:
+    executor: missing
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes("executor-unknown"))).toBe(true);
+  });
+
+  it("errors when job_defaults or executors are not mappings", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+job_defaults: bad
+executors: bad
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes('"job_defaults" must be a mapping'))).toBe(true);
+    expect(errors.some((d) => d.message.includes('"executors" must be a mapping'))).toBe(true);
+  });
+
+  it("errors when an executor definition is not a mapping", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+executors:
+  bad: ubuntu-latest
+  good:
+    runs-on: ubuntu-latest
+jobs:
+  test:
+    executor: good
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes('Executor "bad" must be a mapping'))).toBe(true);
+  });
+
+  it("errors when executor is used on a reusable-workflow call job", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+executors:
+  linux:
+    runs-on: ubuntu-latest
+jobs:
+  call:
+    uses: org/repo/.github/workflows/reuse.yml@main
+    executor: linux
+`);
+    expect(result.ok).toBe(false);
+    expect(
+      errors.some((d) =>
+        d.message.includes('"executor" is not supported on reusable-workflow call jobs'),
+      ),
+    ).toBe(true);
+  });
+
+  it("errors when executor is not a non-empty string", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+executors:
+  linux:
+    runs-on: ubuntu-latest
+jobs:
+  test:
+    executor: "   "
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes("executor must be a non-empty string"))).toBe(
+      true,
+    );
+  });
+
+  it("deep-merges nested strategy maps and drops empty merged if conditions", () => {
+    const { result, errors, doc } = build(`name: x
+on: [push]
+job_defaults:
+  if: ""
+  strategy:
+    matrix:
+      node: [20]
+      os: [ubuntu-latest]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        shard: [1, 2]
+      fail-fast: false
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(true);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.test.if).toBeUndefined();
+    expect(doc.jobs.test.strategy).toEqual({
+      matrix: {
+        node: [20],
+        os: ["ubuntu-22.04"],
+        shard: [1, 2],
+      },
+      "fail-fast": false,
+    });
+  });
+});
