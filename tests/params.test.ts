@@ -182,6 +182,115 @@ jobs:
     );
   });
 
+  it("errors when params root is used inside runtime function arguments", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+  targets:
+    type: object
+    default: [x, y]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ toJSON(params.env) }}"
+      - run: echo "\${{ contains(params.targets, 'x') }}"
+`);
+
+    const runtimeSigilErrors = errors.filter((diagnostic) =>
+      diagnostic.message.includes("[params-runtime-sigil]"),
+    );
+    expect(runtimeSigilErrors.length).toBe(2);
+  });
+
+  it("errors when params root is used within nested runtime expressions", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+params:
+  name:
+    type: string
+    default: a
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format('{0}', params.name) }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
+  it("does not flag params when it is a non-root path segment in runtime expressions", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - id: params
+        run: echo "x=ok" >> "$GITHUB_OUTPUT"
+      - run: echo "\${{ steps.params.outputs.x }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      false,
+    );
+  });
+
+  it("does not flag identifiers that only contain params as a substring", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ vars.myparams }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      false,
+    );
+  });
+
+  it("does not flag params text inside runtime string literals", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format('params.x', github.ref) }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      false,
+    );
+  });
+
+  it("does not treat compile-time sigils as runtime params usage", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+params:
+  x:
+    type: string
+    default: ok
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "{{ params.x }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      false,
+    );
+  });
+
   it("errors when interpolating non-scalars without toJSON", () => {
     const errors = errorsFor(`name: x
 on: [push]

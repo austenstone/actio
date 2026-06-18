@@ -220,6 +220,54 @@ function findRuntimeExpressions(value: string): string[] {
   return expressions;
 }
 
+function isIdentifierStart(char: string): boolean {
+  return /[A-Za-z_]/.test(char);
+}
+
+function isIdentifierPart(char: string): boolean {
+  return /[A-Za-z0-9_]/.test(char);
+}
+
+function containsParamsRootReference(expr: string): boolean {
+  let quote: "'" | '"' | undefined;
+  for (let index = 0; index < expr.length; index++) {
+    const char = expr[index];
+    if (!char) continue;
+
+    if (quote) {
+      if (char !== quote) continue;
+      if (quote === "'" && expr[index + 1] === "'") {
+        index++;
+        continue;
+      }
+      if (quote === '"' && expr[index - 1] === "\\") continue;
+      quote = undefined;
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      quote = char;
+      continue;
+    }
+
+    if (!isIdentifierStart(char)) continue;
+
+    const start = index;
+    let end = index + 1;
+    while (end < expr.length && isIdentifierPart(expr[end] ?? "")) end++;
+    const identifier = expr.slice(start, end);
+    index = end - 1;
+
+    if (identifier !== "params") continue;
+
+    let prev = start - 1;
+    while (prev >= 0 && /\s/.test(expr[prev] ?? "")) prev--;
+    if (prev >= 0 && expr[prev] === ".") continue;
+    return true;
+  }
+  return false;
+}
+
 function hasCompileToken(value: string): boolean {
   let cursor = 0;
   while (cursor < value.length) {
@@ -338,7 +386,7 @@ function interpolateCompileTokens(ctx: ParseContext, value: string, path: Path):
 function resolveInterpolationsInTree(ctx: ParseContext, value: unknown, path: Path): unknown {
   if (typeof value === "string") {
     for (const expr of findRuntimeExpressions(value)) {
-      if (/^params(?:\.|$)/.test(expr)) {
+      if (containsParamsRootReference(expr)) {
         pushDiagnostic(
           ctx,
           "error",
