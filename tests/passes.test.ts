@@ -57,6 +57,7 @@ describe("sortPasses", () => {
     const byName = new Map(builtinPasses.map((pass) => [pass.name, pass]));
     const shuffled = [
       byName.get("fragments"),
+      byName.get("share"),
       byName.get("dynamic_matrix"),
       byName.get("fallback"),
       byName.get("retry"),
@@ -71,7 +72,8 @@ describe("sortPasses", () => {
     expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("when_compile"));
     expect(ordered.indexOf("for_each")).toBeLessThan(ordered.indexOf("when_compile"));
     expect(ordered.indexOf("when_compile")).toBeLessThan(ordered.indexOf("fragments"));
-    expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("retry"));
+    expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("share"));
+    expect(ordered.indexOf("share")).toBeLessThan(ordered.indexOf("retry"));
     expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
     expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("dynamic_matrix"));
   });
@@ -93,6 +95,7 @@ describe("sortPasses", () => {
       "for_each",
       "when_compile",
       "fragments",
+      "share",
       "retry",
       "fallback",
       "dynamic_matrix",
@@ -119,6 +122,7 @@ describe("PassRegistry", () => {
       "for_each",
       "when_compile",
       "fragments",
+      "share",
       "retry",
       "fallback",
       "dynamic_matrix",
@@ -153,6 +157,7 @@ describe("createRegistry", () => {
       "for_each",
       "when_compile",
       "fragments",
+      "share",
       "retry",
       "fallback",
       "dynamic_matrix",

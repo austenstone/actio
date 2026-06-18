@@ -1,0 +1,11 @@
+name: Escape
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Doc
+        run: TAG=$(date +%s)
+        share:
+          tag: $TAG
+      - run: echo "real ${{ share.tag }} literal $${{ share.tag }}"

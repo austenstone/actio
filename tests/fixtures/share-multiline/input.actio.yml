@@ -1,0 +1,14 @@
+name: Multiline
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notes
+        share:
+          notes:
+            run: git log --oneline -n 20
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ share.notes }}"
