@@ -10,6 +10,7 @@ import {
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,
 } from "./jobDefaults.js";
+import { lifecycle } from "./lifecycle.js";
 import { params } from "./params.js";
 import { applyPasses, type Pass, PassRegistry } from "./registry.js";
 import { retry } from "./retry.js";
@@ -29,6 +30,7 @@ export const builtinPasses: Pass[] = [
   retry,
   fallback,
   dynamicMatrix,
+  lifecycle,
 ];
 
 /** Run a set of passes (defaults to the built-ins) in dependency order. */
@@ -66,6 +68,7 @@ export {
   fragments,
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,
+  lifecycle,
   params,
   retry,
   whenCompile,

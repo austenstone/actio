@@ -1,0 +1,17 @@
+name: Finally
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build.sh
+  test:
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - run: ./test.sh
+finally:
+  teardown:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./destroy.sh

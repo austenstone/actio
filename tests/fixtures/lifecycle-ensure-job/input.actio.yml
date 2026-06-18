@@ -1,0 +1,11 @@
+name: Ensure Job
+on: [push]
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    ensure:
+      - name: Teardown
+        run: docker compose down -v
+    steps:
+      - name: Up
+        run: docker compose up -d

@@ -1,0 +1,11 @@
+name: Ensure Step
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        run: make build
+        ensure:
+          - name: Cleanup
+            run: ./cleanup.sh

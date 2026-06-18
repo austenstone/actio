@@ -30,6 +30,32 @@
       "type": "object",
       "description": "Actio macro. Named runner/container/service presets referenced by `jobs.<id>.executor`. Stripped from generated workflow YAML.",
       "additionalProperties": { "$ref": "#/definitions/executorDefinition" }
+    },
+    "finally": {
+      "type": "object",
+      "title": "finally (Actio macro)",
+      "description": "Actio macro. Whole-workflow teardown. Each entry becomes an aggregator job that `needs:` every real job; a `finally:` job also auto-emits a `cancelled()` companion so teardown runs on success, failure, and cancel. Use `on_success:`/`on_failure:`/`on_abort:` sub-mappings for outcome-scoped teardown, and `on_abort: []` to opt out of the cancel path. Stripped from generated workflow YAML.",
+      "markdownDescription": "**Actio macro**: whole-workflow teardown (sibling to `jobs:`).\n\nEach teardown job auto-aggregates `needs:` over every real job. A bare `finally:` job emits both a `!cancelled()` aggregator and a `cancelled()` companion (default `timeout-minutes: 5`) so cleanup runs on success, failure, **and** cancel. For same-unit teardown use `ensure:` on a step or job instead.\n\n```yaml\nfinally:\n  teardown:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./destroy-preview-env.sh\n  on_abort:\n    teardown-cancelled:\n      runs-on: ubuntu-latest\n      steps:\n        - run: ./notify.sh \"cancelled\"\n```",
+      "properties": {
+        "on_success": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/normalJob" }
+        },
+        "on_failure": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/normalJob" }
+        },
+        "on_abort": {
+          "oneOf": [
+            { "type": "array", "maxItems": 0 },
+            {
+              "type": "object",
+              "additionalProperties": { "$ref": "#/definitions/normalJob" }
+            }
+          ]
+        }
+      },
+      "additionalProperties": { "$ref": "#/definitions/normalJob" }
     }
   },
   "patchDefinitions": {
@@ -48,7 +74,11 @@
           "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for_each.*`, `define.*`). If the expression is false the entire step is removed from the generated workflow; if true the `static_if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\nsteps:\n  - name: Publish preview\n    static_if: params.deploy\n    run: ./publish.sh\n```"
         },
         "retry": { "$ref": "#/definitions/retry" },
-        "fallback": { "$ref": "#/definitions/fallback" }
+        "fallback": { "$ref": "#/definitions/fallback" },
+        "ensure": { "$ref": "#/definitions/lifecycleHook" },
+        "on_success": { "$ref": "#/definitions/lifecycleHook" },
+        "on_failure": { "$ref": "#/definitions/lifecycleHook" },
+        "on_abort": { "$ref": "#/definitions/lifecycleHook" }
       },
       "patternProperties": {
         "^static_if\\(.+\\)$": {
@@ -68,6 +98,15 @@
         },
         "dynamic_matrix": { "$ref": "#/definitions/dynamicMatrix" },
         "fallback": { "$ref": "#/definitions/fallback" },
+        "ensure": { "$ref": "#/definitions/lifecycleHook" },
+        "on_success": { "$ref": "#/definitions/lifecycleHook" },
+        "on_failure": { "$ref": "#/definitions/lifecycleHook" },
+        "on_abort": { "$ref": "#/definitions/lifecycleHook" },
+        "when": {
+          "type": "string",
+          "title": "when (Actio finally sugar)",
+          "description": "Actio macro. Inside a `finally:` teardown job, gate the job on another job's result: `<job>.failed` / `.succeeded` / `.cancelled` / `.skipped`. Compiles to `needs.<job>.result == '<result>'` and force-adds the referenced job to `needs:`."
+        },
         "executor": {
           "description": "Actio macro. Name (or ordered list of names) from top-level `executors:`. Expanded during compile and stripped from output.",
           "oneOf": [
@@ -96,6 +135,12 @@
     }
   },
   "addDefinitions": {
+    "lifecycleHook": {
+      "title": "lifecycle hook (Actio macro)",
+      "description": "Actio macro. An ordered list of teardown/branch steps attached to a step or job. Compiled into guarded steps and stripped from emitted workflow YAML.",
+      "type": "array",
+      "items": { "$ref": "#/definitions/step" }
+    },
     "actioParam": {
       "title": "params.<name> (Actio macro)",
       "description": "A typed compile-time parameter definition.",

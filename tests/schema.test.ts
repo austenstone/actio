@@ -302,4 +302,58 @@ jobs:
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);
   });
+
+  it("accepts a top-level finally block with branch sub-mappings and on_abort: []", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build.sh
+finally:
+  teardown:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./destroy.sh
+  on_failure:
+    alert:
+      runs-on: ubuntu-latest
+      steps:
+        - run: ./page.sh
+  on_abort: []`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts when: sugar and ensure: on finally and real jobs", () => {
+    const doc = load(`on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    ensure:
+      - run: ./cleanup.sh
+    steps:
+      - name: Deploy
+        run: ./deploy.sh
+        on_failure:
+          - run: ./rollback.sh
+finally:
+  notify:
+    runs-on: ubuntu-latest
+    when: deploy.failed
+    steps:
+      - run: ./notify.sh`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects a non-object finally block", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build.sh
+finally:
+  - run: ./oops.sh`);
+    expect(validate(doc)).toBe(false);
+  });
 });

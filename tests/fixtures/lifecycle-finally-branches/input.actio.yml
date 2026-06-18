@@ -1,0 +1,19 @@
+name: Finally Branches
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+finally:
+  on_success:
+    notify-shipped:
+      runs-on: ubuntu-latest
+      steps:
+        - run: ./notify.sh
+  on_failure:
+    page-oncall:
+      runs-on: ubuntu-latest
+      steps:
+        - run: ./page.sh
+  on_abort: []
