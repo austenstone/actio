@@ -1,0 +1,16 @@
+name: escape
+on: [push]
+jobs:
+  emit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: make color
+        run: echo making
+        share:
+          color: blue
+  show:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "literal $${{ share.color }}"
+          echo "real ${{ share.color }}"

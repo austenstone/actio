@@ -14,13 +14,17 @@
       "additionalProperties": {
         "type": "array",
         "description": "An ordered list of steps to inject wherever this fragment is referenced.",
-        "items": { "$ref": "#/definitions/step" }
+        "items": {
+          "$ref": "#/definitions/step"
+        }
       }
     },
     "params": {
       "type": "object",
       "description": "Actio macro. Typed compile-time parameters. References are resolved with `{{ params.<name> }}` or `{{ toJSON(params.<name>) }}` and stripped from emitted workflow YAML.",
-      "additionalProperties": { "$ref": "#/definitions/actioParam" }
+      "additionalProperties": {
+        "$ref": "#/definitions/actioParam"
+      }
     },
     "job_defaults": {
       "$ref": "#/definitions/jobDefaults",
@@ -29,7 +33,9 @@
     "executors": {
       "type": "object",
       "description": "Actio macro. Named runner/container/service presets referenced by `jobs.<id>.executor`. Stripped from generated workflow YAML.",
-      "additionalProperties": { "$ref": "#/definitions/executorDefinition" }
+      "additionalProperties": {
+        "$ref": "#/definitions/executorDefinition"
+      }
     }
   },
   "patchDefinitions": {
@@ -47,8 +53,15 @@
           "description": "Actio macro. Compile-time structural condition. If false, this entire step map is omitted from emitted workflow YAML.",
           "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for_each.*`, `define.*`). If the expression is false the entire step is removed from the generated workflow; if true the `static_if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\nsteps:\n  - name: Publish preview\n    static_if: params.deploy\n    run: ./publish.sh\n```"
         },
-        "retry": { "$ref": "#/definitions/retry" },
-        "fallback": { "$ref": "#/definitions/fallback" }
+        "retry": {
+          "$ref": "#/definitions/retry"
+        },
+        "fallback": {
+          "$ref": "#/definitions/fallback"
+        },
+        "share": {
+          "$ref": "#/definitions/share"
+        }
       },
       "patternProperties": {
         "^static_if\\(.+\\)$": {
@@ -56,7 +69,11 @@
           "description": "Actio macro. Conditional merge map. When expression is true, merge this mapping into the parent map."
         }
       },
-      "appendOneOf": [{ "required": ["inject"] }]
+      "appendOneOf": [
+        {
+          "required": ["inject"]
+        }
+      ]
     },
     "normalJob": {
       "properties": {
@@ -66,15 +83,23 @@
           "description": "Actio macro. Compile-time structural condition. If false, this entire job map is omitted from emitted workflow YAML.",
           "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for_each.*`, `define.*`). If the expression is false the entire job is removed from the generated workflow; if true the `static_if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\njobs:\n  release:\n    static_if: params.deploy\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./release.sh\n```"
         },
-        "dynamic_matrix": { "$ref": "#/definitions/dynamicMatrix" },
-        "fallback": { "$ref": "#/definitions/fallback" },
+        "dynamic_matrix": {
+          "$ref": "#/definitions/dynamicMatrix"
+        },
+        "fallback": {
+          "$ref": "#/definitions/fallback"
+        },
         "executor": {
           "description": "Actio macro. Name (or ordered list of names) from top-level `executors:`. Expanded during compile and stripped from output.",
           "oneOf": [
-            { "type": "string" },
+            {
+              "type": "string"
+            },
             {
               "type": "array",
-              "items": { "type": "string" }
+              "items": {
+                "type": "string"
+              }
             }
           ]
         }
@@ -100,13 +125,27 @@
       "title": "params.<name> (Actio macro)",
       "description": "A typed compile-time parameter definition.",
       "oneOf": [
-        { "$ref": "#/definitions/actioParamString" },
-        { "$ref": "#/definitions/actioParamNumber" },
-        { "$ref": "#/definitions/actioParamBoolean" },
-        { "$ref": "#/definitions/actioParamEnum" },
-        { "$ref": "#/definitions/actioParamObject" },
-        { "$ref": "#/definitions/actioParamStepList" },
-        { "$ref": "#/definitions/actioParamSteps" }
+        {
+          "$ref": "#/definitions/actioParamString"
+        },
+        {
+          "$ref": "#/definitions/actioParamNumber"
+        },
+        {
+          "$ref": "#/definitions/actioParamBoolean"
+        },
+        {
+          "$ref": "#/definitions/actioParamEnum"
+        },
+        {
+          "$ref": "#/definitions/actioParamObject"
+        },
+        {
+          "$ref": "#/definitions/actioParamStepList"
+        },
+        {
+          "$ref": "#/definitions/actioParamSteps"
+        }
       ]
     },
     "actioParamString": {
@@ -114,8 +153,12 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "const": "string" },
-        "default": { "type": "string" }
+        "type": {
+          "const": "string"
+        },
+        "default": {
+          "type": "string"
+        }
       }
     },
     "actioParamNumber": {
@@ -123,8 +166,12 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "const": "number" },
-        "default": { "type": "number" }
+        "type": {
+          "const": "number"
+        },
+        "default": {
+          "type": "number"
+        }
       }
     },
     "actioParamBoolean": {
@@ -132,8 +179,12 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "const": "boolean" },
-        "default": { "type": "boolean" }
+        "type": {
+          "const": "boolean"
+        },
+        "default": {
+          "type": "boolean"
+        }
       }
     },
     "actioParamEnum": {
@@ -141,13 +192,19 @@
       "additionalProperties": false,
       "required": ["type", "values"],
       "properties": {
-        "type": { "const": "enum" },
+        "type": {
+          "const": "enum"
+        },
         "values": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
-        "default": { "type": "string" }
+        "default": {
+          "type": "string"
+        }
       }
     },
     "actioParamObject": {
@@ -155,10 +212,19 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "const": "object" },
+        "type": {
+          "const": "object"
+        },
         "default": {
           "description": "JSON-like default value. Use `{{ toJSON(params.<name>) }}` for string interpolation.",
-          "anyOf": [{ "type": "object" }, { "type": "array" }]
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "array"
+            }
+          ]
         }
       }
     },
@@ -167,10 +233,14 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "const": "stepList" },
+        "type": {
+          "const": "stepList"
+        },
         "default": {
           "type": "array",
-          "items": { "$ref": "#/definitions/step" }
+          "items": {
+            "$ref": "#/definitions/step"
+          }
         }
       }
     },
@@ -179,10 +249,14 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "const": "steps" },
+        "type": {
+          "const": "steps"
+        },
         "default": {
           "type": "array",
-          "items": { "$ref": "#/definitions/step" }
+          "items": {
+            "$ref": "#/definitions/step"
+          }
         }
       }
     },
@@ -190,38 +264,72 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "if": { "$ref": "#/definitions/normalJob/properties/if" },
-        "permissions": { "$ref": "#/definitions/normalJob/properties/permissions" },
-        "concurrency": { "$ref": "#/definitions/normalJob/properties/concurrency" },
-        "strategy": { "$ref": "#/definitions/normalJob/properties/strategy" },
+        "if": {
+          "$ref": "#/definitions/normalJob/properties/if"
+        },
+        "permissions": {
+          "$ref": "#/definitions/normalJob/properties/permissions"
+        },
+        "concurrency": {
+          "$ref": "#/definitions/normalJob/properties/concurrency"
+        },
+        "strategy": {
+          "$ref": "#/definitions/normalJob/properties/strategy"
+        },
         "continue-on-error": {
           "$ref": "#/definitions/normalJob/properties/continue-on-error"
         },
-        "environment": { "$ref": "#/definitions/normalJob/properties/environment" },
+        "environment": {
+          "$ref": "#/definitions/normalJob/properties/environment"
+        },
         "timeout-minutes": {
           "$ref": "#/definitions/normalJob/properties/timeout-minutes"
         },
-        "runs-on": { "$ref": "#/definitions/normalJob/properties/runs-on" },
-        "env": { "$ref": "#/definitions/env" },
-        "container": { "$ref": "#/definitions/normalJob/properties/container" },
-        "services": { "$ref": "#/definitions/normalJob/properties/services" },
-        "defaults": { "$ref": "#/definitions/normalJob/properties/defaults" }
+        "runs-on": {
+          "$ref": "#/definitions/normalJob/properties/runs-on"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "container": {
+          "$ref": "#/definitions/normalJob/properties/container"
+        },
+        "services": {
+          "$ref": "#/definitions/normalJob/properties/services"
+        },
+        "defaults": {
+          "$ref": "#/definitions/normalJob/properties/defaults"
+        }
       }
     },
     "executorDefinition": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "runs-on": { "$ref": "#/definitions/normalJob/properties/runs-on" },
+        "runs-on": {
+          "$ref": "#/definitions/normalJob/properties/runs-on"
+        },
         "timeout-minutes": {
           "$ref": "#/definitions/normalJob/properties/timeout-minutes"
         },
-        "permissions": { "$ref": "#/definitions/normalJob/properties/permissions" },
-        "concurrency": { "$ref": "#/definitions/normalJob/properties/concurrency" },
-        "defaults": { "$ref": "#/definitions/normalJob/properties/defaults" },
-        "container": { "$ref": "#/definitions/normalJob/properties/container" },
-        "services": { "$ref": "#/definitions/normalJob/properties/services" },
-        "env": { "$ref": "#/definitions/env" }
+        "permissions": {
+          "$ref": "#/definitions/normalJob/properties/permissions"
+        },
+        "concurrency": {
+          "$ref": "#/definitions/normalJob/properties/concurrency"
+        },
+        "defaults": {
+          "$ref": "#/definitions/normalJob/properties/defaults"
+        },
+        "container": {
+          "$ref": "#/definitions/normalJob/properties/container"
+        },
+        "services": {
+          "$ref": "#/definitions/normalJob/properties/services"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        }
       }
     },
     "retry": {
@@ -252,7 +360,10 @@
                   "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhSMH]?\\s*$",
                   "examples": ["10s", "2m", "1h"]
                 },
-                { "type": "number", "exclusiveMinimum": 0 }
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
               ]
             }
           }
@@ -267,7 +378,9 @@
         {
           "type": "array",
           "description": "Fallback steps (notify mode). The job still fails.",
-          "items": { "$ref": "#/definitions/step" }
+          "items": {
+            "$ref": "#/definitions/step"
+          }
         },
         {
           "type": "object",
@@ -277,7 +390,9 @@
             "steps": {
               "type": "array",
               "description": "Steps to run when the guarded step or job fails.",
-              "items": { "$ref": "#/definitions/step" }
+              "items": {
+                "$ref": "#/definitions/step"
+              }
             },
             "recover": {
               "type": "boolean",
@@ -305,7 +420,17 @@
         },
         "runs-on": {
           "description": "Runner for the generated setup job. Defaults to the job's `runs-on`, else `ubuntu-latest`.",
-          "anyOf": [{ "type": "string" }, { "type": "array" }, { "type": "object" }]
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array"
+            },
+            {
+              "type": "object"
+            }
+          ]
         },
         "shell": {
           "type": "string",
@@ -323,7 +448,51 @@
           "type": "boolean",
           "description": "Value for `strategy.fail-fast` on the matrix job. Defaults to false."
         },
-        "id": { "type": "string", "description": "Override the generated setup job id." }
+        "id": {
+          "type": "string",
+          "description": "Override the generated setup job id."
+        }
+      }
+    },
+    "share": {
+      "title": "share (Actio macro)",
+      "description": "Actio macro. Publish a step's output for same-job or cross-job consumption via ${{ share.<name> }}. Actio writes the value to $GITHUB_OUTPUT and auto-wires job.outputs and needs.",
+      "markdownDescription": "**Actio macro**: publish a step output for `${{ share.<name> }}` consumption.\n\nActio writes the value to `$GITHUB_OUTPUT`, then rewrites every `${{ share.<name> }}` reference into the right `steps.*`/`needs.*` expression and infers the `job.outputs` and `needs` edges.\n\n```yaml\nsteps:\n  - name: resolve\n    share:\n      version: ${{ steps.x.outputs.v }}\n      meta:\n        run: cat meta.json\n        json: true\n```",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": ["string", "number", "boolean"],
+            "description": "Value-form: the scalar is written to $GITHUB_OUTPUT. A multiline string is shorthand for { run: <block> } (capture-form)."
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "value": {
+                "type": ["string", "number", "boolean"],
+                "description": "Value-form source written verbatim to $GITHUB_OUTPUT."
+              },
+              "run": {
+                "type": "string",
+                "description": "Capture-form: a command whose stdout is captured into $GITHUB_OUTPUT via a heredoc."
+              },
+              "json": {
+                "type": "boolean",
+                "description": "Mark the value as JSON so dotted ${{ share.<name>.<field> }} expands to fromJSON(target).field."
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Emit a runtime guard that fails the step if the produced value is empty."
+              },
+              "type": {
+                "enum": ["string", "number", "boolean", "object"],
+                "description": "Compile-time type assertion. boolean is assertion-only with no runtime coercion."
+              }
+            }
+          }
+        ]
       }
     }
   }

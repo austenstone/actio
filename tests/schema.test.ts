@@ -114,6 +114,34 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
+  it("accepts share directives on steps in scalar and object forms", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        share:
+          version: "1.2.3"
+          info:
+            run: cat meta.json
+            json: true
+            required: true
+          tag:
+            value: v1
+            type: string
+`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("exposes share on the step definition", () => {
+    const schema = actioSchema() as {
+      definitions: { step: { properties: Record<string, unknown> }; share?: unknown };
+    };
+    expect(schema.definitions.step.properties.share).toBeDefined();
+    expect(schema.definitions.share).toBeDefined();
+  });
+
   it("rejects enum params without values", () => {
     const doc = load(`on: [push]
 params:

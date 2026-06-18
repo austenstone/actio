@@ -645,6 +645,9 @@
         },
         "fallback": {
           "$ref": "#/definitions/fallback"
+        },
+        "share": {
+          "$ref": "#/definitions/share"
         }
       },
       "patternProperties": {
@@ -1582,6 +1585,60 @@
           "type": "string",
           "description": "Override the generated setup job id."
         }
+      }
+    },
+    "share": {
+      "title": "share (Actio macro)",
+      "description": "Actio macro. Publish a step's output for same-job or cross-job consumption via ${{ share.<name> }}. Actio writes the value to $GITHUB_OUTPUT and auto-wires job.outputs and needs.",
+      "markdownDescription": "**Actio macro**: publish a step output for `${{ share.<name> }}` consumption.\n\nActio writes the value to `$GITHUB_OUTPUT`, then rewrites every `${{ share.<name> }}` reference into the right `steps.*`/`needs.*` expression and infers the `job.outputs` and `needs` edges.\n\n```yaml\nsteps:\n  - name: resolve\n    share:\n      version: ${{ steps.x.outputs.v }}\n      meta:\n        run: cat meta.json\n        json: true\n```",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "description": "Value-form: the scalar is written to $GITHUB_OUTPUT. A multiline string is shorthand for { run: <block> } (capture-form)."
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "value": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
+                "description": "Value-form source written verbatim to $GITHUB_OUTPUT."
+              },
+              "run": {
+                "type": "string",
+                "description": "Capture-form: a command whose stdout is captured into $GITHUB_OUTPUT via a heredoc."
+              },
+              "json": {
+                "type": "boolean",
+                "description": "Mark the value as JSON so dotted ${{ share.<name>.<field> }} expands to fromJSON(target).field."
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Emit a runtime guard that fails the step if the produced value is empty."
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "object"
+                ],
+                "description": "Compile-time type assertion. boolean is assertion-only with no runtime coercion."
+              }
+            }
+          }
+        ]
       }
     }
   },

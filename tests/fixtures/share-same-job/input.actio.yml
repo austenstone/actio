@@ -1,0 +1,11 @@
+name: same-job
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: compute token
+        run: echo computing
+        share:
+          token: abc123
+      - run: echo "token is ${{ share.token }}"

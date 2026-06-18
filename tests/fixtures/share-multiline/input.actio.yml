@@ -1,0 +1,19 @@
+name: multiline
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: gen notes
+        share:
+          notes:
+            run: |
+              echo line one
+              echo line two
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          cat <<'MSG'
+          ${{ share.notes }}
+          MSG

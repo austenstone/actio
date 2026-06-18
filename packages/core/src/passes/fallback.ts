@@ -151,6 +151,6 @@ export function fallbackPass(ctx: ParseContext): void {
 /** Wrap steps with try/catch before dynamic_matrix moves them between jobs. */
 export const fallback: Pass = {
   name: "fallback",
-  runsAfter: ["fragments", "retry"],
+  runsAfter: ["fragments", "retry", "share"],
   apply: fallbackPass,
 };

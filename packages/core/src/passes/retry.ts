@@ -297,4 +297,4 @@ export function retryPass(ctx: ParseContext): void {
 }
 
 /** Fan out retry attempts before fallback wraps the final attempt. */
-export const retry: Pass = { name: "retry", runsAfter: ["fragments"], apply: retryPass };
+export const retry: Pass = { name: "retry", runsAfter: ["fragments", "share"], apply: retryPass };

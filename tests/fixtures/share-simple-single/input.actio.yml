@@ -1,0 +1,14 @@
+name: simple-single
+on: [push]
+jobs:
+  produce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: resolve version
+        run: echo resolving
+        share:
+          version: "1.2.3"
+  consume:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "version is ${{ share.version }}"

@@ -1,0 +1,15 @@
+name: json-fanout
+on: [push]
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: collect meta
+        share:
+          info:
+            run: cat meta.json
+            json: true
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "deploying ${{ share.info.version }} at ${{ share.info.sha }}"
