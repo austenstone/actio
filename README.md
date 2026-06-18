@@ -406,6 +406,8 @@ to stop.
 
 Actio ships a JSON Schema for `.actio.yml`, so the [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) (which bundles `yaml-language-server`) gives you autocomplete, hover docs, and validation for the macro keywords — no custom language server required.
 
+The schema inherits the full official [GitHub Actions workflow schema](https://www.schemastore.org/github-workflow.json) (vendored from [SchemaStore](https://www.schemastore.org/)) and layers the Actio macros on top, so you get complete Actions validation _plus_ the macro keywords — nothing from regular Actions is missing. The only hand-maintained piece is [`actio.extensions.json`](packages/core/schema/actio.extensions.json); run `npm run schema:build -w actio-core` to regenerate, or `npm run schema:refresh -w actio-core` to pull the latest upstream Actions schema first.
+
 Add this modeline to the top of any `.actio.yml` file (`actio init` adds it for you):
 
 ```yaml

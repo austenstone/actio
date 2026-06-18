@@ -42,14 +42,26 @@ function stripExprWrapper(cond: string): string {
 }
 
 function needsParens(expr: string): boolean {
-  return /\s\|\|\s/.test(expr);
+  // Wrap only when a `||` sits at the top level (depth 0). GitHub allows the
+  // spaceless `a||b` form, so a whitespace check misses it; tracking paren depth
+  // also avoids double-wrapping an already-grouped `(a||b)`.
+  let depth = 0;
+  for (let i = 0; i < expr.length; i++) {
+    const ch = expr[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if (depth === 0 && ch === "|" && expr[i + 1] === "|") return true;
+  }
+  return false;
 }
 
 /** Combine GitHub `if` conditions with `&&`, normalizing `${{ }}` wrappers. */
-export function combineIf(...conditions: (string | undefined | null)[]): string {
+export function combineIf(...conditions: (string | boolean | number | undefined | null)[]): string {
   const parts = conditions
-    .filter((c): c is string => typeof c === "string" && c.trim().length > 0)
-    .map(stripExprWrapper);
+    // Keep falsy booleans/numbers (`false`, `0` are valid "never run" gates);
+    // only drop nullish operands and empty/whitespace strings.
+    .filter((c) => c != null && !(typeof c === "string" && c.trim().length === 0))
+    .map((c) => stripExprWrapper(String(c)));
   if (parts.length === 0) return "";
   if (parts.length === 1) return parts[0];
   return parts.map((p) => (needsParens(p) ? `(${p})` : p)).join(" && ");

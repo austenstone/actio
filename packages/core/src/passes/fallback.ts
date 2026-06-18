@@ -29,30 +29,41 @@ function applyIf(step: Step, guard: string): Step {
   return step;
 }
 
+/** Expand a single step's `fallback:` block, recursing into nested fallbacks. */
+function expandStepFallback(
+  ctx: ParseContext,
+  jobId: string,
+  step: Step,
+  idx: number,
+  used: Set<string>,
+): Step[] {
+  if (!isObject(step) || step.fallback == null) return [step];
+  const { steps: fbSteps, recover } = normalizeFallback(step.fallback);
+  delete step.fallback;
+  if (fbSteps.length === 0) return [step];
+
+  const id = ensureStepId(step, used, `actio_${jobId}_step_${idx + 1}`);
+  const guard = recover
+    ? `steps.${id}.outcome == 'failure'`
+    : `failure() && steps.${id}.conclusion == 'failure'`;
+  if (recover && step["continue-on-error"] === undefined) {
+    // True try/catch: swallow the failure so the job can continue.
+    step["continue-on-error"] = true;
+  }
+  const out: Step[] = [step];
+  fbSteps.forEach((f, j) => {
+    const clone = applyIf(deriveNode(ctx, step, cloneNode(ctx, f)), guard);
+    // A fallback step may itself carry a `fallback:` — expand it recursively.
+    out.push(...expandStepFallback(ctx, jobId, clone, j, used));
+  });
+  return out;
+}
+
 /** Expand `fallback:` keys nested on individual steps into recover (try/catch) logic. */
 function processStepFallbacks(ctx: ParseContext, jobId: string, job: Job): void {
   if (!Array.isArray(job.steps)) return;
   const used = collectUsedStepIds(job.steps);
-  transformSteps(ctx, jobId, job, (step, idx) => {
-    if (!isObject(step) || step.fallback == null) return [step];
-    const { steps: fbSteps, recover } = normalizeFallback(step.fallback);
-    delete step.fallback;
-    if (fbSteps.length === 0) return [step];
-
-    const id = ensureStepId(step, used, `actio_${jobId}_step_${idx + 1}`);
-    const guard = recover
-      ? `steps.${id}.outcome == 'failure'`
-      : `failure() && steps.${id}.conclusion == 'failure'`;
-    if (recover && step["continue-on-error"] === undefined) {
-      // True try/catch: swallow the failure so the job can continue.
-      step["continue-on-error"] = true;
-    }
-    const out: Step[] = [step];
-    for (const f of fbSteps) {
-      out.push(applyIf(deriveNode(ctx, step, cloneNode(ctx, f)), guard));
-    }
-    return out;
-  });
+  transformSteps(ctx, jobId, job, (step, idx) => expandStepFallback(ctx, jobId, step, idx, used));
 }
 
 /** Expand a job-level `fallback:` block into notify steps gated on `failure()`. */
@@ -60,6 +71,17 @@ function processJobFallback(ctx: ParseContext, job: Job, jobId: string): void {
   if (job.fallback == null) return;
   const { steps: fbSteps, recover } = normalizeFallback(job.fallback);
   delete job.fallback;
+  // A reusable-workflow job (`uses:`) cannot also declare `steps:`; appending
+  // fallback steps would emit schema-invalid output. Skip and warn instead.
+  if (typeof job.uses === "string") {
+    pushDiagnostic(
+      ctx,
+      "warning",
+      `Job "${jobId}": job-level fallback is not supported on a reusable-workflow (uses) job; ignoring`,
+      ["jobs", jobId, "fallback"],
+    );
+    return;
+  }
   if (recover) {
     pushDiagnostic(
       ctx,
@@ -69,8 +91,13 @@ function processJobFallback(ctx: ParseContext, job: Job, jobId: string): void {
     );
   }
   if (!Array.isArray(job.steps)) job.steps = [];
+  const used = collectUsedStepIds(job.steps);
   for (const f of fbSteps) {
-    job.steps.push(applyIf(deriveNode(ctx, job, cloneNode(ctx, f)), "failure()"));
+    const clone = applyIf(deriveNode(ctx, job, cloneNode(ctx, f)), "failure()");
+    // A job-level fallback step may itself carry a nested `fallback:`.
+    for (const s of expandStepFallback(ctx, jobId, clone, job.steps.length, used)) {
+      job.steps.push(s);
+    }
   }
 }
 

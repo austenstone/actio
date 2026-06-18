@@ -20,7 +20,10 @@
     "node": ">=20"
   },
   "scripts": {
+    "prebuild": "node scripts/build-schema.mjs",
     "build": "tsup",
+    "schema:build": "node scripts/build-schema.mjs",
+    "schema:refresh": "node scripts/refresh-schema.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
