@@ -169,8 +169,11 @@ function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefi
     outputs: { matrix: "${{ steps.actio_eval.outputs.matrix }}" },
     steps,
   });
-  // Carry permissions/env through to the setup job when the script may need them.
+  // Carry context the matrix script may read: permissions, the target's
+  // upstream `needs`, and job-level `env`.
   if (job.permissions !== undefined) setup.permissions = job.permissions;
+  if (job.needs !== undefined) setup.needs = job.needs;
+  if (job.env !== undefined) setup.env = job.env;
   return setup;
 }
 
@@ -223,7 +226,7 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
       rebuilt[jobId] = job;
       continue;
     }
-    const setupId = `actio_setup_${jobId}`;
+    const setupId = opt<string>(job.dynamic_matrix as DM, "id") ?? `actio_setup_${jobId}`;
     const setup = buildSetupJob(ctx, jobId, job as Job);
     if (!setup) {
       // Leave the job intact (minus the macro key) so other passes/validation proceed.
