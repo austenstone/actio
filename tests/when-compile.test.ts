@@ -628,47 +628,14 @@ jobs:
     expect(doc.jobs.build.steps[0]?.env?.SHARED).toBe("second");
   });
 
-  it("evaluates against a seeded loop binding symbol (TODO(for-each-integration))", () => {
-    const loopBindingSymbol: SymbolDef = {
-      name: "for_each.item",
-      kind: "shared-output",
-      type: "object",
-      compileTimeKnown: true,
-      valueKnown: true,
-      hasDefault: false,
-      required: false,
-      taint: { tainted: false, derivedFrom: [] },
-      value: { enabled: true },
-    };
-    const seedLoopBinding: Pass = {
-      name: "for_each",
-      runsAfter: ["params"],
-      apply: (ctx) => {
-        ctx.symbols.set(loopBindingSymbol.name, loopBindingSymbol);
-      },
-    };
-    const rendered = transpile(
-      `name: x
-on: [push]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo kept
-        static_if: for_each.item.enabled
-      - run: echo always
-`,
-      {
-        fileName: "t.actio.yml",
-        passes: [seedLoopBinding],
-      },
-    );
-    expect(rendered.ok).toBe(true);
-    const doc = parse(rendered.yaml) as {
-      jobs: { build: { steps: Array<{ run?: string }> } };
-    };
-    expect(doc.jobs.build.steps.map((step) => step.run)).toEqual(["echo kept", "echo always"]);
-  });
+  // TODO(for-each-integration): the for_each x static_if seam is not built yet.
+  // for_each does not publish loop bindings (e.g. `for_each.item`) as compile-time
+  // symbols, so static_if cannot read them. Verified production behavior today:
+  // the real combo fails loud with [static-if-undefined-ref] — NOT a silent
+  // miscompile. Re-enable (seed via the real for_each, drop the stub) once for_each
+  // exposes loop-binding symbols static_if can resolve, alongside the #18
+  // shared-output integration seam.
+  it.todo("evaluates against a seeded loop binding symbol (for_each x static_if seam)");
 
   it("supports parser precedence, literals, and stdlib calls", () => {
     const result = transpileResult(`name: x

@@ -1,0 +1,12 @@
+name: ci
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: item
+          in: [alpha, beta]
+        steps:
+          - run: echo {{ item }}
+      - run: echo done

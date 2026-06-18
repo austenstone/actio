@@ -1,5 +1,12 @@
 import type { ParseContext } from "actio-core";
-import { applyPasses, builtinPasses, type Pass, PassRegistry, sortPasses } from "actio-core";
+import {
+  applyPasses,
+  builtinPasses,
+  createRegistry,
+  type Pass,
+  PassRegistry,
+  sortPasses,
+} from "actio-core";
 import { describe, expect, it } from "vitest";
 
 /** A no-op pass that records the order it ran in. */
@@ -131,5 +138,33 @@ describe("PassRegistry", () => {
     expect(registry.has("temp")).toBe(true);
     expect(registry.unregister("temp")).toBe(true);
     expect(registry.has("temp")).toBe(false);
+  });
+});
+
+describe("createRegistry", () => {
+  it("seeds the built-in pipeline in dependency order", () => {
+    expect(
+      createRegistry()
+        .list()
+        .map((p) => p.name),
+    ).toEqual([
+      "params",
+      "job_defaults",
+      "for_each",
+      "when_compile",
+      "fragments",
+      "retry",
+      "fallback",
+      "dynamic_matrix",
+    ]);
+  });
+
+  it("lets a caller-supplied pass override a same-named built-in", () => {
+    const log: string[] = [];
+    const override = recorder("for_each", ["params"], log);
+    const baseline = createRegistry().list().length;
+    const registry = createRegistry([override]);
+    expect(registry.list().filter((p) => p.name === "for_each")).toEqual([override]);
+    expect(registry.list().length).toBe(baseline);
   });
 });

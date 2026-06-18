@@ -36,9 +36,16 @@ export function runPasses(ctx: ParseContext, passes: Pass[] = builtinPasses): vo
   applyPasses(ctx, passes);
 }
 
-/** A registry seeded with the built-in passes, ready for extra ones to be added. */
+/**
+ * A registry seeded with the built-in passes, ready for extra ones to be added.
+ * A caller-supplied pass whose name matches a built-in replaces that built-in,
+ * so the pipeline can be customized without `register()` throwing on the clash.
+ * (`register()` itself stays strict; the dedupe happens here at the merge layer.)
+ */
 export function createRegistry(extra: Pass[] = []): PassRegistry {
-  return new PassRegistry([...builtinPasses, ...extra]);
+  const overridden = new Set(extra.map((pass) => pass.name));
+  const base = builtinPasses.filter((pass) => !overridden.has(pass.name));
+  return new PassRegistry([...base, ...extra]);
 }
 
 export { ANNOTATE_ACTION, ANNOTATE_JOB_ID, annotate } from "./annotate.js";
