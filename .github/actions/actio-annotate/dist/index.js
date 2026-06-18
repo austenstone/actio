@@ -31209,7 +31209,9 @@ function matchStepIndex(apiStepName, steps) {
   const target = norm(apiStepName);
   if (target.length === 0) return void 0;
   for (let i = 0; i < steps.length; i++) {
-    const derived = norm(defaultStepName(steps[i]));
+    const step = steps[i];
+    if (!step) continue;
+    const derived = norm(defaultStepName(step));
     if (derived.length === 0) continue;
     if (target === derived || target.startsWith(derived) || derived.startsWith(target)) {
       return i;
@@ -31237,6 +31239,7 @@ function resolvePath(map, target) {
 var SELF_JOB_NAME = "Actio annotate";
 function workflowPathFromRef(ref, repo) {
   const withoutGit = ref.split("@")[0];
+  if (!withoutGit) return void 0;
   const prefix = `${repo}/`;
   if (!withoutGit.startsWith(prefix)) return void 0;
   return withoutGit.slice(prefix.length);
