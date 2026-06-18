@@ -44,7 +44,7 @@ interface Token {
   pos: number;
 }
 
-const FORM_B_KEY_RE = /^when_compile\((.*)\)$/;
+const FORM_B_KEY_RE = /^static_if\((.*)\)$/;
 
 const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
 
@@ -85,7 +85,7 @@ const isStepPath = (path: Path): boolean =>
   typeof path[3] === "number";
 
 const hintForRuntimeContext =
-  "when_compile only supports compile-time roots (params.*, for_each.*, define.*). Use if: for runtime contexts.";
+  "static_if only supports compile-time roots (params.*, for_each.*, define.*). Use if: for runtime contexts.";
 
 class Tokenizer {
   readonly source: string;
@@ -594,10 +594,7 @@ const evaluateWhenCompile = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage(
-        "when-compile-empty",
-        "when_compile requires a non-empty boolean expression",
-      ),
+      diagnosticMessage("static-if-empty", "static_if requires a non-empty boolean expression"),
       path,
     );
     return undefined;
@@ -626,10 +623,10 @@ const evaluateWhenCompile = (
       ctx,
       "error",
       diagnosticMessage(
-        "when-compile-runtime-context",
+        "static-if-runtime-context",
         runtimeRoot
-          ? `when_compile cannot reference runtime context "${runtimeRoot}.*"`
-          : "when_compile takes a bare compile-time expression; `${{ }}` is runtime-only",
+          ? `static_if cannot reference runtime context "${runtimeRoot}.*"`
+          : "static_if takes a bare compile-time expression; `${{ }}` is runtime-only",
       ),
       path,
       { hint: "Drop `${{ }}` and use a bare expression such as `params.deploy`." },
@@ -642,7 +639,7 @@ const evaluateWhenCompile = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage("when-compile-empty", `Cannot parse when_compile expression "${trimmed}"`),
+      diagnosticMessage("static-if-empty", `Cannot parse static_if expression "${trimmed}"`),
       path,
     );
     return undefined;
@@ -660,8 +657,8 @@ const evaluateWhenCompile = (
       ctx,
       "error",
       diagnosticMessage(
-        "when-compile-runtime-context",
-        `when_compile cannot reference runtime context "${runtimeRoot}.*"`,
+        "static-if-runtime-context",
+        `static_if cannot reference runtime context "${runtimeRoot}.*"`,
       ),
       path,
       { hint: hintForRuntimeContext },
@@ -688,14 +685,14 @@ const evaluateWhenCompile = (
         ctx,
         "error",
         diagnosticMessage(
-          "when-compile-undefined-ref",
-          `when_compile references unknown value "${refKey}"`,
+          "static-if-undefined-ref",
+          `static_if references unknown value "${refKey}"`,
         ),
         path,
         {
           hint: maybeSuggestion
             ? `Did you mean "params.${maybeSuggestion}"?`
-            : "Declare the value in params or seed it as a compile-time symbol before when_compile.",
+            : "Declare the value in params or seed it as a compile-time symbol before static_if.",
         },
       );
       continue;
@@ -712,7 +709,7 @@ const evaluateWhenCompile = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage("when-compile-non-boolean", `when_compile evaluation failed: ${message}`),
+      diagnosticMessage("static-if-non-boolean", `static_if evaluation failed: ${message}`),
       path,
     );
     return undefined;
@@ -723,8 +720,8 @@ const evaluateWhenCompile = (
       ctx,
       "error",
       diagnosticMessage(
-        "when-compile-non-boolean",
-        `when_compile expression must resolve to boolean, got ${value === null ? "null" : typeof value}`,
+        "static-if-non-boolean",
+        `static_if expression must resolve to boolean, got ${value === null ? "null" : typeof value}`,
       ),
       path,
     );
@@ -743,16 +740,13 @@ const evaluateWhenCompileValue = (
   pushDiagnostic(
     ctx,
     "error",
-    diagnosticMessage(
-      "when-compile-non-boolean",
-      "when_compile must resolve to a boolean expression",
-    ),
+    diagnosticMessage("static-if-non-boolean", "static_if must resolve to a boolean expression"),
     path,
   );
   return undefined;
 };
 
-const OMIT = Symbol("actio.when_compile.omit");
+const OMIT = Symbol("actio.static_if.omit");
 
 type TransformedValue = unknown | typeof OMIT;
 
@@ -769,17 +763,17 @@ const transformNode = (ctx: ParseContext, value: unknown, path: Path): Transform
   if (!isObject(value)) return value;
 
   const allowFormA = isJobPath(path) || isStepPath(path);
-  const formAExpression = value.when_compile;
+  const formAExpression = value.static_if;
   if (allowFormA && formAExpression !== undefined) {
-    const keep = evaluateWhenCompileValue(ctx, formAExpression, [...path, "when_compile"]);
+    const keep = evaluateWhenCompileValue(ctx, formAExpression, [...path, "static_if"]);
     if (keep === false) return OMIT;
-    delete value.when_compile;
+    delete value.static_if;
   }
 
   const keys = Object.keys(value);
   const formBKeys: string[] = [];
   for (const key of keys) {
-    if (key === "when_compile") continue;
+    if (key === "static_if") continue;
     const expression = key.match(FORM_B_KEY_RE)?.[1];
     if (expression !== undefined) {
       formBKeys.push(key);
@@ -803,8 +797,8 @@ const transformNode = (ctx: ParseContext, value: unknown, path: Path): Transform
         ctx,
         "error",
         diagnosticMessage(
-          "when-compile-merge-non-map",
-          `when_compile(${expression}) must map to an object value for conditional merge`,
+          "static-if-merge-non-map",
+          `static_if(${expression}) must map to an object value for conditional merge`,
         ),
         [...path, key],
       );
@@ -819,8 +813,8 @@ const transformNode = (ctx: ParseContext, value: unknown, path: Path): Transform
           ctx,
           "warning",
           diagnosticMessage(
-            "when-compile-merge-collision",
-            `when_compile merge key "${mergeKey}" overrides an existing value`,
+            "static-if-merge-collision",
+            `static_if merge key "${mergeKey}" overrides an existing value`,
           ),
           [...path, key, mergeKey],
         );
@@ -867,8 +861,8 @@ export const whenCompilePass = (ctx: ParseContext): void => {
         ctx,
         "error",
         diagnosticMessage(
-          "when-compile-empty-job",
-          `Job "${jobId}" has no steps after when_compile filtering; gate the job instead`,
+          "static-if-empty-job",
+          `Job "${jobId}" has no steps after static_if filtering; gate the job instead`,
         ),
         ["jobs", jobId, "steps"],
       );
@@ -883,7 +877,7 @@ export const whenCompilePass = (ctx: ParseContext): void => {
         ctx,
         "error",
         diagnosticMessage(
-          "when-compile-dangling-needs",
+          "static-if-dangling-needs",
           `Job "${id}" still needs omitted job(s): ${danglingNeeds.join(", ")}`,
         ),
         [...path, "needs"],

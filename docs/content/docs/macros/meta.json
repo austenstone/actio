@@ -3,6 +3,7 @@
   "pages": [
     "params",
     "fragments",
+    "static-if",
     "retry",
     "dynamic-matrix",
     "fallback"

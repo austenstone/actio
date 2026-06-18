@@ -14,9 +14,9 @@ jobs:
       - run: echo hi
         env:
           BASE: yes
-          when_compile(params.first):
+          static_if(params.first):
             MODE: one
             SHARED: first
-          when_compile(params.second):
+          static_if(params.second):
             SHARED: second
             EXTRA: true

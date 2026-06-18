@@ -12,6 +12,6 @@ jobs:
       - name: Build
         run: npm run build
       - name: Publish preview
-        when_compile: params.deploy
+        static_if: params.deploy
         if: github.ref == 'refs/heads/main'
         run: npm run publish:preview
