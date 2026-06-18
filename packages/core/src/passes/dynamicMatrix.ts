@@ -225,6 +225,12 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
     ? [...recorded.filter((k) => k in jobs), ...Object.keys(jobs).filter((k) => !seen.has(k))]
     : Object.keys(jobs);
 
+  const allJobIds = new Set(order);
+  // Track setup ids we have already generated so two different dynamic_matrix
+  // jobs that resolve to the same setupId can't overwrite each other in the
+  // rebuild (the same silent-drop/dangling-needs failure mode as an original-id
+  // collision, just between two generated jobs).
+  const generatedSetupIds = new Set<string>();
   const rebuilt: Record<string, unknown> = {};
   const rebuiltOrder: string[] = [];
   for (const jobId of order) {
@@ -235,6 +241,30 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
       continue;
     }
     const setupId = opt<string>(job.dynamic_matrix as DM, "id") ?? `actio_setup_${jobId}`;
+    // The generated setup job is stored as `rebuilt[setupId]`; if that id equals
+    // the consuming job's own id, another existing job id, or a setup id already
+    // generated for an earlier dynamic_matrix job, the plain-object rebuild would
+    // overwrite one with the other and silently drop a job, leaving
+    // `needs.<setupId>` dangling. Refuse rather than corrupt.
+    if (allJobIds.has(setupId) || generatedSetupIds.has(setupId)) {
+      const reason =
+        setupId === jobId
+          ? `equals the consuming job's own id`
+          : generatedSetupIds.has(setupId)
+            ? `collides with another generated setup job "${setupId}"`
+            : `collides with an existing job "${setupId}"`;
+      pushDiagnostic(
+        ctx,
+        "error",
+        `Job "${jobId}": dynamic_matrix.id "${setupId}" ${reason}; choose a unique dynamic_matrix.id for the generated setup job`,
+        ["jobs", jobId, "dynamic_matrix", "id"],
+      );
+      // Leave the input job untouched so we never emit a workflow that
+      // references a setup job we couldn't safely create.
+      rebuilt[jobId] = job;
+      rebuiltOrder.push(jobId);
+      continue;
+    }
     const setup = buildSetupJob(ctx, jobId, job as Job);
     if (!setup) {
       // Leave the job intact (minus the macro key) so other passes/validation proceed.
@@ -244,6 +274,7 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
       continue;
     }
     transformTargetJob(ctx, jobId, job as Job, setupId);
+    generatedSetupIds.add(setupId);
     rebuilt[setupId] = setup;
     rebuiltOrder.push(setupId);
     rebuilt[jobId] = job;
