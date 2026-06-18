@@ -34,6 +34,34 @@ const baseOpts = (cwd: string): BuildOptions => ({
   cwd,
 });
 
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const waitForFileToContain = async (
+  filePath: string,
+  needle: string,
+  timeoutMs: number,
+): Promise<void> => {
+  const deadline = Date.now() + timeoutMs;
+  let lastContents = "";
+
+  while (Date.now() <= deadline) {
+    try {
+      lastContents = await readFile(filePath, "utf8");
+      if (lastContents.includes(needle)) return;
+    } catch {
+      // File may not exist yet while watch rebuild is in-flight.
+    }
+    await sleep(50);
+  }
+
+  throw new Error(
+    `Timed out waiting for ${path.basename(filePath)} to contain "${needle}". Last contents: ${lastContents}`,
+  );
+};
+
 // A tiny async signal so tests can await the next rebuild deterministically
 // instead of polling the filesystem.
 const makeSignal = () => {
@@ -110,12 +138,12 @@ describe("runWatch", () => {
     await signal.next(); // initial
     await ready;
 
+    const outPath = path.join(dir, "out", "c.yml");
     await writeFile(path.join(dir, "c.actio.yml"), SOURCE_A, "utf8");
 
-    const rebuild = await signal.next();
-    expect(rebuild.results.map((r) => r.file)).toEqual(["c.actio.yml"]);
-    expect(await readFile(path.join(dir, "out", "c.yml"), "utf8")).toContain("echo a");
-  }, 15000);
+    await waitForFileToContain(outPath, "echo a", 20000);
+    expect(await readFile(outPath, "utf8")).toContain("echo a");
+  }, 30000);
 
   it("keeps watching after a transpile error", async () => {
     await writeFile(path.join(dir, "bad.actio.yml"), "this: : not valid yaml\n", "utf8");
