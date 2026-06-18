@@ -9,10 +9,6 @@ Actio is a transpiler. The dangerous failure mode is not a crash, it is silently
 3. Implement the pass in `packages/core/src/passes/` only after the fixture and diagnostic tests fail for the right reason.
 4. Iterate to GREEN with `npm test`, then run the standard PR gate before opening a PR.
 
-Coverage proves code ran. Mutation testing proves the assertions bite. For a YAML transpiler, mutation testing is the load-bearing TDD gate because it catches tests that snapshot happy paths without detecting wrong conditions, missing branches, or subtly incorrect emitted YAML.
-
-The canonical mutation threshold lives in `stryker.config.json`; the current `break` threshold is 62%. Mutation is intentionally manual because it is slow: run `npm run test:mutation` locally or trigger the `Mutation` workflow with `workflow_dispatch` for macro PRs and other load-bearing transpiler changes. A PR can fail mutation testing even with 100% line coverage if it deletes or weakens a load-bearing assertion. Treat that as the gate working, not as a flaky coverage check.
-
 ## Fully typed expectations
 
 - No explicit `any`. Use `unknown`, type guards, discriminated unions, or typed helpers.
@@ -44,7 +40,6 @@ Pass order is data-driven with `runsAfter`, not array position. The locked macro
 - [ ] `npm run build` passes.
 - [ ] `npm test` passes.
 - [ ] `npm run test:coverage` passes.
-- [ ] Macro or transpiler PR: `npm run test:mutation` passes locally or the manual `Mutation` workflow is green.
 - [ ] `npm run build:workflows && npm run check:workflows` passes when workflow sources changed.
 
 ## Gate commands
@@ -59,7 +54,5 @@ npm test
 npm run test:coverage
 npm run check:workflows
 ```
-
-For macro or transpiler behavior PRs, also run `npm run test:mutation` locally or trigger the manual `Mutation` workflow from the Actions tab.
 
 If you edit `.github/actio/*.actio.yml`, do not hand-edit `.github/workflows/*.yml`. Run `npm run build:workflows`, commit the generated workflow and map, then run `npm run check:workflows`.
