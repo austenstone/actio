@@ -74,7 +74,12 @@ function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
     const label = stepLabel(step);
     const slug = slugify(label);
     const base = slug ? `step_${slug}` : `actio_${jobId}_step_${idx + 1}`;
-    const originalIf = typeof step.if === "string" ? step.if : undefined;
+    // Preserve a falsy boolean/number `if` (e.g. `if: false` / `if: 0`) — both
+    // are valid "never run" gates that must survive onto the first attempt.
+    const originalIf =
+      typeof step.if === "string" || typeof step.if === "boolean" || typeof step.if === "number"
+        ? step.if
+        : undefined;
     const { attempts, delaySeconds, delayLabel } = cfg;
     const out: Step[] = [];
 
@@ -82,14 +87,17 @@ function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
     for (let n = 1; n <= attempts; n++) {
       const isLast = n === attempts;
       const guard = prevId ? `steps.${prevId}.outcome == 'failure'` : undefined;
-      const condition = combineIf(originalIf, guard);
+      // The first attempt (no guard) carries the user's gate verbatim so a falsy
+      // boolean/number `if` stays a real boolean and keeps the step disabled.
+      const condition: string | boolean | number | undefined =
+        guard == null && typeof originalIf !== "string" ? originalIf : combineIf(originalIf, guard);
 
       if (delaySeconds != null && prevId) {
         const sleepStep: Step = deriveNode(ctx, step, {
           name: `Retry backoff (${delayLabel ?? `${delaySeconds}s`}) before attempt ${n}/${attempts}`,
           run: `sleep ${delaySeconds}`,
         });
-        if (condition) sleepStep.if = condition;
+        if (condition !== undefined && condition !== "") sleepStep.if = condition as string;
         out.push(sleepStep);
       }
 
@@ -101,8 +109,8 @@ function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
       used.add(id);
       attempt.id = id;
 
-      if (condition) {
-        attempt.if = condition;
+      if (condition !== undefined && condition !== "") {
+        attempt.if = condition as string;
       } else {
         delete attempt.if;
       }

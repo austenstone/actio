@@ -56,10 +56,12 @@ function needsParens(expr: string): boolean {
 }
 
 /** Combine GitHub `if` conditions with `&&`, normalizing `${{ }}` wrappers. */
-export function combineIf(...conditions: (string | undefined | null)[]): string {
+export function combineIf(...conditions: (string | boolean | number | undefined | null)[]): string {
   const parts = conditions
-    .filter((c): c is string => typeof c === "string" && c.trim().length > 0)
-    .map(stripExprWrapper);
+    // Keep falsy booleans/numbers (`false`, `0` are valid "never run" gates);
+    // only drop nullish operands and empty/whitespace strings.
+    .filter((c) => c != null && !(typeof c === "string" && c.trim().length === 0))
+    .map((c) => stripExprWrapper(String(c)));
   if (parts.length === 0) return "";
   if (parts.length === 1) return parts[0];
   return parts.map((p) => (needsParens(p) ? `(${p})` : p)).join(" && ");
