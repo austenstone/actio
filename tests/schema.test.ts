@@ -95,6 +95,25 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
+  it("accepts when_compile directives on jobs and steps, including form B merge keys", () => {
+    const doc = load(`on: [push]
+params:
+  deploy:
+    type: boolean
+    default: true
+jobs:
+  build:
+    when_compile: params.deploy
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        when_compile: params.deploy
+        when_compile(params.deploy):
+          timeout-minutes: 5
+`);
+    expect(validate(doc)).toBe(true);
+  });
+
   it("rejects enum params without values", () => {
     const doc = load(`on: [push]
 params:

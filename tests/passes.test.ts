@@ -40,14 +40,25 @@ describe("sortPasses", () => {
     expect(() => sortPasses(passes)).toThrow(/cycle/i);
   });
 
-  it("declares params as an explicit dependency for fragments", () => {
+  it("declares explicit dependencies for fragments", () => {
     const fragmentsPass = builtinPasses.find((pass) => pass.name === "fragments");
     expect(fragmentsPass?.runsAfter ?? []).toContain("params");
+    expect(fragmentsPass?.runsAfter ?? []).toContain("when_compile");
   });
 
-  it("keeps params before fragments because of dependency metadata", () => {
-    const ordered = sortPasses(builtinPasses).map((pass) => pass.name);
-    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("fragments"));
+  it("enforces when_compile before fragments from metadata even with shuffled input", () => {
+    const byName = new Map(builtinPasses.map((pass) => [pass.name, pass]));
+    const shuffled = [
+      byName.get("fragments"),
+      byName.get("dynamic_matrix"),
+      byName.get("fallback"),
+      byName.get("retry"),
+      byName.get("when_compile"),
+      byName.get("params"),
+    ].filter((pass): pass is Pass => pass !== undefined);
+    const ordered = sortPasses(shuffled).map((pass) => pass.name);
+    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("when_compile"));
+    expect(ordered.indexOf("when_compile")).toBeLessThan(ordered.indexOf("fragments"));
     expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("retry"));
     expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
     expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("dynamic_matrix"));
@@ -67,6 +78,7 @@ describe("sortPasses", () => {
     expect(sortPasses(builtinPasses).map((p) => p.name)).toEqual([
       "params",
       "job_defaults",
+      "when_compile",
       "fragments",
       "retry",
       "fallback",
@@ -91,6 +103,7 @@ describe("PassRegistry", () => {
     expect(registry.list().map((p) => p.name)).toEqual([
       "params",
       "job_defaults",
+      "when_compile",
       "fragments",
       "retry",
       "fallback",

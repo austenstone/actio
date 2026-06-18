@@ -34,6 +34,9 @@ export function buildSchema() {
     const target = s.definitions[def];
     if (!target) throw new Error(`upstream schema is missing definition "${def}"`);
     if (patch.properties) target.properties = { ...target.properties, ...patch.properties };
+    if (patch.patternProperties) {
+      target.patternProperties = { ...target.patternProperties, ...patch.patternProperties };
+    }
     if (patch.appendOneOf) target.oneOf = [...(target.oneOf ?? []), ...patch.appendOneOf];
   }
 

@@ -1,0 +1,15 @@
+name: When Compile Step Kept
+on: [push]
+params:
+  deploy:
+    type: boolean
+    default: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo start
+      - name: Publish preview
+        when_compile: params.deploy
+        run: echo publish
+      - run: echo end
