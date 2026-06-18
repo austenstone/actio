@@ -1,0 +1,19 @@
+name: JSON Fanout
+on: [push]
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Plan
+        share:
+          cfg:
+            run: ./scripts/plan.sh
+            json: true
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: deploy --env ${{ share.cfg.env }}
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "region ${{ share.cfg.region }}"

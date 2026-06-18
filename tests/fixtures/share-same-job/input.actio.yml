@@ -1,0 +1,11 @@
+name: Same Job
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tag
+        run: TAG=$(date +%s)
+        share:
+          tag: $TAG
+      - run: echo "building ${{ share.tag }}"

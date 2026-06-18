@@ -645,6 +645,9 @@
         },
         "fallback": {
           "$ref": "#/definitions/fallback"
+        },
+        "share": {
+          "$ref": "#/definitions/share"
         }
       },
       "patternProperties": {
@@ -1225,6 +1228,92 @@
         }
       ],
       "additionalProperties": false
+    },
+    "share": {
+      "title": "share (Actio macro)",
+      "type": "object",
+      "minProperties": 1,
+      "description": "Actio macro. Publish step outputs so other jobs can consume them. Each entry maps an output `<name>` to a scalar value (value-form) or a captured command (`run`, capture-form). Reference anywhere with `${{ share.<name> }}`; Actio wires `job.outputs` and `needs` automatically and strips the `share` key from the generated workflow.",
+      "markdownDescription": "**Actio macro**: publish step outputs cross-job.\n\nEach entry maps an output `<name>` to a value. Reference it anywhere with `${{ share.<name> }}` and Actio auto-wires `job.outputs` + `needs`.\n\n- **value-form** — scalar shorthand or `{ value, required?, type? }`.\n- **capture-form** — `{ run, json?, type? }` captures command stdout via a heredoc.\n- **json: true** lets consumers read fields: `${{ share.<name>.<field> }}` lowers to `fromJSON(...)`.\n\n```yaml\nsteps:\n  - run: VERSION=$(jq -r .version package.json)\n    share:\n      version: $VERSION\n```",
+      "additionalProperties": {
+        "$ref": "#/definitions/sharedOutput"
+      }
+    },
+    "sharedOutput": {
+      "title": "share.<name> (Actio macro)",
+      "description": "A shared output definition: a scalar shorthand, a value-form object (`value`), or a capture-form object (`run`).",
+      "oneOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Scalar shorthand value-form: the shell value to publish (e.g. `$VERSION`)."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "value": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
+              "description": "The shell value to publish as this output."
+            },
+            "required": {
+              "type": "boolean",
+              "description": "Opt-in runtime guard. When true, Actio appends a non-empty assertion that fails the step with `::error::empty share value` if the value is blank."
+            },
+            "json": {
+              "type": "boolean",
+              "description": "Declare the value as JSON so consumers can read fields via `${{ share.<name>.<field> }}` (lowered to `fromJSON(...)`)."
+            },
+            "type": {
+              "$ref": "#/definitions/sharedOutputType"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "run"
+          ],
+          "properties": {
+            "run": {
+              "type": "string",
+              "description": "Capture-form: command whose stdout is captured into this output via a heredoc (`ACTIO_EOF_<name>`)."
+            },
+            "json": {
+              "type": "boolean",
+              "description": "Declare the captured value as JSON so consumers can read fields via `${{ share.<name>.<field> }}` (lowered to `fromJSON(...)`)."
+            },
+            "required": {
+              "type": "boolean",
+              "description": "Opt-in runtime guard for empty captured output."
+            },
+            "type": {
+              "$ref": "#/definitions/sharedOutputType"
+            }
+          }
+        }
+      ]
+    },
+    "sharedOutputType": {
+      "description": "Compile-time type assertion for the shared output. Boolean is a type assertion only — Actio does NOT coerce the runtime value.",
+      "enum": [
+        "string",
+        "number",
+        "boolean",
+        "enum",
+        "object"
+      ]
     },
     "actioParam": {
       "title": "params.<name> (Actio macro)",

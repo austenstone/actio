@@ -1,0 +1,16 @@
+name: Required
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version
+        run: VERSION=$(jq -r .version package.json)
+        share:
+          version:
+            value: $VERSION
+            required: true
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm publish --tag v${{ share.version }}

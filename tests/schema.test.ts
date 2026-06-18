@@ -77,6 +77,64 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
+  it("accepts share value-form, capture-form, and json on a step", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: VERSION=1.2.3
+        share:
+          version: $VERSION
+          tag:
+            value: $TAG
+            required: true
+            type: string
+          config:
+            run: cat config.json
+            json: true`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects an empty share mapping", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        share: {}`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("rejects unknown keys in a share output definition", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        share:
+          version:
+            value: $V
+            bogus: true`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("rejects an unknown share output type", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        share:
+          version:
+            value: $V
+            type: weird`);
+    expect(validate(doc)).toBe(false);
+  });
+
   it("accepts top-level typed params", () => {
     const doc = load(`on: [push]
 params:
