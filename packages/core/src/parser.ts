@@ -31,6 +31,8 @@ export interface ParseContextInternal {
   jobDefaults?: JobDefaultsInternalSnapshot;
   /** v1 handoff contract for #18 share integration. */
   forEachShareContracts?: ForEachShareContract[];
+  /** Global default mode for the injection-hoist security pass (per-block knobs override). */
+  injectionHoist?: "fix" | "warn" | "error" | "off";
 }
 
 /**

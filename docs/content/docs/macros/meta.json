@@ -7,6 +7,7 @@
     "static-if",
     "retry",
     "dynamic-matrix",
-    "fallback"
+    "fallback",
+    "injection-hoist"
   ]
 }

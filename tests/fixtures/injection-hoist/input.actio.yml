@@ -1,0 +1,8 @@
+name: Injection Hoist
+on: [pull_request]
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Greet PR author
+        run: echo Hello ${{ github.event.pull_request.title }}

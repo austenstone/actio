@@ -648,6 +648,27 @@
         },
         "share": {
           "$ref": "#/definitions/share"
+        },
+        "injectionHoist": {
+          "$ref": "#/definitions/injectionHoistMode"
+        },
+        "unsafe": {
+          "type": "boolean",
+          "description": "Actio macro (injection-hoist). Opt this step out of injection-hoist entirely (`${{ }}` left inline in `run:`). Stripped from generated workflow YAML."
+        },
+        "trust": {
+          "type": "array",
+          "description": "Actio macro (injection-hoist). Context paths that should NOT be hoisted out of `run:` even if untrusted (you vouch for them). Stripped from generated workflow YAML.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "force": {
+          "type": "array",
+          "description": "Actio macro (injection-hoist). Context paths to hoist into `env:` even if classified trusted. Stripped from generated workflow YAML.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "patternProperties": {
@@ -1060,6 +1081,9 @@
         },
         "fallback": {
           "$ref": "#/definitions/fallback"
+        },
+        "injectionHoist": {
+          "$ref": "#/definitions/injectionHoistMode"
         },
         "executor": {
           "description": "Actio macro. Name (or ordered list of names) from top-level `executors:`. Expanded during compile and stripped from output.",
@@ -1672,6 +1696,17 @@
           "description": "Override the generated setup job id."
         }
       }
+    },
+    "injectionHoistMode": {
+      "type": "string",
+      "enum": [
+        "fix",
+        "warn",
+        "error",
+        "off"
+      ],
+      "title": "injectionHoist mode (Actio macro)",
+      "description": "Actio macro. Injection-hoist behavior for `run:` `${{ }}` interpolation: `fix` (hoist untrusted values into env and rewrite the body, default), `warn`, `error`, or `off`. Stripped from generated workflow YAML."
     }
   },
   "properties": {
@@ -2915,6 +2950,10 @@
       "additionalProperties": {
         "$ref": "#/definitions/executorDefinition"
       }
+    },
+    "injectionHoist": {
+      "$ref": "#/definitions/injectionHoistMode",
+      "description": "Actio macro. Global default injection-hoist mode for every `run:` in the workflow. Overridden by job- and step-level `injectionHoist`. Stripped from generated workflow YAML."
     }
   },
   "required": [

@@ -360,4 +360,31 @@ jobs:
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);
   });
+
+  it("accepts injection-hoist macro keys on root, job, and step", () => {
+    const doc = load(`on: [push]
+injectionHoist: warn
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    injectionHoist: error
+    steps:
+      - run: echo hi
+        injectionHoist: "off"
+        unsafe: true
+        trust: [github.event.pull_request.title]
+        force: [github.sha]`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects an invalid injectionHoist mode", () => {
+    const doc = load(`on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        injectionHoist: defuse`);
+    expect(validate(doc)).toBe(false);
+  });
 });

@@ -8,6 +8,7 @@ const fixturesDir = fileURLToPath(new URL("fixtures", import.meta.url));
 
 const fixtureDirsByPassName: Record<string, string[]> = {
   dynamic_matrix: ["dynamic-matrix"],
+  "injection-hoist": ["injection-hoist"],
   fallback: ["fallback-job", "fallback-notify", "fallback-recover"],
   fragments: ["fragments"],
   params: ["params-scalar", "params-list", "params-step-list", "params-enum"],
