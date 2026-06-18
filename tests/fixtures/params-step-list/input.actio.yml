@@ -1,0 +1,14 @@
+name: Params Step List
+on: [push]
+params:
+  bootstrap:
+    type: stepList
+    default:
+      - run: npm ci
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+jobs:
+  show:
+    runs-on: ubuntu-latest
+    steps: params.bootstrap

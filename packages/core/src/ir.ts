@@ -8,6 +8,15 @@ import {
   setKeyOrder,
 } from "./parser.js";
 
+export {
+  conservativeTaint,
+  type ParamType,
+  type SymbolDef,
+  type SymbolKind,
+  type SymbolTable,
+  type TaintFacet,
+} from "./symbols.js";
+
 export type { Origin };
 
 /**

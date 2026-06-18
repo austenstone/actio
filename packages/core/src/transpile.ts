@@ -3,6 +3,7 @@ import { emitYaml, generatedHeader } from "./emit.js";
 import { parseActio } from "./parser.js";
 import { annotate } from "./passes/annotate.js";
 import { createRegistry, type Pass, runPasses } from "./passes/index.js";
+import { resolveCompileTimeTextBoundaries } from "./passes/params.js";
 import { buildSourceMap, resolveGeneratedLine, type SourceMap } from "./sourcemap.js";
 import { validateWorkflowYaml } from "./validate.js";
 
@@ -75,6 +76,7 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
     passes = registry.list();
   }
   runPasses(ctx, passes);
+  resolveCompileTimeTextBoundaries(ctx, ctx.data, []);
 
   const body = emitYaml(ctx.data, { header: false });
   const header = options.header === false ? "" : generatedHeader(fileName);

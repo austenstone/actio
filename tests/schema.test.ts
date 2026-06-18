@@ -65,6 +65,67 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
+  it("accepts top-level typed params", () => {
+    const doc = load(`on: [push]
+params:
+  env:
+    type: enum
+    values: [dev, prod]
+    default: dev
+  retries:
+    type: number
+    default: 3
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "{{ params.env }}"`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects enum params without values", () => {
+    const doc = load(`on: [push]
+params:
+  env:
+    type: enum
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("rejects unknown keys on param definitions", () => {
+    const doc = load(`on: [push]
+params:
+  env:
+    type: string
+    default: prod
+    description: Production environment
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("rejects non-enum params with values", () => {
+    const doc = load(`on: [push]
+params:
+  env:
+    type: string
+    default: prod
+    values: [dev, prod]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(false);
+  });
+
   it("starter still transpiles cleanly with the modeline present", () => {
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);

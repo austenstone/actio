@@ -10,6 +10,7 @@ const fixtureDirsByPassName: Record<string, string[]> = {
   dynamic_matrix: ["dynamic-matrix"],
   fallback: ["fallback-job", "fallback-notify", "fallback-recover"],
   fragments: ["fragments"],
+  params: ["params-scalar", "params-list", "params-step-list", "params-enum"],
   retry: ["retry-basic", "retry-delay", "retry-shorthand"],
 };
 

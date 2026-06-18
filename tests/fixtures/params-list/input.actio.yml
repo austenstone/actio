@@ -1,0 +1,13 @@
+name: Params List
+on: [push]
+params:
+  targets:
+    type: object
+    default:
+      - linux
+      - windows
+jobs:
+  fanout:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo '{{ toJSON(params.targets) }}'
