@@ -69,3 +69,33 @@ jobs:
     expect(setup.env.SHARDS).toBe("3");
   });
 });
+
+describe("composition: retry nested inside a fallback block", () => {
+  it("expands a retry on a step that lives inside a step-level fallback", () => {
+    // A recovery (fallback) step that itself wants to retry is a reasonable
+    // composition. The retry pass only walks job.steps and runs before fallback
+    // lifts these steps in, so the `retry:` key is never expanded and leaks into
+    // the generated workflow — which GitHub's parser rejects.
+    const { result } = build(`name: x
+on: [push]
+jobs:
+  f:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Main
+        run: ./main.sh
+        fallback:
+          recover: true
+          steps:
+            - name: Cleanup
+              run: ./cleanup.sh
+              retry: 3
+`);
+    const parsed = parse(result.yaml);
+    const steps = parsed.jobs.f.steps as Array<Record<string, unknown>>;
+    // No raw `retry:` key may survive into standard Actions YAML.
+    expect(steps.some((s) => "retry" in s)).toBe(false);
+    // And the generated workflow must be valid.
+    expect(result.ok).toBe(true);
+  });
+});
