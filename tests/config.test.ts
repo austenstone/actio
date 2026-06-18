@@ -124,6 +124,7 @@ describe("resolveBuildOptions precedence", () => {
       header: true,
       check: false,
       stdout: false,
+      target: "legacy",
     });
   });
 
@@ -160,6 +161,35 @@ describe("resolveBuildOptions precedence", () => {
   it("threads config passes into build options", () => {
     const { options } = resolveBuildOptions({ ...base, config: { passes: [addEnv] } });
     expect(options.passes).toEqual([addEnv]);
+  });
+
+  it("threads config target into build options", () => {
+    const { options } = resolveBuildOptions({
+      ...base,
+      config: { target: "github-actions-native-dependencies-preview" },
+    });
+    expect(options.target).toBe("github-actions-native-dependencies-preview");
+  });
+
+  it("lets an explicit --target flag override config target", () => {
+    const { options } = resolveBuildOptions({
+      ...base,
+      flags: { target: "legacy" },
+      argv: ["build", "--target", "legacy"],
+      config: { target: "github-actions-native-dependencies-preview" },
+    });
+    expect(options.target).toBe("legacy");
+  });
+
+  it("rejects unknown target profiles", () => {
+    expect(() =>
+      resolveBuildOptions({
+        ...base,
+        flags: { target: "not-a-target" },
+        argv: ["build", "--target", "not-a-target"],
+        config: {},
+      }),
+    ).toThrow(/target must be one of/);
   });
 
   it("defaults annotate on and lets --no-annotate turn it off", () => {

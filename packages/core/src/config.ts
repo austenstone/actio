@@ -1,5 +1,7 @@
 import type { Pass } from "./passes/index.js";
 
+export type ActioTarget = "legacy" | "github-actions-native-dependencies-preview";
+
 /**
  * Shape of an `actio.config.{ts,js,mjs,cjs,json}` file. Every field is optional;
  * a missing field falls back to the built-in default (and any explicit CLI flag
@@ -26,6 +28,12 @@ export interface ActioConfig {
   include?: string[];
   /** Extra transform passes merged into the built-in pipeline (ordered by `runsAfter`). */
   passes?: Pass[];
+  /**
+   * Output target capability profile.
+   * - `legacy`: emits standard workflows with no native dependency lock block.
+   * - `github-actions-native-dependencies-preview`: emits a native `dependencies:` block.
+   */
+  target?: ActioTarget;
 }
 
 /** Identity helper that gives `actio.config.ts` authors full type-checking and inference. */
