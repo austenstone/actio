@@ -11,6 +11,14 @@ const fixtureDirsByPassName: Record<string, string[]> = {
   fallback: ["fallback-job", "fallback-notify", "fallback-recover"],
   fragments: ["fragments"],
   params: ["params-scalar", "params-list", "params-step-list", "params-enum"],
+  job_defaults: [
+    "job-defaults-normal-merge",
+    "job-defaults-uses-partition",
+    "job-defaults-if-combine",
+    "job-defaults-shape-aware",
+    "executors-expansion",
+    "executors-compose",
+  ],
   retry: ["retry-basic", "retry-delay", "retry-shorthand"],
 };
 

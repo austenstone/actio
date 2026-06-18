@@ -73,6 +73,18 @@ describe("sortPasses", () => {
     expect(() => sortPasses(passes)).not.toThrow();
     expect(sortPasses(passes).map((pass) => pass.name)).toEqual(["params", "when_compile"]);
   });
+
+  it("resolves the built-in pipeline to the documented order", () => {
+    expect(sortPasses(builtinPasses).map((p) => p.name)).toEqual([
+      "params",
+      "job_defaults",
+      "when_compile",
+      "fragments",
+      "retry",
+      "fallback",
+      "dynamic_matrix",
+    ]);
+  });
 });
 
 describe("applyPasses", () => {
@@ -90,6 +102,7 @@ describe("PassRegistry", () => {
     registry.register(recorder("post", ["dynamic_matrix"], log));
     expect(registry.list().map((p) => p.name)).toEqual([
       "params",
+      "job_defaults",
       "when_compile",
       "fragments",
       "retry",

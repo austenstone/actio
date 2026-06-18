@@ -104,6 +104,9 @@ function stripResidualWhenCompile(ctx: ParseContext, value: unknown, path: Path)
       delete value[key];
       continue;
     }
+    if (path.length === 0 && key === "jobs") {
+      continue;
+    }
     stripResidualWhenCompile(ctx, value[key], [...path, key]);
   }
 }
@@ -131,6 +134,7 @@ export function fragmentsPass(ctx: ParseContext): void {
     stripResidualWhenCompile(ctx, job, ["jobs", id]);
   });
   delete ctx.data.fragments;
+  stripResidualWhenCompile(ctx, ctx.data, []);
 }
 
 /** Splice reusable `inject:` steps in first, so later passes see real steps. */

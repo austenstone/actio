@@ -1,4 +1,4 @@
-export type Severity = "error" | "warning";
+export type Severity = "error" | "warning" | "info";
 
 export interface Position {
   /** 1-based line number. */
@@ -39,7 +39,7 @@ export class ActioError extends Error {
 }
 
 function severityLabel(s: Severity): string {
-  return s === "error" ? "error" : "warning";
+  return s === "error" ? "error" : s === "warning" ? "warning" : "info";
 }
 
 /**
@@ -77,7 +77,7 @@ function escapeProperty(s: string): string {
  * diagnostic's range already being source-mapped (see `transpile`'s `sourceMap`).
  */
 export function formatGithubAnnotation(d: Diagnostic): string {
-  const cmd = d.severity === "error" ? "error" : "warning";
+  const cmd = d.severity === "error" ? "error" : d.severity === "warning" ? "warning" : "notice";
   const props: string[] = [];
   if (d.file) props.push(`file=${escapeProperty(d.file)}`);
   if (d.range) {

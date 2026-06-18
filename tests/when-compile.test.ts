@@ -469,6 +469,73 @@ jobs:
     expect(output.jobs.build.steps[0]?.env?.KEEP).toBe("yes");
   });
 
+  it("fails loud on residual when_compile form B keys under top-level env", () => {
+    const source = `name: t
+on: push
+params:
+  deploy:
+    type: boolean
+    default: true
+env:
+  when_compile(params.deploy):
+    DEPLOY_TOKEN: abc
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+`;
+    const result = transpile(source, { fileName: "t.actio.yml" });
+    expect(result.ok).toBe(false);
+    expect(
+      result.diagnostics.some((diagnostic) =>
+        diagnostic.message.includes("[when-compile-residual]"),
+      ),
+    ).toBe(true);
+    expect(result.yaml.includes("when_compile")).toBe(false);
+  });
+
+  it("fails loud on residual when_compile form B keys under top-level env with validate disabled", () => {
+    const source = `name: t
+on: push
+params:
+  deploy:
+    type: boolean
+    default: true
+env:
+  when_compile(params.deploy):
+    DEPLOY_TOKEN: abc
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+`;
+    const result = transpile(source, { fileName: "t.actio.yml", validate: false });
+    expect(result.ok).toBe(false);
+    expect(
+      result.diagnostics.some((diagnostic) =>
+        diagnostic.message.includes("[when-compile-residual]"),
+      ),
+    ).toBe(true);
+    expect(result.yaml.includes("when_compile")).toBe(false);
+  });
+
+  it("allows top-level env without when_compile directives", () => {
+    const result = transpileResult(`name: t
+on: push
+env:
+  DEPLOY_TOKEN: abc
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(true);
+    expect(result.diagnostics.some((diagnostic) => diagnostic.severity === "error")).toBe(false);
+  });
+
   it("errors when a fragment injects a residual when_compile directive", () => {
     const errors = transpileErrors(`name: x
 on: [push]

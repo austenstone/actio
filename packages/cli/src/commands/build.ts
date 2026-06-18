@@ -61,7 +61,12 @@ export function printDiagnostics(diags: Diagnostic[], source: string): void {
     // originating .actio.yml source line (schema/syntax errors are the useful ones).
     if (ci) process.stderr.write(`${formatGithubAnnotation(d)}\n`);
     const text = formatDiagnostic(d, source);
-    const colored = d.severity === "error" ? colorizeError(text) : pc.yellow(text);
+    const colored =
+      d.severity === "error"
+        ? colorizeError(text)
+        : d.severity === "warning"
+          ? pc.yellow(text)
+          : pc.cyan(text);
     process.stderr.write(`${colored}\n\n`);
   }
 }

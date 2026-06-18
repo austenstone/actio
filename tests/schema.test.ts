@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { actioSchema, transpile } from "actio-core";
+import { actioSchema, EXECUTOR_KEYS, transpile } from "actio-core";
 import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
@@ -8,6 +8,18 @@ import { STARTER_ACTIO } from "../packages/cli/src/starter.js";
 
 const ajv = new Ajv({ strict: false, allErrors: true });
 const validate = ajv.compile(actioSchema());
+const extensionsSchema = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL("../packages/core/schema/actio.extensions.json", import.meta.url)),
+    "utf8",
+  ),
+) as {
+  addDefinitions: {
+    executorDefinition: {
+      properties: Record<string, unknown>;
+    };
+  };
+};
 
 function load(source: string) {
   return parse(source) as unknown;
@@ -139,6 +151,147 @@ params:
     values: [dev, prod]
 jobs:
   a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("accepts executor arrays and executor definitions with runtime executor keys", () => {
+    const doc = load(`on: [push]
+executors:
+  hardened:
+    permissions:
+      contents: read
+    concurrency:
+      group: hardened-group
+    defaults:
+      run:
+        shell: bash
+    env:
+      HARDENED: "true"
+    timeout-minutes: 10
+  gpu:
+    runs-on: [self-hosted, gpu]
+jobs:
+  release:
+    executor: [hardened, gpu]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo release`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects strategy in executor definitions", () => {
+    const doc = load(`on: [push]
+executors:
+  bad:
+    strategy:
+      fail-fast: false
+jobs:
+  test:
+    executor: bad
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("accepts all allowlisted executor keys", () => {
+    const doc = load(`on: [push]
+executors:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    concurrency:
+      group: full-group
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: node:20
+    services:
+      redis:
+        image: redis:7
+    env:
+      CI: "true"
+jobs:
+  test:
+    executor: full
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("keeps executorDefinition in lockstep with runtime EXECUTOR_KEYS", () => {
+    const runtimeKeys = [...EXECUTOR_KEYS].sort();
+    const mergedKeys = Object.keys(
+      (
+        actioSchema() as {
+          definitions: { executorDefinition: { properties: Record<string, unknown> } };
+        }
+      ).definitions.executorDefinition.properties,
+    ).sort();
+    const sourceKeys = Object.keys(
+      extensionsSchema.addDefinitions.executorDefinition.properties,
+    ).sort();
+
+    expect(mergedKeys).toEqual(runtimeKeys);
+    expect(sourceKeys).toEqual(runtimeKeys);
+  });
+
+  it("rejects job-only keys in executor definitions", () => {
+    for (const key of ["strategy", "if", "continue-on-error", "environment"]) {
+      const doc = load(`on: [push]
+executors:
+  bad:
+    ${key}: value
+jobs:
+  test:
+    executor: bad
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+      expect(validate(doc)).toBe(false);
+    }
+  });
+
+  it("accepts job_defaults strategy for reusable-workflow caller jobs", () => {
+    const doc = load(`on: [push]
+job_defaults:
+  strategy:
+    fail-fast: false
+    matrix:
+      shard: [a, b]
+jobs:
+  call:
+    uses: org/repo/.github/workflows/reuse.yml@main`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts continue-on-error and environment in job_defaults", () => {
+    const doc = load(`on: [push]
+job_defaults:
+  continue-on-error: true
+  environment: staging
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects non-allowlisted keys in job_defaults", () => {
+    const doc = load(`on: [push]
+job_defaults:
+  steps:
+    - run: echo nope
+jobs:
+  test:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi`);

@@ -1,0 +1,27 @@
+name: Job defaults uses partition
+on: [push]
+
+job_defaults:
+  if: github.ref == 'refs/heads/main'
+  permissions:
+    contents: read
+  concurrency:
+    group: default-group
+    cancel-in-progress: true
+  strategy:
+    fail-fast: false
+    matrix:
+      shard: [a, b]
+  runs-on: ubuntu-latest
+  timeout-minutes: 15
+  env:
+    CI: "true"
+
+jobs:
+  call-release:
+    uses: org/repo/.github/workflows/release.yml@main
+    if: success()
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo test
