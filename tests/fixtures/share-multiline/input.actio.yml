@@ -1,0 +1,17 @@
+name: Changelog
+on: [push]
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Notes
+        share:
+          notes:
+            run: git log --oneline -n 20
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ share.notes }}

@@ -1,0 +1,14 @@
+name: Escape Share
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version
+        run: VERSION=$(jq -r .version package.json)
+        share:
+          version: $VERSION
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Reference a shared value with $${{ share.version }} in docs"

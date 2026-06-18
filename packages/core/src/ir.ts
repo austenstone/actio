@@ -37,6 +37,7 @@ export interface Step {
   inject?: string;
   retry?: unknown;
   fallback?: unknown;
+  share?: unknown;
   [key: string]: unknown;
 }
 
@@ -59,6 +60,7 @@ export interface Job {
   retry?: unknown;
   fallback?: unknown;
   dynamic_matrix?: unknown;
+  share?: unknown;
   [key: string]: unknown;
 }
 

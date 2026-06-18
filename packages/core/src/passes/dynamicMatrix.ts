@@ -351,6 +351,6 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
 /** Split jobs and move the (already finalized) steps. Runs last. */
 export const dynamicMatrix: Pass = {
   name: "dynamic_matrix",
-  runsAfter: ["fragments", "retry", "fallback"],
+  runsAfter: ["fragments", "retry", "fallback", "share"],
   apply: dynamicMatrixPass,
 };

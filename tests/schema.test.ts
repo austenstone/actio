@@ -302,4 +302,47 @@ jobs:
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);
   });
+
+  it("exposes share on the step definition", () => {
+    const schema = actioSchema() as {
+      definitions: {
+        step: { properties: Record<string, unknown> };
+        share?: unknown;
+        shareOutput?: unknown;
+      };
+    };
+    expect(schema.definitions.step.properties.share).toBeDefined();
+    expect(schema.definitions.share).toBeDefined();
+    expect(schema.definitions.shareOutput).toBeDefined();
+  });
+
+  it("accepts scalar and mapping share sources on a step", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+        share:
+          version: $VERSION
+          config:
+            run: cat config.json
+            json: true
+            required: true`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects unknown options inside a share mapping source", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+        share:
+          version:
+            value: $VERSION
+            bogus: true`);
+    expect(validate(doc)).toBe(false);
+  });
 });

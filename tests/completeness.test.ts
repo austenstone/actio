@@ -20,6 +20,14 @@ const fixtureDirsByPassName: Record<string, string[]> = {
     "executors-compose",
   ],
   retry: ["retry-basic", "retry-delay", "retry-shorthand"],
+  share: [
+    "share-simple-single",
+    "share-multiline",
+    "share-json-fanout",
+    "share-same-job",
+    "share-required",
+    "share-escape",
+  ],
 };
 
 const hasGoldenPair = (fixtureDir: string): boolean =>

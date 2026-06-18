@@ -48,7 +48,8 @@
           "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for_each.*`, `define.*`). If the expression is false the entire step is removed from the generated workflow; if true the `static_if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\nsteps:\n  - name: Publish preview\n    static_if: params.deploy\n    run: ./publish.sh\n```"
         },
         "retry": { "$ref": "#/definitions/retry" },
-        "fallback": { "$ref": "#/definitions/fallback" }
+        "fallback": { "$ref": "#/definitions/fallback" },
+        "share": { "$ref": "#/definitions/share" }
       },
       "patternProperties": {
         "^static_if\\(.+\\)$": {
@@ -282,6 +283,48 @@
             "recover": {
               "type": "boolean",
               "description": "When true, swallow the guarded failure (continue-on-error) so the job can continue. Step-level only; ignored on job-level fallback."
+            }
+          }
+        }
+      ]
+    },
+    "share": {
+      "title": "share (Actio macro)",
+      "type": "object",
+      "description": "Actio macro. Declare cross-job (or same-job) outputs on a step. Each entry `name: <source>` writes to GITHUB_OUTPUT and is consumed elsewhere as `${{ share.<name> }}`; Actio infers the producing step id, job-level `outputs`, and consumer `needs`. Stripped from generated workflow YAML.",
+      "markdownDescription": "**Actio macro**: cross-job output auto-wiring.\n\nDeclare a value on the producing step under `share:`, then read it anywhere as `${{ share.<name> }}`. Actio writes `$GITHUB_OUTPUT`, assigns a step id, hoists job-level `outputs`, and infers `needs` on consumers.\n\n```yaml\njobs:\n  build:\n    steps:\n      - run: VERSION=$(jq -r .version package.json)\n        share:\n          version: $VERSION\n  publish:\n    steps:\n      - run: npm publish --tag v${{ share.version }}\n```",
+      "additionalProperties": { "$ref": "#/definitions/shareOutput" }
+    },
+    "shareOutput": {
+      "title": "share.<name> (Actio macro)",
+      "description": "A shared output source: a scalar value, or a mapping selecting `value:`/`run:` with `json`/`type`/`required` options.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Single-line value expression written verbatim to `$GITHUB_OUTPUT`."
+            },
+            "run": {
+              "type": "string",
+              "description": "Capture-form: a (possibly multi-line) shell snippet whose stdout becomes the shared value, written via a per-output heredoc delimiter."
+            },
+            "json": {
+              "type": "boolean",
+              "description": "Mark the value as structured JSON so dotted reads `${{ share.<name>.<field> }}` lower to `fromJSON(...).<field>`."
+            },
+            "type": {
+              "enum": ["string", "number", "boolean", "object"],
+              "description": "Compile-time TYPE assertion for the shared output. No runtime coercion is injected (job outputs are already typed)."
+            },
+            "required": {
+              "type": "boolean",
+              "description": "Emit a runtime guard after the writer that fails the step if the captured value is empty. Off by default."
             }
           }
         }
