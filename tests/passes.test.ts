@@ -48,6 +48,8 @@ describe("sortPasses", () => {
   it("keeps params before fragments because of dependency metadata", () => {
     const ordered = sortPasses(builtinPasses).map((pass) => pass.name);
     expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("fragments"));
+    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("when_compile"));
+    expect(ordered.indexOf("when_compile")).toBeLessThan(ordered.indexOf("fragments"));
     expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("retry"));
     expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
     expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("dynamic_matrix"));
@@ -79,6 +81,7 @@ describe("PassRegistry", () => {
     registry.register(recorder("post", ["dynamic_matrix"], log));
     expect(registry.list().map((p) => p.name)).toEqual([
       "params",
+      "when_compile",
       "fragments",
       "retry",
       "fallback",

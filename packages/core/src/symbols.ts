@@ -21,6 +21,69 @@ export interface SymbolDef {
 
 export type SymbolTable = Map<string, SymbolDef>;
 
+export const RUNTIME_CONTEXT_ROOTS = [
+  "github",
+  "needs",
+  "steps",
+  "secrets",
+  "env",
+  "inputs",
+  "vars",
+  "runner",
+  "job",
+  "matrix",
+  "strategy",
+] as const;
+
+export const RUNTIME_CONTEXT_ROOT_SET: ReadonlySet<string> = new Set(RUNTIME_CONTEXT_ROOTS);
+
 export function conservativeTaint(): TaintFacet {
   return { tainted: false, derivedFrom: [] };
+}
+
+const isIdentifierStart = (char: string): boolean => /[A-Za-z_]/.test(char);
+
+const isIdentifierPart = (char: string): boolean => /[A-Za-z0-9_]/.test(char);
+
+export function collectExpressionRoots(
+  expression: string,
+  rootsOfInterest?: ReadonlySet<string>,
+): Set<string> {
+  const roots = new Set<string>();
+  let quote: "'" | '"' | undefined;
+  for (let index = 0; index < expression.length; index++) {
+    const char = expression[index];
+    if (!char) continue;
+
+    if (quote) {
+      if (char !== quote) continue;
+      if (quote === "'" && expression[index + 1] === "'") {
+        index++;
+        continue;
+      }
+      if (quote === '"' && expression[index - 1] === "\\") continue;
+      quote = undefined;
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      quote = char;
+      continue;
+    }
+
+    if (!isIdentifierStart(char)) continue;
+
+    const start = index;
+    let end = index + 1;
+    while (end < expression.length && isIdentifierPart(expression[end] ?? "")) end++;
+    const identifier = expression.slice(start, end);
+    index = end - 1;
+
+    let prev = start - 1;
+    while (prev >= 0 && /\s/.test(expression[prev] ?? "")) prev--;
+    if (prev >= 0 && expression[prev] === ".") continue;
+    if (rootsOfInterest && !rootsOfInterest.has(identifier)) continue;
+    roots.add(identifier);
+  }
+  return roots;
 }

@@ -1,0 +1,22 @@
+name: When Compile Form B Multi Merge
+on: [push]
+params:
+  first:
+    type: boolean
+    default: true
+  second:
+    type: boolean
+    default: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        env:
+          BASE: yes
+          when_compile(params.first):
+            MODE: one
+            SHARED: first
+          when_compile(params.second):
+            SHARED: second
+            EXTRA: true

@@ -28,15 +28,43 @@
           "type": "string",
           "description": "Actio macro. Splice in the steps of the named fragment (defined under top-level `fragments:`) at this position. Replaced inline by `actio build`."
         },
+        "when_compile": {
+          "type": "string",
+          "description": "Actio macro. Compile-time structural condition. If false, this entire step map is omitted from emitted workflow YAML."
+        },
         "retry": { "$ref": "#/definitions/retry" },
         "fallback": { "$ref": "#/definitions/fallback" }
+      },
+      "patternProperties": {
+        "^when_compile\\(.+\\)$": {
+          "type": "object",
+          "description": "Actio macro. Conditional merge map. When expression is true, merge this mapping into the parent map."
+        }
       },
       "appendOneOf": [{ "required": ["inject"] }]
     },
     "normalJob": {
       "properties": {
+        "when_compile": {
+          "type": "string",
+          "description": "Actio macro. Compile-time structural condition. If false, this entire job map is omitted from emitted workflow YAML."
+        },
         "dynamic_matrix": { "$ref": "#/definitions/dynamicMatrix" },
         "fallback": { "$ref": "#/definitions/fallback" }
+      },
+      "patternProperties": {
+        "^when_compile\\(.+\\)$": {
+          "type": "object",
+          "description": "Actio macro. Conditional merge map. When expression is true, merge this mapping into the parent map."
+        }
+      }
+    },
+    "env": {
+      "patternProperties": {
+        "^when_compile\\(.+\\)$": {
+          "type": "object",
+          "description": "Actio macro. Conditional merge map. When expression is true, merge this mapping into the parent map."
+        }
       }
     }
   },
