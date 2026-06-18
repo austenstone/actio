@@ -1,0 +1,9 @@
+name: Trust Optout
+on: [issues]
+jobs:
+  b:
+    runs-on: ubuntu-latest
+    trust:
+      - github.event.issue.title
+    steps:
+      - run: echo "${{ github.event.issue.title }}"

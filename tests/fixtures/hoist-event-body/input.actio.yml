@@ -1,0 +1,7 @@
+name: Hoist Event Body
+on: [issues]
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Issue title is ${{ github.event.issue.title }}"

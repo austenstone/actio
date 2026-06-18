@@ -1,0 +1,10 @@
+name: Unquoted Heredoc
+on: [issues]
+jobs:
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          cat <<EOF
+          title: ${{ github.event.issue.title }}
+          EOF

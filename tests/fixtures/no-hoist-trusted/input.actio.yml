@@ -1,0 +1,8 @@
+name: No Hoist Trusted
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "sha is ${{ github.sha }} run ${{ github.run_id }}"
+      - run: echo "${{ secrets.TOKEN }}"

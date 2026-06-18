@@ -1,0 +1,10 @@
+name: Pwsh Hoist
+on: [issues]
+jobs:
+  b:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - run: Write-Host "title ${{ github.event.issue.title }}"

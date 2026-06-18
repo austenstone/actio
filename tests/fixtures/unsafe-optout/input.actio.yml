@@ -1,0 +1,8 @@
+name: Unsafe Optout
+on: [issues]
+jobs:
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ github.event.issue.title }}"
+        unsafe: true

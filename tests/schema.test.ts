@@ -302,4 +302,55 @@ jobs:
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);
   });
+
+  it("accepts injectionHoist mode + unsafe/trust/force at workflow, job, and step scope", () => {
+    const doc = load(`on: [push]
+injectionHoist: warn
+trust:
+  - github.event.pull_request.number
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    injectionHoist: fix
+    unsafe: false
+    steps:
+      - run: echo "\${{ github.event.issue.title }}"
+        injectionHoist: error
+        force:
+          - github.sha`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects an invalid injectionHoist mode", () => {
+    const doc = load(`on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        injectionHoist: loud`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("rejects a non-array trust list", () => {
+    const doc = load(`on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        trust: github.event.issue.title`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("rejects a non-boolean unsafe flag", () => {
+    const doc = load(`on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    unsafe: nope
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(false);
+  });
 });

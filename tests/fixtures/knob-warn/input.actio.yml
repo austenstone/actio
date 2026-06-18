@@ -1,0 +1,8 @@
+name: Knob Warn
+on: [issues]
+jobs:
+  b:
+    runs-on: ubuntu-latest
+    injectionHoist: warn
+    steps:
+      - run: echo "${{ github.event.issue.title }}"

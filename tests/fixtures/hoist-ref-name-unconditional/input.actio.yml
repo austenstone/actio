@@ -1,0 +1,8 @@
+name: Hoist Ref Name
+on: [pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ github.ref_name }}
+      - run: git checkout "${{ github.head_ref }}"

@@ -1,0 +1,8 @@
+name: Knob Off
+on: [issues]
+jobs:
+  b:
+    runs-on: ubuntu-latest
+    injectionHoist: off
+    steps:
+      - run: echo "${{ github.event.issue.title }}"

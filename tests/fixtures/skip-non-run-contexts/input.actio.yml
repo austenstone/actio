@@ -1,0 +1,11 @@
+name: Skip Non Run Contexts
+on: [issues]
+jobs:
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Title ${{ github.event.issue.title }}
+        if: ${{ github.event.issue.title != '' }}
+        uses: actions/github-script@v7
+        with:
+          script: console.log("${{ github.event.issue.title }}")

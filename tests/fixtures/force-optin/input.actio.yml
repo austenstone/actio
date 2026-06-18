@@ -1,0 +1,9 @@
+name: Force Optin
+on: [push]
+jobs:
+  b:
+    runs-on: ubuntu-latest
+    force:
+      - github.actor
+    steps:
+      - run: echo "actor ${{ github.actor }}"

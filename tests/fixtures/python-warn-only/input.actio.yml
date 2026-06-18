@@ -1,0 +1,8 @@
+name: Python Warn Only
+on: [issues]
+jobs:
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - shell: python
+        run: print("title ${{ github.event.issue.title }}")

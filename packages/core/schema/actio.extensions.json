@@ -30,7 +30,11 @@
       "type": "object",
       "description": "Actio macro. Named runner/container/service presets referenced by `jobs.<id>.executor`. Stripped from generated workflow YAML.",
       "additionalProperties": { "$ref": "#/definitions/executorDefinition" }
-    }
+    },
+    "injectionHoist": { "$ref": "#/definitions/injectionHoistMode" },
+    "unsafe": { "$ref": "#/definitions/injectionUnsafe" },
+    "trust": { "$ref": "#/definitions/injectionTrustList" },
+    "force": { "$ref": "#/definitions/injectionForceList" }
   },
   "patchDefinitions": {
     "step": {
@@ -48,7 +52,11 @@
           "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for_each.*`, `define.*`). If the expression is false the entire step is removed from the generated workflow; if true the `static_if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\nsteps:\n  - name: Publish preview\n    static_if: params.deploy\n    run: ./publish.sh\n```"
         },
         "retry": { "$ref": "#/definitions/retry" },
-        "fallback": { "$ref": "#/definitions/fallback" }
+        "fallback": { "$ref": "#/definitions/fallback" },
+        "injectionHoist": { "$ref": "#/definitions/injectionHoistMode" },
+        "unsafe": { "$ref": "#/definitions/injectionUnsafe" },
+        "trust": { "$ref": "#/definitions/injectionTrustList" },
+        "force": { "$ref": "#/definitions/injectionForceList" }
       },
       "patternProperties": {
         "^static_if\\(.+\\)$": {
@@ -77,7 +85,11 @@
               "items": { "type": "string" }
             }
           ]
-        }
+        },
+        "injectionHoist": { "$ref": "#/definitions/injectionHoistMode" },
+        "unsafe": { "$ref": "#/definitions/injectionUnsafe" },
+        "trust": { "$ref": "#/definitions/injectionTrustList" },
+        "force": { "$ref": "#/definitions/injectionForceList" }
       },
       "patternProperties": {
         "^static_if\\(.+\\)$": {
@@ -325,6 +337,29 @@
         },
         "id": { "type": "string", "description": "Override the generated setup job id." }
       }
+    },
+    "injectionHoistMode": {
+      "title": "injectionHoist (Actio macro)",
+      "description": "Actio macro. Controls the injection-hoist defense, which lifts untrusted `${{ }}` interpolations (e.g. `github.event.*`, `github.head_ref`, `github.ref_name`) out of `run:` script bodies into `env:` vars and rewrites the script to reference the shell variable instead. `fix` (default) rewrites; `warn` only diagnoses; `error` fails the build on an untrusted interpolation; `off` disables. Cascades step \u2192 job \u2192 workflow. Stripped from generated workflow YAML.",
+      "markdownDescription": "**Actio macro**: auto-defuse `${{ }}` script injection.\n\nUntrusted interpolations (`github.event.*`, `github.head_ref`, `github.ref_name`) inside a `run:` body are hoisted into `env:` and the script is rewritten to use the shell variable (`\"$VAR\"` / `\"$env:VAR\"`), closing the classic command-injection hole. Default-on.\n\n- `fix` (default): hoist + rewrite.\n- `warn`: diagnose only, emit nothing.\n- `error`: fail the build when an untrusted interpolation is found.\n- `off`: disable for this scope.\n\nCascades step \u2192 job \u2192 workflow. Stripped from generated YAML.\n\n```yaml\njobs:\n  build:\n    injectionHoist: fix\n    steps:\n      - run: echo \"${{ github.event.issue.title }}\"\n```",
+      "enum": ["fix", "warn", "error", "off"]
+    },
+    "injectionUnsafe": {
+      "type": "boolean",
+      "title": "unsafe (Actio macro)",
+      "description": "Actio macro. When true, opt out of injection-hoist for this scope (workflow/job/step) entirely \u2014 untrusted interpolations are left in the `run:` body verbatim. You are asserting the script is safe. Cascades by OR across scopes. Stripped from generated workflow YAML."
+    },
+    "injectionTrustList": {
+      "type": "array",
+      "items": { "type": "string" },
+      "title": "trust (Actio macro)",
+      "description": "Actio macro. A list of `${{ }}` expressions (e.g. `github.event.pull_request.number`) to treat as TRUSTED for injection-hoist, suppressing the hoist for those expressions in this scope. Unioned across scopes. Stripped from generated workflow YAML."
+    },
+    "injectionForceList": {
+      "type": "array",
+      "items": { "type": "string" },
+      "title": "force (Actio macro)",
+      "description": "Actio macro. A list of `${{ }}` expressions to FORCE-hoist even if they are otherwise classified as trusted. Unioned across scopes; `force` beats `trust` on conflict. Stripped from generated workflow YAML."
     }
   }
 }

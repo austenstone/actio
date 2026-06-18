@@ -20,6 +20,20 @@ const fixtureDirsByPassName: Record<string, string[]> = {
     "executors-compose",
   ],
   retry: ["retry-basic", "retry-delay", "retry-shorthand"],
+  injection_hoist: [
+    "hoist-event-body",
+    "hoist-ref-name-unconditional",
+    "no-hoist-trusted",
+    "pwsh-hoist",
+    "python-warn-only",
+    "unquoted-heredoc-hoist",
+    "skip-non-run-contexts",
+    "knob-off",
+    "knob-warn",
+    "unsafe-optout",
+    "trust-optout",
+    "force-optin",
+  ],
 };
 
 const hasGoldenPair = (fixtureDir: string): boolean =>
