@@ -29,6 +29,15 @@
     "lineWidth": 100
   },
   "files": {
-    "includes": ["**", "!**/dist", "!**/node_modules", "!**/coverage", "!**/*.yml", "!**/*.yaml"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/coverage",
+      "!**/*.yml",
+      "!**/*.yaml",
+      "!packages/core/schema/actio.schema.json",
+      "!packages/core/schema/vendor"
+    ]
   }
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/austenstone/actio/main/packages/core/schema/actio.schema.json",
-  "$comment": "GENERATED FILE — do not edit by hand. Built by scripts/build-schema.mjs from vendor/github-workflow.json (the official GitHub Actions schema from SchemaStore) plus actio.extensions.json (the Actio macro layer). Edit actio.extensions.json and run `npm run schema:build -w actio-core`. Refresh the upstream snapshot with `npm run schema:refresh -w actio-core`.",
+  "$id": "https://json.schemastore.org/github-workflow.json",
+  "$comment": "https://help.github.com/en/github/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions",
   "additionalProperties": false,
   "definitions": {
     "architecture": {
@@ -534,11 +534,6 @@
           "required": [
             "run"
           ]
-        },
-        {
-          "required": [
-            "inject"
-          ]
         }
       ],
       "properties": {
@@ -621,16 +616,6 @@
               "$ref": "#/definitions/expressionSyntax"
             }
           ]
-        },
-        "inject": {
-          "type": "string",
-          "description": "Actio macro. Splice in the steps of the named fragment (defined under top-level `fragments:`) at this position. Replaced inline by `actio build`."
-        },
-        "retry": {
-          "$ref": "#/definitions/retry"
-        },
-        "fallback": {
-          "$ref": "#/definitions/fallback"
         }
       }
     },
@@ -1025,12 +1010,6 @@
               "$ref": "#/definitions/concurrency"
             }
           ]
-        },
-        "dynamic_matrix": {
-          "$ref": "#/definitions/dynamicMatrix"
-        },
-        "fallback": {
-          "$ref": "#/definitions/fallback"
         }
       },
       "required": [
@@ -1179,135 +1158,6 @@
         }
       ],
       "additionalProperties": false
-    },
-    "retry": {
-      "title": "retry (Actio macro)",
-      "description": "Actio macro. Retry a flaky step with optional backoff; expands into a chain of conditional attempts where attempt N runs only if attempt N-1 failed. Shorthand `retry: 3` is the same as `retry: { attempts: 3 }`.",
-      "oneOf": [
-        {
-          "type": "integer",
-          "minimum": 2,
-          "description": "Number of attempts (minimum 2)."
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "attempts"
-          ],
-          "properties": {
-            "attempts": {
-              "type": "integer",
-              "minimum": 2,
-              "description": "Number of attempts (minimum 2)."
-            },
-            "delay": {
-              "description": "Backoff between attempts: a duration like \"10s\", \"2m\", \"1h\", or a number of seconds. Injects `sleep` steps between attempts.",
-              "oneOf": [
-                {
-                  "type": "string",
-                  "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhSMH]?\\s*$",
-                  "examples": [
-                    "10s",
-                    "2m",
-                    "1h"
-                  ]
-                },
-                {
-                  "type": "number",
-                  "exclusiveMinimum": 0
-                }
-              ]
-            }
-          }
-        }
-      ]
-    },
-    "fallback": {
-      "title": "fallback (Actio macro)",
-      "description": "Actio macro. A native try/catch. Default (notify): the fallback runs on failure via `if: failure()` but the job still fails. With `recover: true` the guarded step gets `continue-on-error: true` and the fallback keys off `outcome`, so the job can pass.",
-      "oneOf": [
-        {
-          "type": "array",
-          "description": "Fallback steps (notify mode). The job still fails.",
-          "items": {
-            "$ref": "#/definitions/step"
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "steps"
-          ],
-          "properties": {
-            "steps": {
-              "type": "array",
-              "description": "Steps to run when the guarded step or job fails.",
-              "items": {
-                "$ref": "#/definitions/step"
-              }
-            },
-            "recover": {
-              "type": "boolean",
-              "description": "When true, swallow the guarded failure (continue-on-error) so the job can continue. Step-level only; ignored on job-level fallback."
-            }
-          }
-        }
-      ]
-    },
-    "dynamicMatrix": {
-      "title": "dynamic_matrix (Actio macro)",
-      "type": "object",
-      "description": "Actio macro. Build a matrix at runtime: `script` prints a JSON array (or `{include:[...]}`) to stdout. Actio generates a setup job that publishes the JSON and wires this job to consume it via `fromJSON()` with a fail-fast:false default and an empty-matrix guard.",
-      "required": [
-        "script"
-      ],
-      "additionalProperties": true,
-      "properties": {
-        "script": {
-          "type": "string",
-          "description": "Command or local script path that prints a JSON array (or `{\"include\":[...]}`) to stdout."
-        },
-        "alias": {
-          "type": "string",
-          "description": "Wrap a scalar JSON array under `matrix.<alias>` (referenced as `${{ matrix.<alias> }}`). Omit for raw `{include:[...]}` mode."
-        },
-        "runs-on": {
-          "description": "Runner for the generated setup job. Defaults to the job's `runs-on`, else `ubuntu-latest`.",
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array"
-            },
-            {
-              "type": "object"
-            }
-          ]
-        },
-        "shell": {
-          "type": "string",
-          "description": "Shell that runs `script` in the setup job, like a step's `shell`. Supported: bash, sh, pwsh, powershell, python. Actio emits matching plumbing to publish the matrix output; other shells (e.g. cmd) are rejected."
-        },
-        "compact": {
-          "type": "boolean",
-          "description": "Pipe the script's stdout through `jq -c .` to normalize the matrix JSON to one line. POSIX-only (bash/sh); ignored for pwsh/powershell/python, which emit raw multi-line output that `fromJSON` parses fine. Defaults to true."
-        },
-        "checkout": {
-          "type": "boolean",
-          "description": "Check out the repository in the setup job. Defaults to true when `script` is a local path."
-        },
-        "fail-fast": {
-          "type": "boolean",
-          "description": "Value for `strategy.fail-fast` on the matrix job. Defaults to false."
-        },
-        "id": {
-          "type": "string",
-          "description": "Override the generated setup job id."
-        }
-      }
     }
   },
   "properties": {
@@ -2520,24 +2370,11 @@
     },
     "permissions": {
       "$ref": "#/definitions/permissions"
-    },
-    "fragments": {
-      "type": "object",
-      "description": "Actio macro. Reusable, named lists of steps. Splice a fragment into a job with `- inject: <name>`. The `fragments` key is stripped from the generated workflow.",
-      "additionalProperties": {
-        "type": "array",
-        "description": "An ordered list of steps to inject wherever this fragment is referenced.",
-        "items": {
-          "$ref": "#/definitions/step"
-        }
-      }
     }
   },
   "required": [
     "on",
     "jobs"
   ],
-  "type": "object",
-  "title": "Actio workflow (.actio.yml)",
-  "description": "Source language for the Actio transpiler: the official GitHub Actions workflow schema (inherited wholesale from SchemaStore) plus Actio macro keywords (fragments/inject, retry, dynamic_matrix, fallback) that compile into standard workflow YAML. Every standard GitHub Actions key, event, and value is validated and autocompleted from the upstream schema; the macro keys are additive. See https://github.com/austenstone/actio."
+  "type": "object"
 }
