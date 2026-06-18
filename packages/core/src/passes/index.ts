@@ -2,6 +2,13 @@ import type { ParseContext } from "../parser.js";
 import { dynamicMatrix } from "./dynamicMatrix.js";
 import { fallback } from "./fallback.js";
 import { fragments } from "./fragments.js";
+import {
+  applyDefaults,
+  applyExecutor,
+  EXECUTOR_KEYS,
+  JOB_DEFAULTS_SAFE_SUBSET,
+  jobDefaults,
+} from "./jobDefaults.js";
 import { params } from "./params.js";
 import { applyPasses, type Pass, PassRegistry } from "./registry.js";
 import { retry } from "./retry.js";
@@ -9,9 +16,16 @@ import { retry } from "./retry.js";
 /**
  * The transforms Actio ships with. Order is derived from each pass's `runsAfter`
  * (see registry.ts), not this array, so the effective pipeline is:
- *   params → fragments → retry → fallback → dynamic_matrix
+ *   params → job_defaults → fragments → retry → fallback → dynamic_matrix
  */
-export const builtinPasses: Pass[] = [params, fragments, retry, fallback, dynamicMatrix];
+export const builtinPasses: Pass[] = [
+  params,
+  jobDefaults,
+  fragments,
+  retry,
+  fallback,
+  dynamicMatrix,
+];
 
 /** Run a set of passes (defaults to the built-ins) in dependency order. */
 export function runPasses(ctx: ParseContext, passes: Pass[] = builtinPasses): void {
@@ -31,4 +45,15 @@ export {
   PassRegistry,
   sortPasses,
 } from "./registry.js";
-export { dynamicMatrix, fallback, fragments, params, retry };
+export {
+  applyDefaults,
+  applyExecutor,
+  dynamicMatrix,
+  EXECUTOR_KEYS,
+  fallback,
+  fragments,
+  JOB_DEFAULTS_SAFE_SUBSET,
+  jobDefaults,
+  params,
+  retry,
+};

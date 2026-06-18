@@ -1,0 +1,35 @@
+name: Executors compose
+on: [push]
+
+executors:
+  hardened:
+    permissions:
+      contents: read
+    concurrency:
+      group: hardened-group
+    defaults:
+      run:
+        shell: bash
+    env:
+      HARDENED: "true"
+    timeout-minutes: 10
+  gpu:
+    runs-on: [self-hosted, gpu]
+    container:
+      image: nvidia/cuda:12.4.0-base
+  fast:
+    runs-on: ubuntu-latest
+    env:
+      FAST: "true"
+    timeout-minutes: 5
+
+jobs:
+  release:
+    executor: [hardened, gpu]
+    steps:
+      - run: echo release
+  tuned:
+    executor: [hardened, fast]
+    runs-on: windows-latest
+    steps:
+      - run: echo tuned

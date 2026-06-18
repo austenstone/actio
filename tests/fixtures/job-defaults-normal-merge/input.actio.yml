@@ -1,0 +1,20 @@
+name: Job defaults normal merge
+on: [push]
+
+job_defaults:
+  runs-on: ubuntu-latest
+  timeout-minutes: 20
+  env:
+    CI: "true"
+    LOG_LEVEL: info
+  defaults:
+    run:
+      shell: bash
+
+jobs:
+  build:
+    steps:
+      - run: echo build
+    env:
+      LOG_LEVEL: debug
+
