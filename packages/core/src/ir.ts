@@ -118,7 +118,7 @@ function reapplyKeyOrder(src: unknown, dst: unknown): void {
   }
   if (isObject(src) && isObject(dst)) {
     const order = (src as Record<symbol, unknown>)[KEY_ORDER];
-    if (Array.isArray(order)) setKeyOrder(dst, order as string[]);
+    if (Array.isArray(order)) setKeyOrder(dst, [...(order as string[])]);
     for (const k of Object.keys(src)) reapplyKeyOrder(src[k], dst[k]);
   }
 }
