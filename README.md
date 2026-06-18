@@ -32,7 +32,7 @@ serialization. Actio's differentiator is the **macro/transform compiler**.
 ```bash
 npm install -D actio-cli
 # or run without installing:
-npx actio-cli build
+npx -p actio-cli actio build
 ```
 
 Requires Node ≥ 20.
@@ -41,13 +41,13 @@ Requires Node ≥ 20.
 
 ```bash
 # scaffold a starter source file
-npx actio-cli init ci.actio.yml
+npx -p actio-cli actio init ci.actio.yml
 
 # compile *.actio.yml → .github/workflows/*.yml
-npx actio-cli build
+npx -p actio-cli actio build
 
 # CI drift check (fails if generated output is stale)
-npx actio-cli check
+npx -p actio-cli actio check
 ```
 
 **Recommended layout:** keep sources in `.github/actio/` and compile them into
@@ -67,13 +67,13 @@ Actio ships a dedicated pin-management surface for freezing mutable refs to immu
 
 ```bash
 # verify pin state
-npx actio-cli pins check .github/actio/ci.actio.yml
+npx -p actio-cli actio pins check .github/actio/ci.actio.yml
 
 # mechanical pin rewrite only (no build/config/custom-pass execution)
-npx actio-cli pins update .github/actio/ci.actio.yml --no-exec --delta-out .actio/pins-delta.json
+npx -p actio-cli actio pins update .github/actio/ci.actio.yml --no-exec --delta-out .actio/pins-delta.json
 
 # privileged apply of a precomputed delta with strict allowlist checks
-npx actio-cli pins apply --constrained .actio/pins-delta.json
+npx -p actio-cli actio pins apply --constrained .actio/pins-delta.json
 ```
 
 Exit codes are security-significant:

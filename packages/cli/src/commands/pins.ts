@@ -118,6 +118,7 @@ export interface PinsUpdateOptions extends PinsCheckOptions {
 export interface PinsApplyOptions {
   cwd?: string;
   lockPath?: string;
+  resolver?: PinResolver;
 }
 
 const DEFAULT_OUT_DIR = ".github/workflows";
@@ -621,8 +622,16 @@ export const runPinsUpdate = async (
   const cwd = options.cwd ?? process.cwd();
   const outDir = options.outDir ?? DEFAULT_OUT_DIR;
   const resolver = options.resolver ?? createGitHubResolver();
-  const lock = await readLock(cwd, options.lockPath);
   const files = await resolveSourceFiles(patterns, cwd);
+  if (files.length === 0) {
+    process.stderr.write(
+      `${pc.yellow("warning")}: no .actio.yml files found${
+        patterns.length ? ` for: ${patterns.join(", ")}` : ""
+      }\n`,
+    );
+    return 0;
+  }
+  const lock = await readLock(cwd, options.lockPath);
   const lockBefore = `${JSON.stringify(lock.data, null, 2)}\n`;
   const nowIso = new Date().toISOString();
   const sourceChanges: FileChangeSet[] = [];
@@ -659,51 +668,24 @@ export const runPinsUpdate = async (
       }
 
       const generatedEntry = generatedByAction.get(entry.action);
-      const generatedComment = generatedEntry ? normalizeCommentRef(generatedEntry.raw) : null;
-      const targetRef =
-        generatedComment && generatedComment !== entry.ref ? generatedComment : entry.ref;
-
+      const targetRef = entry.ref;
       const resolved = await resolveAndHashAction(resolver, entry.action, targetRef);
-      lock.data.actions[entry.action] = {
-        action: entry.action,
-        sourceRef: targetRef,
-        digest: resolved.digest,
-        integrity: resolved.integrity,
-        resolvedAt: nowIso,
-      };
+      const actionChanged =
+        !oldLock ||
+        oldLock.digest !== resolved.digest ||
+        oldLock.sourceRef !== targetRef ||
+        oldLock.integrity !== resolved.integrity;
+      if (actionChanged) {
+        lock.data.actions[entry.action] = {
+          action: entry.action,
+          sourceRef: targetRef,
+          digest: resolved.digest,
+          integrity: resolved.integrity,
+          resolvedAt: nowIso,
+        };
+      }
 
-      if (targetRef !== entry.ref) {
-        const replacement = `${entry.prefix}${entry.action}@${targetRef}`;
-        const sourceEdit = replaceLine(nextSource, entry.line, replacement);
-        nextSource = sourceEdit.content;
-        bumpCount += 1;
-
-        if (generatedEntry) {
-          const pinnedGenerated = emitPinnedLine(
-            generatedEntry.prefix,
-            entry.action,
-            resolved.digest,
-            targetRef,
-          );
-          const generatedEdit = replaceLine(nextGenerated, generatedEntry.line, pinnedGenerated);
-          nextGenerated = generatedEdit.content;
-
-          if (bumpCount === 1 && oldLock?.digest && PINNED_SHA_RE.test(generatedEntry.ref)) {
-            singleBumpDelta = buildDelta({
-              action: entry.action,
-              fromRef: entry.ref,
-              toRef: targetRef,
-              fromDigest: oldLock.digest,
-              toDigest: resolved.digest,
-              sourceFile: file,
-              generatedFile: path.relative(cwd, generatedPath),
-              lockFile: path.relative(cwd, lock.path),
-              sourceEdit: { search: sourceEdit.previous, replace: sourceEdit.next },
-              generatedEdit: { search: generatedEdit.previous, replace: generatedEdit.next },
-            });
-          }
-        }
-      } else if (generatedEntry) {
+      if (generatedEntry) {
         const pinnedGenerated = emitPinnedLine(
           generatedEntry.prefix,
           entry.action,
@@ -712,6 +694,50 @@ export const runPinsUpdate = async (
         );
         const generatedEdit = replaceLine(nextGenerated, generatedEntry.line, pinnedGenerated);
         nextGenerated = generatedEdit.content;
+
+        if (
+          actionChanged &&
+          oldLock &&
+          oldLock.sourceRef !== targetRef &&
+          bumpCount === 0 &&
+          PINNED_SHA_RE.test(generatedEntry.ref)
+        ) {
+          bumpCount += 1;
+          singleBumpDelta = buildDelta({
+            action: entry.action,
+            fromRef: oldLock.sourceRef,
+            toRef: targetRef,
+            fromDigest: oldLock.digest,
+            toDigest: resolved.digest,
+            sourceFile: file,
+            generatedFile: path.relative(cwd, generatedPath),
+            lockFile: path.relative(cwd, lock.path),
+            sourceEdit: {
+              search: `${entry.prefix}${entry.action}@${oldLock.sourceRef}`,
+              replace: `${entry.prefix}${entry.action}@${targetRef}`,
+            },
+            generatedEdit: {
+              search: emitPinnedLine(
+                generatedEntry.prefix,
+                entry.action,
+                oldLock.digest,
+                oldLock.sourceRef,
+              ),
+              replace: emitPinnedLine(
+                generatedEntry.prefix,
+                entry.action,
+                resolved.digest,
+                targetRef,
+              ),
+            },
+          });
+        } else if (actionChanged && oldLock && oldLock.sourceRef !== targetRef) {
+          bumpCount += 1;
+          singleBumpDelta = null;
+        }
+      } else if (actionChanged && oldLock && oldLock.sourceRef !== targetRef) {
+        bumpCount += 1;
+        singleBumpDelta = null;
       }
     }
 
@@ -734,7 +760,15 @@ export const runPinsUpdate = async (
         );
         return 2;
       }
-      lock.data.imports[importLine.spec] = entry;
+      const existingLock = lock.data.imports[importLine.spec];
+      const importChanged =
+        !existingLock ||
+        existingLock.source !== entry.source ||
+        existingLock.immutableRef !== entry.immutableRef ||
+        existingLock.integrity !== entry.integrity;
+      if (importChanged) {
+        lock.data.imports[importLine.spec] = entry;
+      }
       if (existingPinned !== entry.integrity) {
         const replacement = emitImportLine(importLine.prefix, importLine.spec, entry.integrity);
         const sourceEdit = replaceLine(nextSource, importLine.line, replacement);
@@ -783,52 +817,71 @@ export const runPinsApplyConstrained = async (
   options: PinsApplyOptions = {},
 ): Promise<PinsExitCode> => {
   const cwd = options.cwd ?? process.cwd();
-  const delta = await parseDelta(cwd, deltaFile);
-  const deltaError = validateConstrainedDelta(delta);
-  if (deltaError) {
-    process.stderr.write(`${pc.red("error")}: constrained delta rejected: ${deltaError}\n`);
-    return 2;
-  }
+  const resolver = options.resolver ?? createGitHubResolver();
+  try {
+    const delta = await parseDelta(cwd, deltaFile);
+    const deltaError = validateConstrainedDelta(delta);
+    if (deltaError) {
+      process.stderr.write(`${pc.red("error")}: constrained delta rejected: ${deltaError}\n`);
+      return 2;
+    }
 
-  const sourceApplied = await updateSingleFile(
-    cwd,
-    delta.sourceFile,
-    delta.sourceEdit.search,
-    delta.sourceEdit.replace,
-  );
-  if (!sourceApplied) {
-    process.stderr.write(`${pc.red("error")}: constrained apply rejected source change shape\n`);
-    return 2;
-  }
-
-  const generatedApplied = await updateSingleFile(
-    cwd,
-    delta.generatedFile,
-    delta.generatedEdit.search,
-    delta.generatedEdit.replace,
-  );
-  if (!generatedApplied) {
-    process.stderr.write(`${pc.red("error")}: constrained apply rejected generated change shape\n`);
-    return 2;
-  }
-
-  const lock = await readLock(cwd, options.lockPath ?? delta.lockFile);
-  const actionEntry = lock.data.actions[delta.action];
-  if (
-    !actionEntry ||
-    actionEntry.digest !== delta.fromDigest ||
-    actionEntry.sourceRef !== delta.fromRef
-  ) {
-    process.stderr.write(
-      `${pc.red("error")}: constrained apply rejected lockfile state for ${delta.action}\n`,
+    const sourceApplied = await updateSingleFile(
+      cwd,
+      delta.sourceFile,
+      delta.sourceEdit.search,
+      delta.sourceEdit.replace,
     );
+    if (!sourceApplied) {
+      process.stderr.write(`${pc.red("error")}: constrained apply rejected source change shape\n`);
+      return 2;
+    }
+
+    const generatedApplied = await updateSingleFile(
+      cwd,
+      delta.generatedFile,
+      delta.generatedEdit.search,
+      delta.generatedEdit.replace,
+    );
+    if (!generatedApplied) {
+      process.stderr.write(
+        `${pc.red("error")}: constrained apply rejected generated change shape\n`,
+      );
+      return 2;
+    }
+
+    const lock = await readLock(cwd, options.lockPath ?? delta.lockFile);
+    const actionEntry = lock.data.actions[delta.action];
+    if (
+      !actionEntry ||
+      actionEntry.digest !== delta.fromDigest ||
+      actionEntry.sourceRef !== delta.fromRef
+    ) {
+      process.stderr.write(
+        `${pc.red("error")}: constrained apply rejected lockfile state for ${delta.action}\n`,
+      );
+      return 2;
+    }
+    const request: ResolverRequest = { kind: "action", id: delta.action, ref: delta.toRef };
+    const immutable = await resolver.resolveToImmutable(request);
+    if (immutable !== delta.toDigest) {
+      process.stderr.write(
+        `${pc.red("error")}: constrained apply rejected digest mismatch for ${delta.action} (${delta.toRef} resolved to ${immutable})\n`,
+      );
+      return 2;
+    }
+    const bytes = await resolver.fetchByImmutable(request, immutable);
+    actionEntry.digest = immutable;
+    actionEntry.sourceRef = delta.toRef;
+    actionEntry.integrity = `sha256:${sha256Hex(bytes)}`;
+    actionEntry.resolvedAt = new Date().toISOString();
+    await writeLock(lock);
+
+    process.stderr.write(`${pc.green("✓")} constrained pin delta applied\n`);
+    return 0;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${pc.red("error")}: constrained apply failed: ${message}\n`);
     return 2;
   }
-  actionEntry.digest = delta.toDigest;
-  actionEntry.sourceRef = delta.toRef;
-  actionEntry.resolvedAt = new Date().toISOString();
-  await writeLock(lock);
-
-  process.stderr.write(`${pc.green("✓")} constrained pin delta applied\n`);
-  return 0;
 };

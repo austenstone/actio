@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -31,6 +32,7 @@ const TMP_DIRS: string[] = [];
 
 const setupWorkspace = async (params: {
   sourceRef: string;
+  lockSourceRef?: string;
   generatedDigest: string;
   generatedRef: string;
   lockDigest: string;
@@ -61,7 +63,7 @@ const setupWorkspace = async (params: {
     actions: {
       [ACTION]: {
         action: ACTION,
-        sourceRef: params.sourceRef,
+        sourceRef: params.lockSourceRef ?? params.sourceRef,
         digest: params.lockDigest,
         integrity: params.lockIntegrity,
         resolvedAt: "2026-01-01T00:00:00.000Z",
@@ -147,16 +149,20 @@ describe("pins update --no-exec", () => {
   it("never invokes build execution when --no-exec is set", async () => {
     let buildCalls = 0;
     const resolver = makeResolver({
-      resolutions: { [`${ACTION}@v2`]: D2 },
+      resolutions: {
+        [`${ACTION}@v1`]: D1,
+        [`${ACTION}@v2`]: D2,
+      },
       bytes: {
         [`${ACTION}@${D1}`]: "bytes-v1",
         [`${ACTION}@${D2}`]: "bytes-v2",
       },
     });
     const dir = await setupWorkspace({
-      sourceRef: "v1",
-      generatedDigest: D2,
-      generatedRef: "v2",
+      sourceRef: "v2",
+      lockSourceRef: "v1",
+      generatedDigest: D1,
+      generatedRef: "v1",
       lockDigest: D1,
       lockIntegrity: toIntegrity("bytes-v1"),
     });
@@ -183,16 +189,20 @@ describe("pins update --no-exec", () => {
   it("invokes build execution when --no-exec is not set", async () => {
     let buildCalls = 0;
     const resolver = makeResolver({
-      resolutions: { [`${ACTION}@v2`]: D2 },
+      resolutions: {
+        [`${ACTION}@v1`]: D1,
+        [`${ACTION}@v2`]: D2,
+      },
       bytes: {
         [`${ACTION}@${D1}`]: "bytes-v1",
         [`${ACTION}@${D2}`]: "bytes-v2",
       },
     });
     const dir = await setupWorkspace({
-      sourceRef: "v1",
-      generatedDigest: D2,
-      generatedRef: "v2",
+      sourceRef: "v2",
+      lockSourceRef: "v1",
+      generatedDigest: D1,
+      generatedRef: "v1",
       lockDigest: D1,
       lockIntegrity: toIntegrity("bytes-v1"),
     });
@@ -210,21 +220,102 @@ describe("pins update --no-exec", () => {
     expect(code).toBe(0);
     expect(buildCalls).toBe(1);
   });
+
+  it("treats source .actio.yml refs as authoritative over generated comments", async () => {
+    const resolver = makeResolver({
+      resolutions: {
+        [`${ACTION}@v1`]: D1,
+        [`${ACTION}@v2`]: D2,
+      },
+      bytes: {
+        [`${ACTION}@${D1}`]: "bytes-v1",
+        [`${ACTION}@${D2}`]: "bytes-v2",
+      },
+    });
+    const dir = await setupWorkspace({
+      sourceRef: "v2",
+      generatedDigest: D1,
+      generatedRef: "v1",
+      lockDigest: D1,
+      lockIntegrity: toIntegrity("bytes-v1"),
+    });
+
+    const code = await runPinsUpdate([path.join(".github", "actio", "ci.actio.yml")], {
+      cwd: dir,
+      noExec: true,
+      resolver,
+      deltaOut: path.join(".actio", "pins-delta.json"),
+    });
+
+    expect(code).toBe(0);
+    const source = await readFile(path.join(dir, ".github", "actio", "ci.actio.yml"), "utf8");
+    const generated = await readFile(path.join(dir, ".github", "workflows", "ci.yml"), "utf8");
+    const lock = JSON.parse(await readFile(path.join(dir, "actio.lock"), "utf8")) as {
+      actions: Record<string, { sourceRef: string; digest: string }>;
+    };
+    expect(source).toContain(`${ACTION}@v2`);
+    expect(generated).toContain(`${ACTION}@${D2} # v2`);
+    expect(lock.actions[ACTION]?.sourceRef).toBe("v2");
+    expect(lock.actions[ACTION]?.digest).toBe(D2);
+  });
+
+  it("preserves resolvedAt when lock entries are unchanged", async () => {
+    const resolver = makeResolver({
+      resolutions: { [`${ACTION}@v1`]: D1 },
+      bytes: { [`${ACTION}@${D1}`]: "bytes-v1" },
+    });
+    const dir = await setupWorkspace({
+      sourceRef: "v1",
+      generatedDigest: D1,
+      generatedRef: "v1",
+      lockDigest: D1,
+      lockIntegrity: toIntegrity("bytes-v1"),
+    });
+
+    const code = await runPinsUpdate([path.join(".github", "actio", "ci.actio.yml")], {
+      cwd: dir,
+      noExec: true,
+      resolver,
+    });
+
+    expect(code).toBe(0);
+    const lock = JSON.parse(await readFile(path.join(dir, "actio.lock"), "utf8")) as {
+      actions: Record<string, { resolvedAt: string }>;
+    };
+    expect(lock.actions[ACTION]?.resolvedAt).toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it("warns and exits 0 without creating actio.lock when no files match", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "actio-pins-empty-"));
+    TMP_DIRS.push(dir);
+
+    const code = await runPinsUpdate([path.join(".github", "actio", "*.actio.yml")], {
+      cwd: dir,
+      noExec: true,
+    });
+
+    expect(code).toBe(0);
+    expect(existsSync(path.join(dir, "actio.lock"))).toBe(false);
+  });
 });
 
 describe("pins apply --constrained", () => {
   it("accepts a valid three-artifact delta", async () => {
     const resolver = makeResolver({
-      resolutions: { [`${ACTION}@v2`]: D2 },
+      resolutions: {
+        [`${ACTION}@v1`]: D1,
+        [`${ACTION}@v2`]: D2,
+      },
       bytes: {
         [`${ACTION}@${D1}`]: "bytes-v1",
         [`${ACTION}@${D2}`]: "bytes-v2",
       },
     });
     const computeDir = await setupWorkspace({
-      sourceRef: "v1",
-      generatedDigest: D2,
-      generatedRef: "v2",
+      sourceRef: "v2",
+      lockSourceRef: "v1",
+      generatedDigest: D1,
+      generatedRef: "v1",
       lockDigest: D1,
       lockIntegrity: toIntegrity("bytes-v1"),
     });
@@ -240,8 +331,8 @@ describe("pins apply --constrained", () => {
 
     const applyDir = await setupWorkspace({
       sourceRef: "v1",
-      generatedDigest: D2,
-      generatedRef: "v2",
+      generatedDigest: D1,
+      generatedRef: "v1",
       lockDigest: D1,
       lockIntegrity: toIntegrity("bytes-v1"),
     });
@@ -250,13 +341,23 @@ describe("pins apply --constrained", () => {
 
     const applyCode = await runPinsApplyConstrained(path.join(".actio", "pins-delta.json"), {
       cwd: applyDir,
+      resolver,
     });
     expect(applyCode).toBe(0);
 
     const source = await readFile(path.join(applyDir, ".github", "actio", "ci.actio.yml"), "utf8");
-    const lock = await readFile(path.join(applyDir, "actio.lock"), "utf8");
+    const lock = JSON.parse(await readFile(path.join(applyDir, "actio.lock"), "utf8")) as {
+      actions: Record<string, { digest: string; integrity: string }>;
+    };
     expect(source).toContain(`${ACTION}@v2`);
-    expect(lock).toContain(D2);
+    expect(lock.actions[ACTION]?.digest).toBe(D2);
+    expect(lock.actions[ACTION]?.integrity).toBe(toIntegrity("bytes-v2"));
+
+    const checkCode = await runPinsCheck([path.join(".github", "actio", "ci.actio.yml")], {
+      cwd: applyDir,
+      resolver,
+    });
+    expect(checkCode).toBe(0);
   });
 
   it("rejects a delta whose source edit is not a uses ref bump (exit 2)", async () => {
@@ -409,6 +510,22 @@ describe("pins apply --constrained", () => {
       `${JSON.stringify(delta)}\n`,
       "utf8",
     );
+    const code = await runPinsApplyConstrained(path.join(".actio", "pins-delta.json"), {
+      cwd: dir,
+    });
+    expect(code).toBe(2);
+  });
+
+  it("returns exit 2 for malformed constrained delta JSON", async () => {
+    const dir = await setupWorkspace({
+      sourceRef: "v1",
+      generatedDigest: D1,
+      generatedRef: "v1",
+      lockDigest: D1,
+      lockIntegrity: toIntegrity("bytes-v1"),
+    });
+    await mkdir(path.join(dir, ".actio"), { recursive: true });
+    await writeFile(path.join(dir, ".actio", "pins-delta.json"), "{broken-json", "utf8");
     const code = await runPinsApplyConstrained(path.join(".actio", "pins-delta.json"), {
       cwd: dir,
     });

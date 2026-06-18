@@ -3,7 +3,12 @@ import { writeFile } from "node:fs/promises";
 import { cac } from "cac";
 import pc from "picocolors";
 import { type BuildOptions, runBuild } from "./commands/build.js";
-import { runPinsApplyConstrained, runPinsCheck, runPinsUpdate } from "./commands/pins.js";
+import {
+  type PinsExitCode,
+  runPinsApplyConstrained,
+  runPinsCheck,
+  runPinsUpdate,
+} from "./commands/pins.js";
 import { runSchema } from "./commands/schema.js";
 import { runWatch } from "./commands/watch.js";
 import { type LoadedConfig, loadActioConfig, resolveBuildOptions } from "./config.js";
@@ -38,6 +43,18 @@ interface CliPinsApplyFlags {
 }
 
 const cli = cac("actio");
+
+const formatError = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+const runPinsCommand = async (run: () => Promise<PinsExitCode>): Promise<void> => {
+  try {
+    process.exitCode = await run();
+  } catch (error) {
+    process.stderr.write(`${pc.red("error")}: ${formatError(error)}\n`);
+    process.exitCode = 2;
+  }
+};
 
 /** Load the config file, then merge it with CLI flags (explicit flag > config > default). */
 async function resolveOptions(
@@ -160,7 +177,7 @@ cli
   .command("pins check [...files]", "Check pin drift (exit 1) and integrity mismatches (exit 2)")
   .option("--out-dir <dir>", "Generated workflow directory (default .github/workflows)")
   .action(async (files: string[], flags: CliPinsCheckFlags) => {
-    process.exitCode = await runPinsCheck(files, { outDir: flags.outDir });
+    await runPinsCommand(() => runPinsCheck(files, { outDir: flags.outDir }));
   });
 
 cli
@@ -172,35 +189,38 @@ cli
   .option("--delta-out <file>", "Where to write the constrained delta artifact")
   .option("--no-exec", "Do not run build/config/custom passes; rewrite only")
   .action(async (files: string[], flags: CliPinsUpdateFlags) => {
-    process.exitCode = await runPinsUpdate(files, {
-      outDir: flags.outDir,
-      noExec: flags.noExec,
-      deltaOut: flags.deltaOut,
-      runBuild: async (patterns, cwd) => {
-        const loaded = await loadActioConfig(cwd);
-        const { patterns: buildPatterns, options } = resolveBuildOptions({
-          files: patterns,
-          flags: { outDir: flags.outDir },
-          forceCheck: false,
-          argv: process.argv.slice(2),
-          config: loaded?.config ?? {},
-        });
-        options.cwd = cwd;
-        await runBuild(buildPatterns, options);
-      },
-    });
+    await runPinsCommand(() =>
+      runPinsUpdate(files, {
+        outDir: flags.outDir,
+        noExec: flags.noExec,
+        deltaOut: flags.deltaOut,
+        runBuild: async (patterns, cwd) => {
+          const loaded = await loadActioConfig(cwd);
+          const { patterns: buildPatterns, options } = resolveBuildOptions({
+            files: patterns,
+            flags: { outDir: flags.outDir },
+            forceCheck: false,
+            argv: process.argv.slice(2),
+            config: loaded?.config ?? {},
+          });
+          options.cwd = cwd;
+          await runBuild(buildPatterns, options);
+        },
+      }),
+    );
   });
 
 cli
   .command("pins apply", "Apply a precomputed pin delta with constrained allowlist checks")
   .option("--constrained <delta>", "Constrained delta file produced by pins update --no-exec")
   .action(async (flags: CliPinsApplyFlags) => {
-    if (!flags.constrained) {
+    const deltaFile = flags.constrained;
+    if (!deltaFile) {
       process.stderr.write(`${pc.red("error")}: pins apply requires --constrained <delta>\n`);
       process.exitCode = 2;
       return;
     }
-    process.exitCode = await runPinsApplyConstrained(flags.constrained);
+    await runPinsCommand(() => runPinsApplyConstrained(deltaFile));
   });
 
 cli.help();
