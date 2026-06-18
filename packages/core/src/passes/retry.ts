@@ -60,83 +60,137 @@ function stepLabel(step: Step): string {
   return "step";
 }
 
-/** Expand step-level `retry:` blocks into a chain of conditional attempts. */
-function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
-  if (!Array.isArray(job.steps)) return;
-  const used = collectUsedStepIds(job.steps);
+/** Build the fan-out chain of attempts for a single `retry:` step. */
+function buildRetryAttempts(
+  ctx: ParseContext,
+  jobId: string,
+  step: Step,
+  idx: number,
+  used: Set<string>,
+  cfg: NormalizedRetry,
+): Step[] {
+  const label = stepLabel(step);
+  const slug = slugify(label);
+  const base = slug ? `step_${slug}` : `actio_${jobId}_step_${idx + 1}`;
+  // Preserve a user-supplied `id`: the final attempt reclaims it so downstream
+  // `steps.<id>` references (outputs, outcome) still resolve to the real result.
+  const userId = typeof step.id === "string" && step.id.trim() ? step.id.trim() : undefined;
+  if (userId) used.delete(userId);
+  // Preserve a falsy boolean/number `if` (e.g. `if: false` / `if: 0`) — both
+  // are valid "never run" gates that must survive onto the first attempt.
+  const originalIf =
+    typeof step.if === "string" || typeof step.if === "boolean" || typeof step.if === "number"
+      ? step.if
+      : undefined;
+  const { attempts, delaySeconds, delayLabel } = cfg;
+  const out: Step[] = [];
 
-  transformSteps(ctx, jobId, job, (step, idx) => {
-    if (!isObject(step) || step.retry == null) return [step];
+  let prevId: string | undefined;
+  for (let n = 1; n <= attempts; n++) {
+    const isLast = n === attempts;
+    const guard = prevId ? `steps.${prevId}.outcome == 'failure'` : undefined;
+    // The first attempt (no guard) carries the user's gate verbatim so a falsy
+    // boolean/number `if` stays a real boolean and keeps the step disabled.
+    const condition: string | boolean | number | undefined =
+      guard == null && typeof originalIf !== "string" ? originalIf : combineIf(originalIf, guard);
+
+    if (delaySeconds != null && prevId) {
+      const sleepStep: Step = deriveNode(ctx, step, {
+        name: `Retry backoff (${delayLabel ?? `${delaySeconds}s`}) before attempt ${n}/${attempts}`,
+        run: `sleep ${delaySeconds}`,
+      });
+      if (condition !== undefined && condition !== "") sleepStep.if = condition as string;
+      out.push(sleepStep);
+    }
+
+    const attempt = cloneNode(ctx, step);
+    attempt.name = `${label} (attempt ${n}/${attempts})`;
+    let id: string;
+    if (isLast && userId) {
+      id = userId;
+    } else {
+      id = `${base}_attempt_${n}`;
+      let dedupe = 2;
+      while (used.has(id)) id = `${base}_attempt_${n}_${dedupe++}`;
+    }
+    used.add(id);
+    attempt.id = id;
+
+    if (condition !== undefined && condition !== "") {
+      attempt.if = condition as string;
+    } else {
+      delete attempt.if;
+    }
+
+    // Every attempt but the last swallows failure so the next can run. The last
+    // attempt keeps the original `continue-on-error` (default: fail the job).
+    if (!isLast) {
+      attempt["continue-on-error"] = true;
+      // Defer any fallback to the final attempt only.
+      delete attempt.fallback;
+    }
+
+    out.push(attempt);
+    prevId = id;
+  }
+  return out;
+}
+
+/** Expand `retry:` keys in a plain step list, recursing into nested fallbacks. */
+function expandRetryInList(
+  ctx: ParseContext,
+  jobId: string,
+  steps: Step[],
+  used: Set<string>,
+): Step[] {
+  const out: Step[] = [];
+  steps.forEach((step, idx) => {
+    if (isObject(step) && step.fallback != null) expandRetryInFallback(ctx, jobId, step, used);
+    if (!isObject(step) || step.retry == null) {
+      out.push(step);
+      return;
+    }
     const cfg = normalizeRetry(step.retry);
     delete step.retry;
-    if (cfg == null) return [step];
-
-    const label = stepLabel(step);
-    const slug = slugify(label);
-    const base = slug ? `step_${slug}` : `actio_${jobId}_step_${idx + 1}`;
-    // Preserve a user-supplied `id`: the final attempt reclaims it so downstream
-    // `steps.<id>` references (outputs, outcome) still resolve to the real result.
-    const userId = typeof step.id === "string" && step.id.trim() ? step.id.trim() : undefined;
-    if (userId) used.delete(userId);
-    // Preserve a falsy boolean/number `if` (e.g. `if: false` / `if: 0`) — both
-    // are valid "never run" gates that must survive onto the first attempt.
-    const originalIf =
-      typeof step.if === "string" || typeof step.if === "boolean" || typeof step.if === "number"
-        ? step.if
-        : undefined;
-    const { attempts, delaySeconds, delayLabel } = cfg;
-    const out: Step[] = [];
-
-    let prevId: string | undefined;
-    for (let n = 1; n <= attempts; n++) {
-      const isLast = n === attempts;
-      const guard = prevId ? `steps.${prevId}.outcome == 'failure'` : undefined;
-      // The first attempt (no guard) carries the user's gate verbatim so a falsy
-      // boolean/number `if` stays a real boolean and keeps the step disabled.
-      const condition: string | boolean | number | undefined =
-        guard == null && typeof originalIf !== "string" ? originalIf : combineIf(originalIf, guard);
-
-      if (delaySeconds != null && prevId) {
-        const sleepStep: Step = deriveNode(ctx, step, {
-          name: `Retry backoff (${delayLabel ?? `${delaySeconds}s`}) before attempt ${n}/${attempts}`,
-          run: `sleep ${delaySeconds}`,
-        });
-        if (condition !== undefined && condition !== "") sleepStep.if = condition as string;
-        out.push(sleepStep);
-      }
-
-      const attempt = cloneNode(ctx, step);
-      attempt.name = `${label} (attempt ${n}/${attempts})`;
-      let id: string;
-      if (isLast && userId) {
-        id = userId;
-      } else {
-        id = `${base}_attempt_${n}`;
-        let dedupe = 2;
-        while (used.has(id)) id = `${base}_attempt_${n}_${dedupe++}`;
-      }
-      used.add(id);
-      attempt.id = id;
-
-      if (condition !== undefined && condition !== "") {
-        attempt.if = condition as string;
-      } else {
-        delete attempt.if;
-      }
-
-      // Every attempt but the last swallows failure so the next can run. The last
-      // attempt keeps the original `continue-on-error` (default: fail the job).
-      if (!isLast) {
-        attempt["continue-on-error"] = true;
-        // Defer any fallback to the final attempt only.
-        delete attempt.fallback;
-      }
-
-      out.push(attempt);
-      prevId = id;
+    if (cfg == null) {
+      out.push(step);
+      return;
     }
-    return out;
+    out.push(...buildRetryAttempts(ctx, jobId, step, idx, used, cfg));
   });
+  return out;
+}
+
+/** Recurse into a step- or job-level `fallback` block so nested `retry:` expands. */
+function expandRetryInFallback(
+  ctx: ParseContext,
+  jobId: string,
+  container: Step | Job,
+  used: Set<string>,
+): void {
+  const fb = container.fallback;
+  if (Array.isArray(fb)) {
+    container.fallback = expandRetryInList(ctx, jobId, fb, used);
+  } else if (isObject(fb) && Array.isArray((fb as Step).steps)) {
+    (fb as Step).steps = expandRetryInList(ctx, jobId, (fb as Step).steps, used);
+  }
+}
+
+/** Expand step-level `retry:` blocks into a chain of conditional attempts. */
+function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
+  const used = collectUsedStepIds(Array.isArray(job.steps) ? job.steps : []);
+  if (Array.isArray(job.steps)) {
+    transformSteps(ctx, jobId, job, (step, idx) => {
+      if (isObject(step) && step.fallback != null) expandRetryInFallback(ctx, jobId, step, used);
+      if (!isObject(step) || step.retry == null) return [step];
+      const cfg = normalizeRetry(step.retry);
+      delete step.retry;
+      if (cfg == null) return [step];
+      return buildRetryAttempts(ctx, jobId, step, idx, used, cfg);
+    });
+  }
+  // A job-level `fallback` may itself contain steps carrying `retry:`.
+  if (job.fallback != null) expandRetryInFallback(ctx, jobId, job, used);
 }
 
 /**
