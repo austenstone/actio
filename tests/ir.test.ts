@@ -6,7 +6,7 @@ import {
   visitJobs,
   visitSteps,
   workflow,
-} from "@actio/core";
+} from "actio-core";
 import { describe, expect, it } from "vitest";
 
 function ctxOf(source: string) {

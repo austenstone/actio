@@ -1,4 +1,4 @@
-import { transpile } from "@actio/core";
+import { transpile } from "actio-core";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import {

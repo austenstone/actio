@@ -30,9 +30,9 @@ serialization. Actio's differentiator is the **macro/transform compiler**.
 ## Install
 
 ```bash
-npm install -D @actio/cli
+npm install -D actio-cli
 # or run without installing:
-npx @actio/cli build
+npx actio-cli build
 ```
 
 Requires Node ≥ 20.
@@ -356,7 +356,7 @@ This is automatic and always on in CI (it's just a reporter format — same code
 frame you see locally, also surfaced as an annotation). Locally you still get the
 colored code frame on stderr. The formatter is
 [`formatGithubAnnotation`](packages/core/src/diagnostics.ts), exported from
-`@actio/core` if you want to wire it into your own tooling.
+`actio-core` if you want to wire it into your own tooling.
 
 ### Runtime annotations
 
@@ -391,7 +391,7 @@ Injection is gated on source maps (it needs them to resolve lines); requesting
 `annotate` without a source map logs a warning and skips. The compiler stays
 dumb — a single [`annotate` pass](packages/core/src/passes/annotate.ts) just
 pushes the job — and the action carries all the runtime smarts, with no
-dependency on `@actio/core` so its bundle stays lean.
+dependency on `actio-core` so its bundle stays lean.
 
 ### Watch mode
 
@@ -419,7 +419,7 @@ actio schema --out .actio.schema.json
 # then: # yaml-language-server: $schema=./.actio.schema.json
 ```
 
-The schema is also exported from `@actio/core` (`actioSchema()`, `actioSchemaPath`, `ACTIO_SCHEMA_URL`, `SCHEMA_MODELINE`).
+The schema is also exported from `actio-core` (`actioSchema()`, `actioSchemaPath`, `ACTIO_SCHEMA_URL`, `SCHEMA_MODELINE`).
 
 ## Configuration
 
@@ -433,7 +433,7 @@ loaded at runtime via [jiti](https://github.com/unjs/jiti) — no build step).
 
 ```ts
 // actio.config.ts
-import { defineConfig } from "@actio/core"; // also re-exported from "@actio/cli/config"
+import { defineConfig } from "actio-core"; // also re-exported from "actio-cli/config"
 
 export default defineConfig({
   outDir: ".github/workflows",
@@ -474,7 +474,7 @@ descriptor; `apply(ctx)` mutates `ctx.data` (the parsed workflow object) in plac
 
 ```ts
 // actio.config.ts
-import { defineConfig, type Pass } from "@actio/core";
+import { defineConfig, type Pass } from "actio-core";
 
 // Stamp a global env var onto every generated workflow.
 const stampEnv: Pass = {
@@ -496,14 +496,14 @@ built-in or another custom pass).
 
 > **Traversing jobs and steps?** Prefer the typed-IR **visitor helpers** —
 > `workflow`, `visitJobs`, `visitSteps`, `transformSteps`, all exported from
-> `@actio/core` — over poking `ctx.data` by hand. They give you typed nodes and
+> `actio-core` — over poking `ctx.data` by hand. They give you typed nodes and
 > handle the awkward shape-checking for you. (These land with the
 > [typed-IR PR (#10)](https://github.com/austenstone/actio/pull/10); on older
 > versions, fall back to walking `ctx.data` as above.)
 
 ```ts
 // Preferred form once the typed-IR API is available.
-import { defineConfig, transformSteps, type Pass } from "@actio/core";
+import { defineConfig, transformSteps, type Pass } from "actio-core";
 
 // Pin every actions/checkout to a specific SHA.
 const pinCheckout: Pass = {
@@ -546,7 +546,7 @@ Each transform is a **pass** — a `{ name, runsAfter?, apply }` descriptor in
 [`packages/core/src/passes`](packages/core/src/passes). The pipeline order is
 derived by topologically sorting each pass's `runsAfter`, not hand-maintained, so
 adding a feature is: drop in a new file, declare what it runs after, register it.
-`PassRegistry` (exported from `@actio/core`) lets external code add or remove
+`PassRegistry` (exported from `actio-core`) lets external code add or remove
 passes without editing core.
 
 ### Typed IR and provenance
@@ -568,10 +568,10 @@ is the hook source maps build on. Look up an origin with `originOf(ctx, node)`.
 
 | Package | Description |
 | --- | --- |
-| [`@actio/core`](packages/core) | The engine: parse, passes, emit, validate, diagnostics |
-| [`@actio/cli`](packages/cli) | The `actio` binary (wraps core) |
+| [`actio-core`](packages/core) | The engine: parse, passes, emit, validate, diagnostics |
+| [`actio-cli`](packages/cli) | The `actio` binary (wraps core) |
 
-A programmatic TypeScript API on `@actio/core` is planned.
+A programmatic TypeScript API on `actio-core` is planned.
 
 ## Development
 

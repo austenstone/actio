@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { actioSchema, transpile } from "@actio/core";
+import { actioSchema, transpile } from "actio-core";
 import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";

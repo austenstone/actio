@@ -1,4 +1,4 @@
-import { type Diagnostic, formatGithubAnnotation } from "@actio/core";
+import { type Diagnostic, formatGithubAnnotation } from "actio-core";
 import { describe, expect, it } from "vitest";
 
 const base: Diagnostic = {

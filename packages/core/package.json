@@ -1,5 +1,5 @@
 {
-  "name": "@actio/core",
+  "name": "actio-core",
   "version": "0.1.0",
   "description": "Actio transpiler engine — compiles .actio.yml (a GitHub Actions YAML superset) into standard workflow YAML",
   "license": "MIT",

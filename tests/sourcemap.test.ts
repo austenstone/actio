@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveGeneratedLine, type SourceMap, transpile } from "@actio/core";
+import { resolveGeneratedLine, type SourceMap, transpile } from "actio-core";
 import { describe, expect, it } from "vitest";
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");

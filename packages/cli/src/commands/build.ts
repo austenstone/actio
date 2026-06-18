@@ -7,7 +7,7 @@ import {
   formatGithubAnnotation,
   type Pass,
   transpile,
-} from "@actio/core";
+} from "actio-core";
 import pc from "picocolors";
 import { glob } from "tinyglobby";
 

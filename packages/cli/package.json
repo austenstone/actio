@@ -1,5 +1,5 @@
 {
-  "name": "@actio/cli",
+  "name": "actio-cli",
   "version": "0.1.0",
   "description": "Actio CLI — compile .actio.yml files into GitHub Actions workflows",
   "license": "MIT",
@@ -24,7 +24,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@actio/core": "*",
+    "actio-core": "^0.1.0",
     "cac": "^7.0.0",
     "chokidar": "^5.0.0",
     "jiti": "^2.7.0",

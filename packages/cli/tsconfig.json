@@ -4,7 +4,7 @@
     "outDir": "dist",
     "rootDir": "../..",
     "paths": {
-      "@actio/core": ["../core/src/index.ts"]
+      "actio-core": ["../core/src/index.ts"]
     }
   },
   "include": ["src"]

@@ -7,8 +7,8 @@ export default defineConfig({
   sourcemap: true,
   dts: { entry: "src/config-export.ts" },
   target: "node20",
-  // @actio/core is resolved from node_modules (workspace symlink) at runtime.
-  external: ["@actio/core"],
+  // actio-core is resolved from node_modules (workspace symlink) at runtime.
+  external: ["actio-core"],
   banner: {
     js: "#!/usr/bin/env node",
   },

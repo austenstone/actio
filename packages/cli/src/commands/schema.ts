@@ -1,5 +1,5 @@
 import { writeFile } from "node:fs/promises";
-import { actioSchemaJson } from "@actio/core";
+import { actioSchemaJson } from "actio-core";
 import pc from "picocolors";
 
 export async function runSchema(out?: string): Promise<number> {

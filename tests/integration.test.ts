@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { transpile } from "@actio/core";
+import { transpile } from "actio-core";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 

@@ -2,7 +2,7 @@
  * Pure mapping helpers for the actio-annotate action. Kept dependency-free (no
  * `@actions/*`) so they can be unit-tested directly. These reimplement the tiny
  * slice of the source-map format the action needs at runtime — deliberately not
- * importing `@actio/core`, to keep the bundled `dist` lean.
+ * importing `actio-core`, to keep the bundled `dist` lean.
  */
 
 export interface SourceMapping {

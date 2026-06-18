@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { defineConfig, type Pass, transpile } from "@actio/core";
+import { defineConfig, type Pass, transpile } from "actio-core";
 import { afterAll, describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { loadActioConfig, resolveBuildOptions } from "../packages/cli/src/config.js";

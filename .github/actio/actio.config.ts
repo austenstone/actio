@@ -1,4 +1,4 @@
-import { defineConfig } from "@actio/core";
+import { defineConfig } from "actio-core";
 
 export default defineConfig({
   files: [".github/actio/**/*.actio.yml"],

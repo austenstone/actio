@@ -1,5 +1,5 @@
-import type { ParseContext } from "@actio/core";
-import { applyPasses, builtinPasses, type Pass, PassRegistry, sortPasses } from "@actio/core";
+import type { ParseContext } from "actio-core";
+import { applyPasses, builtinPasses, type Pass, PassRegistry, sortPasses } from "actio-core";
 import { describe, expect, it } from "vitest";
 
 /** A no-op pass that records the order it ran in. */
