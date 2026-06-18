@@ -1,0 +1,11 @@
+name: Deploy
+on: [push]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start tunnel
+        run: ./tunnel.sh
+        ensure:
+          - run: ./close-tunnel.sh

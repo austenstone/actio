@@ -1,0 +1,17 @@
+name: ci
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      alias: pkg
+      checkout: true
+      script: |
+        jq -cn '$ARGS.positional' --args core cli
+    steps:
+      - run: npm test --workspace ${{ matrix.pkg }}
+finally:
+  teardown:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./teardown.sh

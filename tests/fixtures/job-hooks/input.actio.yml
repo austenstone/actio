@@ -1,0 +1,12 @@
+name: Deploy
+on: [push]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+    on_failure:
+      - run: ./rollback.sh
+    ensure:
+      - run: ./cleanup.sh

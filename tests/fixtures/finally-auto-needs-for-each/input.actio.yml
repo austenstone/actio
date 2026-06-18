@@ -1,0 +1,16 @@
+name: ci
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    for_each:
+      var: stage
+      in: [staging, prod]
+      parallel: false
+    steps:
+      - run: deploy {{ stage }}
+finally:
+  teardown:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./teardown.sh

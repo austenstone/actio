@@ -19,6 +19,7 @@ const fixtureDirsByPassName: Record<string, string[]> = {
     "executors-expansion",
     "executors-compose",
   ],
+  lifecycle: ["finally-bare"],
   retry: ["retry-basic", "retry-delay", "retry-shorthand"],
 };
 

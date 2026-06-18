@@ -302,4 +302,68 @@ jobs:
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);
   });
+
+  it("accepts a top-level finally with a bare teardown job", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: make
+finally:
+  teardown:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./cleanup.sh`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts finally outcome groups with when: sugar", () => {
+    const doc = load(`on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+finally:
+  on_failure:
+    rollback:
+      runs-on: ubuntu-latest
+      when: deploy.failed
+      steps:
+        - run: ./rollback.sh
+  on_abort: []`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts ensure and on_* hooks on steps and jobs", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    on_failure:
+      - run: ./notify.sh
+    ensure:
+      - run: ./cleanup.sh
+    steps:
+      - run: make
+        on_success:
+          - run: ./publish.sh
+        ensure:
+          - run: ./flush-logs.sh`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects a non-empty array form for a finally branch group", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: make
+finally:
+  on_abort:
+    - run: ./cleanup.sh`);
+    expect(validate(doc)).toBe(false);
+  });
 });

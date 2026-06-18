@@ -58,6 +58,7 @@ describe("sortPasses", () => {
     const shuffled = [
       byName.get("fragments"),
       byName.get("dynamic_matrix"),
+      byName.get("lifecycle"),
       byName.get("fallback"),
       byName.get("retry"),
       byName.get("when_compile"),
@@ -74,6 +75,7 @@ describe("sortPasses", () => {
     expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("retry"));
     expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
     expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("dynamic_matrix"));
+    expect(ordered.indexOf("dynamic_matrix")).toBeLessThan(ordered.indexOf("lifecycle"));
   });
 
   it("ignores forward dependency references to not-yet-registered passes", () => {
@@ -96,6 +98,7 @@ describe("sortPasses", () => {
       "retry",
       "fallback",
       "dynamic_matrix",
+      "lifecycle",
     ]);
   });
 });
@@ -122,6 +125,7 @@ describe("PassRegistry", () => {
       "retry",
       "fallback",
       "dynamic_matrix",
+      "lifecycle",
       "post",
     ]);
   });
@@ -156,6 +160,7 @@ describe("createRegistry", () => {
       "retry",
       "fallback",
       "dynamic_matrix",
+      "lifecycle",
     ]);
   });
 

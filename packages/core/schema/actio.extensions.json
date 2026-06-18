@@ -30,6 +30,18 @@
       "type": "object",
       "description": "Actio macro. Named runner/container/service presets referenced by `jobs.<id>.executor`. Stripped from generated workflow YAML.",
       "additionalProperties": { "$ref": "#/definitions/executorDefinition" }
+    },
+    "finally": {
+      "type": "object",
+      "title": "finally (Actio macro)",
+      "description": "Actio macro. Workflow-scoped teardown. Each entry becomes a real job that auto-`needs:` every other job and runs last. A bare teardown job emits a `!cancelled()` aggregator plus a `cancelled()` companion (default `timeout-minutes: 5`). The special keys `on_success`/`on_failure`/`on_abort` group teardown jobs that run only on that outcome. For job/step teardown use `ensure:` instead.",
+      "markdownDescription": "**Actio macro**: workflow-scoped teardown (sibling to `jobs:`).\n\nEach entry becomes a real job that auto-`needs:` every other job and runs last. A bare teardown job emits a `!cancelled()` aggregator **plus** a `cancelled()` companion (default `timeout-minutes: 5`) so cleanup fires on success, failure, and cancel. `on_abort:` replaces the companion; `on_abort: []` skips the cancel path. The `on_success`/`on_failure`/`on_abort` keys group jobs that run only on that outcome.\n\n```yaml\nfinally:\n  teardown:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./destroy-preview-env.sh\n```",
+      "properties": {
+        "on_success": { "$ref": "#/definitions/finallyBranchGroup" },
+        "on_failure": { "$ref": "#/definitions/finallyBranchGroup" },
+        "on_abort": { "$ref": "#/definitions/finallyBranchGroup" }
+      },
+      "additionalProperties": { "$ref": "#/definitions/finallyJob" }
     }
   },
   "patchDefinitions": {
@@ -48,7 +60,11 @@
           "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for_each.*`, `define.*`). If the expression is false the entire step is removed from the generated workflow; if true the `static_if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\nsteps:\n  - name: Publish preview\n    static_if: params.deploy\n    run: ./publish.sh\n```"
         },
         "retry": { "$ref": "#/definitions/retry" },
-        "fallback": { "$ref": "#/definitions/fallback" }
+        "fallback": { "$ref": "#/definitions/fallback" },
+        "ensure": { "$ref": "#/definitions/lifecycleSteps" },
+        "on_success": { "$ref": "#/definitions/lifecycleSteps" },
+        "on_failure": { "$ref": "#/definitions/lifecycleSteps" },
+        "on_abort": { "$ref": "#/definitions/lifecycleSteps" }
       },
       "patternProperties": {
         "^static_if\\(.+\\)$": {
@@ -68,6 +84,10 @@
         },
         "dynamic_matrix": { "$ref": "#/definitions/dynamicMatrix" },
         "fallback": { "$ref": "#/definitions/fallback" },
+        "ensure": { "$ref": "#/definitions/lifecycleSteps" },
+        "on_success": { "$ref": "#/definitions/lifecycleSteps" },
+        "on_failure": { "$ref": "#/definitions/lifecycleSteps" },
+        "on_abort": { "$ref": "#/definitions/lifecycleSteps" },
         "executor": {
           "description": "Actio macro. Name (or ordered list of names) from top-level `executors:`. Expanded during compile and stripped from output.",
           "oneOf": [
@@ -96,6 +116,39 @@
     }
   },
   "addDefinitions": {
+    "lifecycleSteps": {
+      "title": "ensure / on_success / on_failure / on_abort (Actio macro)",
+      "description": "Actio macro. A list of teardown steps spliced after the guarded step (step scope) or appended to the job (job scope). `ensure:` guards with `always()`; `on_success:` / `on_failure:` key on the unit's outcome; step-level `on_abort:` keys on step cancellation.",
+      "type": "array",
+      "items": { "$ref": "#/definitions/step" }
+    },
+    "finallyJob": {
+      "title": "finally.<id> (Actio macro)",
+      "description": "Actio macro. A teardown job. Like a normal job, plus the `when:` sugar (`<job>.failed` / `.succeeded` / `.cancelled` / `.skipped`) that expands to `needs.<job>.result == '...'`. Actio supplies `needs:` (every real job) and the status guard.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "when": {
+          "type": "string",
+          "description": "Actio sugar. `<job>.failed` / `.succeeded` / `.cancelled` / `.skipped` → `needs.<job>.result == 'failure|success|cancelled|skipped'`, AND-combined onto the branch guard. The referenced job is force-added to `needs:`."
+        }
+      }
+    },
+    "finallyBranchGroup": {
+      "title": "finally.on_* branch group (Actio macro)",
+      "description": "Actio macro. A mapping of teardown jobs that run only on the branch's outcome (`on_success` → `success()`, `on_failure` → `failure()`, `on_abort` → `cancelled()`). `on_abort` jobs replace the auto cancel-companion; `on_abort: []` skips the cancel path entirely.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/finallyJob" }
+        },
+        {
+          "type": "array",
+          "maxItems": 0,
+          "description": "Empty form (`on_abort: []`): skip the cancel path entirely."
+        }
+      ]
+    },
     "actioParam": {
       "title": "params.<name> (Actio macro)",
       "description": "A typed compile-time parameter definition.",
