@@ -1,0 +1,21 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["../packages/core/src/index.ts"],
+  "tsconfig": "../packages/core/tsconfig.json",
+  "plugin": ["typedoc-plugin-markdown", "./typedoc-fumadocs.mjs"],
+  "out": "content/docs/api",
+  "readme": "none",
+  "githubPages": false,
+  "hideGenerator": true,
+  "skipErrorChecking": true,
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "fileExtension": ".mdx",
+  "entryFileName": "index",
+  "hideBreadcrumbs": true,
+  "hidePageHeader": true,
+  "hidePageTitle": true,
+  "useCodeBlocks": true,
+  "sanitizeComments": true
+}

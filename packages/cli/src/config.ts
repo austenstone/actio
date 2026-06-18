@@ -1,12 +1,27 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { ActioConfig } from "actio-core";
+import type { ActioConfig, ActioTarget } from "actio-core";
 import { createJiti } from "jiti";
 import type { BuildOptions } from "./commands/build.js";
 
 const CONFIG_BASENAME = "actio.config";
 const EXTENSIONS = ["ts", "mts", "cts", "js", "mjs", "cjs", "json"] as const;
 const DEFAULT_OUT_DIR = ".github/workflows";
+const DEFAULT_TARGET: ActioTarget = "legacy";
+const ACTIO_TARGETS = ["legacy", "github-actions-native-dependencies-preview"] as const;
+
+function parseActioTarget(raw: unknown, source: string): ActioTarget {
+  if (typeof raw !== "string") {
+    throw new Error(`${source} target must be a string`);
+  }
+  const parsed = ACTIO_TARGETS.find((target) => target === raw);
+  if (parsed === undefined) {
+    throw new Error(
+      `${source} target must be one of: ${ACTIO_TARGETS.join(", ")} (received "${raw}")`,
+    );
+  }
+  return parsed;
+}
 
 export interface LoadedConfig {
   config: ActioConfig;
@@ -67,7 +82,7 @@ export async function loadActioConfig(
  */
 export function resolveBuildOptions(args: {
   files: string[];
-  flags: { outDir?: string };
+  flags: { outDir?: string; target?: string };
   forceCheck: boolean;
   argv: string[];
   config: ActioConfig;
@@ -85,6 +100,11 @@ export function resolveBuildOptions(args: {
     sourceMap: passed("--no-source-map") ? false : (config.sourceMap ?? true),
     annotate: passed("--no-annotate") ? false : (config.annotate ?? true),
     passes: config.passes,
+    target: passed("--target")
+      ? parseActioTarget(flags.target, "CLI")
+      : config.target !== undefined
+        ? parseActioTarget(config.target, "Config")
+        : DEFAULT_TARGET,
   };
 
   const patterns = files.length > 0 ? files : (config.files ?? config.include ?? []);

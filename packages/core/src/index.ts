@@ -1,4 +1,4 @@
-export { type ActioConfig, defineConfig } from "./config.js";
+export { type ActioConfig, type ActioTarget, defineConfig } from "./config.js";
 export {
   ActioError,
   type Diagnostic,
@@ -13,16 +13,22 @@ export {
 export { type EmitOptions, emitYaml, generatedHeader } from "./emit.js";
 export {
   cloneNode,
+  conservativeTaint,
   deriveNode,
   type Job,
   type JobView,
   type Origin,
   originOf,
+  type ParamType,
   recordOrigin,
   type Step,
   type StepView,
+  type SymbolDef,
+  type SymbolKind,
+  type SymbolTable,
   seedOrigins,
   setOrigin,
+  type TaintFacet,
   transformSteps,
   visitJobs,
   visitSteps,
@@ -30,7 +36,9 @@ export {
   workflow,
 } from "./ir.js";
 export {
+  type JobDefaultsInternalSnapshot,
   type ParseContext,
+  type ParseContextInternal,
   type Path,
   parseActio,
   rangeOfPath,
@@ -40,15 +48,21 @@ export {
   ANNOTATE_ACTION,
   ANNOTATE_JOB_ID,
   annotate,
+  applyDefaults,
+  applyExecutor,
   applyPasses,
   builtinPasses,
   createRegistry,
   dynamicMatrix,
+  EXECUTOR_KEYS,
   fallback,
   fragments,
+  JOB_DEFAULTS_SAFE_SUBSET,
+  jobDefaults,
   type Pass,
   type PassFn,
   PassRegistry,
+  params,
   retry,
   runPasses,
   sortPasses,
@@ -67,5 +81,11 @@ export {
   type SourceMap,
   type SourceMapping,
 } from "./sourcemap.js";
-export { type TranspileOptions, type TranspileResult, transpile } from "./transpile.js";
+export {
+  type NativeDependencies,
+  type NativeDependencyEntry,
+  type TranspileOptions,
+  type TranspileResult,
+  transpile,
+} from "./transpile.js";
 export { validateWorkflowYaml } from "./validate.js";

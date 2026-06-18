@@ -3,6 +3,7 @@ dist/
 *.tsbuildinfo
 coverage/
 reports/
+.stryker-tmp/
 .DS_Store
 *.log
 

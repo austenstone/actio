@@ -1,0 +1,39 @@
+name: Executors expansion
+on: [push]
+
+job_defaults:
+  runs-on: ubuntu-latest
+  env:
+    FROM_DEFAULT: "1"
+
+executors:
+  gpu:
+    runs-on: [self-hosted, gpu]
+    container:
+      image: node:20
+      env:
+        FROM_EXECUTOR: "1"
+    services:
+      redis:
+        image: redis:7
+    env:
+      FROM_EXECUTOR: "1"
+
+jobs:
+  train:
+    executor: gpu
+    steps:
+      - run: echo train
+  override:
+    executor: gpu
+    runs-on: ubuntu-24.04
+    container:
+      image: alpine:3.20
+    services:
+      postgres:
+        image: postgres:16
+    env:
+      FROM_JOB: "1"
+    steps:
+      - run: echo override
+

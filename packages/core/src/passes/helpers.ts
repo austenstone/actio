@@ -21,6 +21,24 @@ export function asStepArray(value: unknown): Step[] {
   return asArray(value).filter(isObject);
 }
 
+/**
+ * Apply `fn` to a fallback container's step list, writing the result back in
+ * place. A `fallback:` value is either a bare `Step[]` or `{ steps; recover? }`;
+ * this centralizes that shape so passes (fragments, retry) transform fallback
+ * steps without each re-deriving the union.
+ */
+export function mapFallbackSteps(
+  container: { fallback?: unknown },
+  fn: (steps: Step[]) => Step[],
+): void {
+  const fb = container.fallback;
+  if (Array.isArray(fb)) {
+    container.fallback = fn(asStepArray(fb));
+  } else if (isObject(fb) && Array.isArray(fb.steps)) {
+    fb.steps = fn(asStepArray(fb.steps));
+  }
+}
+
 /** Heuristic: does this script reference look like a local file (vs an inline command)? */
 export function looksLikePath(script: string): boolean {
   const s = script.trim();
@@ -136,7 +154,7 @@ export function pushDiagnostic(
   severity: Diagnostic["severity"],
   message: string,
   path?: Path,
-  extra?: { hint?: string; range?: Range },
+  extra?: { hint?: string; range?: Range; code?: string },
 ): void {
   const range = extra?.range ?? (path ? rangeOfPath(ctx, path) : undefined);
   ctx.diagnostics.push({
@@ -146,5 +164,51 @@ export function pushDiagnostic(
     message,
     range,
     hint: extra?.hint,
+    code: extra?.code,
   });
+}
+
+/**
+ * Assert `value` is a mapping, pushing a diagnostic (default severity `error`)
+ * when it is not. Narrows the value so callers can read its keys afterwards.
+ */
+export function expectMapping(
+  ctx: ParseContext,
+  value: unknown,
+  path: Path,
+  opts: { message: string; severity?: Diagnostic["severity"]; code?: string; hint?: string },
+): value is Record<string, unknown> {
+  if (isObject(value)) return true;
+  pushDiagnostic(ctx, opts.severity ?? "error", opts.message, path, {
+    code: opts.code,
+    hint: opts.hint,
+  });
+  return false;
+}
+
+/**
+ * Push one diagnostic per key of `obj` that is not in `allowed`, returning the
+ * list of offending keys so the caller can branch on it. The message is built
+ * per key so call sites keep their exact wording.
+ */
+export function warnUnknownKeys(
+  ctx: ParseContext,
+  obj: Record<string, unknown>,
+  allowed: ReadonlySet<string>,
+  path: Path,
+  opts: {
+    severity: Diagnostic["severity"];
+    message: (key: string) => string;
+    code?: string;
+    hint?: (key: string) => string;
+  },
+): string[] {
+  const unknown = Object.keys(obj).filter((key) => !allowed.has(key));
+  for (const key of unknown) {
+    pushDiagnostic(ctx, opts.severity, opts.message(key), [...path, key], {
+      code: opts.code,
+      hint: opts.hint?.(key),
+    });
+  }
+  return unknown;
 }

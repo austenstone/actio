@@ -1,0 +1,16 @@
+name: When Compile Job Omitted
+on: [push]
+params:
+  deploy:
+    type: boolean
+    default: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+  release:
+    static_if: params.deploy
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo release

@@ -1,10 +1,10 @@
 import { cloneNode, deriveNode, type Job, type Step, transformSteps, visitJobs } from "../ir.js";
 import type { ParseContext, Path } from "../parser.js";
 import {
-  asStepArray,
   collectUsedStepIds,
   combineIf,
   isObject,
+  mapFallbackSteps,
   pushDiagnostic,
   slugify,
 } from "./helpers.js";
@@ -251,12 +251,7 @@ function expandRetryInFallback(
   container: Step | Job,
   used: Set<string>,
 ): void {
-  const fb = container.fallback;
-  if (Array.isArray(fb)) {
-    container.fallback = expandRetryInList(ctx, jobId, asStepArray(fb), used);
-  } else if (isObject(fb) && Array.isArray(fb.steps)) {
-    fb.steps = expandRetryInList(ctx, jobId, asStepArray(fb.steps), used);
-  }
+  mapFallbackSteps(container, (steps) => expandRetryInList(ctx, jobId, steps, used));
 }
 
 /** Expand step-level `retry:` blocks into a chain of conditional attempts. */

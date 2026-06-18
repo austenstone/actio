@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { parse } from "yaml";
 import { type BuildOptions, ciAnnotationsEnabled, discover, runBuild } from "./build.js";
 
 const INPUT = [
@@ -16,6 +18,9 @@ const INPUT = [
   "",
 ].join("\n");
 
+const toIntegrity = (text: string): string =>
+  `sha256:${createHash("sha256").update(text).digest("hex")}`;
+
 function options(cwd: string, overrides: Partial<BuildOptions> = {}): BuildOptions {
   return {
     outDir: "out",
@@ -25,6 +30,7 @@ function options(cwd: string, overrides: Partial<BuildOptions> = {}): BuildOptio
     header: true,
     sourceMap: true,
     annotate: false,
+    target: "legacy",
     cwd,
     ...overrides,
   };
@@ -83,6 +89,107 @@ describe("runBuild source maps", () => {
     await mkdir(join(dir, "out"), { recursive: true });
     await writeFile(join(dir, "out", "ci.yml.map"), "{}\n", "utf8");
     expect(await runBuild([], options(dir, { check: true }))).toBe(1);
+  });
+
+  it("emits native dependencies when target supports preview locks", async () => {
+    const dir = await workdir();
+    await writeFile(
+      join(dir, "ci.actio.yml"),
+      [
+        "name: CI",
+        "on: [push]",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: echo hi",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const resolver = {
+      resolveToImmutable: async () => "11bd71901bbe5b1630ceea73d27597364c9af683",
+      fetchByImmutable: async () => new TextEncoder().encode("actions/checkout@v4.2.2"),
+    };
+    const code = await runBuild(
+      [],
+      options(dir, {
+        target: "github-actions-native-dependencies-preview",
+        nativeDependencyResolver: resolver,
+      }),
+    );
+    expect(code).toBe(0);
+    const generated = await readFile(join(dir, "out", "ci.yml"), "utf8");
+    const parsed = parse(generated) as Record<string, unknown>;
+    expect(parsed.dependencies).toEqual({
+      "actions/checkout": {
+        ref: "v4",
+        sha: "11bd71901bbe5b1630ceea73d27597364c9af683",
+        integrity: "sha256:17d613e561ca03069505697e042340a1ddf1ce2d21746aa724226fc5262ff12c",
+      },
+    });
+  });
+
+  it("returns 2 when a remote import integrity hash does not match fetched bytes", async () => {
+    const dir = await workdir();
+    const wrongIntegrity =
+      "sha256:0000000000000000000000000000000000000000000000000000000000000000";
+    const resolver = {
+      resolveToImmutable: async () => "11bd71901bbe5b1630ceea73d27597364c9af683",
+      fetchByImmutable: async () => new TextEncoder().encode("tampered-import-bytes"),
+    };
+    await writeFile(
+      join(dir, "ci.actio.yml"),
+      [
+        "name: CI",
+        "imports:",
+        `  - import: github.com/actions/toolkit/packages/core/src/core.ts@v1  # ${wrongIntegrity}`,
+        "on: [push]",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo hi",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const code = await runBuild(
+      [],
+      options(dir, { validate: false, importIntegrityResolver: resolver }),
+    );
+    expect(code).toBe(2);
+  });
+
+  it("returns 0 when a remote import integrity hash matches fetched bytes", async () => {
+    const dir = await workdir();
+    const text = "matching-import-bytes";
+    const resolver = {
+      resolveToImmutable: async () => "11bd71901bbe5b1630ceea73d27597364c9af683",
+      fetchByImmutable: async () => new TextEncoder().encode(text),
+    };
+    await writeFile(
+      join(dir, "ci.actio.yml"),
+      [
+        "name: CI",
+        "imports:",
+        `  - import: github.com/actions/toolkit/packages/core/src/core.ts@v1  # ${toIntegrity(text)}`,
+        "on: [push]",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo hi",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const code = await runBuild(
+      [],
+      options(dir, { validate: false, importIntegrityResolver: resolver }),
+    );
+    expect(code).toBe(0);
   });
 });
 

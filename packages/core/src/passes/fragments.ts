@@ -1,9 +1,12 @@
 import { cloneNode, type Job, type Step, visitJobs } from "../ir.js";
-import type { ParseContext } from "../parser.js";
-import { asStepArray, isObject, pushDiagnostic } from "./helpers.js";
+import type { ParseContext, Path } from "../parser.js";
+import { asStepArray, isObject, mapFallbackSteps, pushDiagnostic } from "./helpers.js";
+import { resolveCompileTimeTextBoundaries } from "./params.js";
 import type { Pass } from "./registry.js";
 
 type FragmentMap = Record<string, Step[]>;
+const FORM_B_KEY_RE = /^static_if\([\s\S]*\)$/;
+const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
 
 function getFragments(ctx: ParseContext): FragmentMap {
   const frags = ctx.data.fragments;
@@ -105,31 +108,68 @@ function expandFallbackInPlace(
   fragments: FragmentMap,
   stack: string[],
 ): void {
-  const fb = container.fallback;
-  if (Array.isArray(fb)) {
-    container.fallback = expandList(asStepArray(fb), ctx, fragments, stack);
-  } else if (isObject(fb) && Array.isArray(fb.steps)) {
-    fb.steps = expandList(asStepArray(fb.steps), ctx, fragments, stack);
+  mapFallbackSteps(container, (steps) => expandList(steps, ctx, fragments, stack));
+}
+
+function stripResidualWhenCompile(ctx: ParseContext, value: unknown, path: Path): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      stripResidualWhenCompile(ctx, item, [...path, index]);
+    });
+    return;
+  }
+  if (!isObject(value)) return;
+
+  for (const key of Object.keys(value)) {
+    if (key === "static_if" || FORM_B_KEY_RE.test(key)) {
+      pushDiagnostic(
+        ctx,
+        "error",
+        diagnosticMessage(
+          "static-if-residual",
+          "Residual static_if directive is not allowed here; move it to a job/step structural position",
+        ),
+        [...path, key],
+      );
+      delete value[key];
+      continue;
+    }
+    if (path.length === 0 && key === "jobs") {
+      continue;
+    }
+    stripResidualWhenCompile(ctx, value[key], [...path, key]);
   }
 }
 
 /**
  * fragments pass: collect top-level `fragments:`, expand all `- inject: <name>`
  * entries (in job steps, job fallback, and step fallback), then strip the
- * `fragments:` key. Runs before other passes so later passes see real steps.
+ * `fragments:` key. Runs after static_if and strips any residual static_if
+ * directives that reach this stage.
  */
 export function fragmentsPass(ctx: ParseContext): void {
   const fragments = getFragments(ctx);
-  visitJobs(ctx, ({ job }) => {
+  visitJobs(ctx, ({ id, job }) => {
     if (Array.isArray(job.steps)) {
       job.steps = expandList(job.steps, ctx, fragments, []);
     }
     if (job.fallback != null) {
       expandFallbackInPlace(job, ctx, fragments, []);
     }
+    resolveCompileTimeTextBoundaries(ctx, job, ["jobs", id], {
+      validateRuntimeExpressions: false,
+      enforceNoResidualTokens: false,
+      reportInterpolationErrors: false,
+    });
+    stripResidualWhenCompile(ctx, job, ["jobs", id]);
   });
   delete ctx.data.fragments;
+  stripResidualWhenCompile(ctx, ctx.data, []);
 }
 
 /** Splice reusable `inject:` steps in first, so later passes see real steps. */
-export const fragments: Pass = { name: "fragments", apply: fragmentsPass };
+export const fragments: Pass = {
+  name: "fragments",
+  runsAfter: ["params", "when_compile"],
+  apply: fragmentsPass,
+};

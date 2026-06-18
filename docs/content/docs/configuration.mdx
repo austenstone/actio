@@ -1,0 +1,94 @@
+---
+title: Configuration
+description: Config file, precedence, and custom transform passes.
+---
+
+For anything beyond flags — and to register **custom passes** — drop an
+`actio.config` file in your project. Actio auto-discovers it by walking up from the
+current directory, so it works from any subfolder. Point at a specific file with
+`--config <file>` to skip discovery (handy when the config lives somewhere
+discovery won't reach, like alongside your sources). Supported formats:
+`actio.config.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs`, `.json` (TS/ESM are
+loaded at runtime via [jiti](https://github.com/unjs/jiti) — no build step).
+
+```ts title="actio.config.ts"
+import { defineConfig } from "actio-core"; // also re-exported from "actio-cli/config"
+
+export default defineConfig({
+  outDir: ".github/workflows",
+  validate: true,
+  header: true,
+  target: "legacy",
+  files: ["**/*.actio.yml"], // `include` is accepted as an alias
+  passes: [],                // custom transform passes (see below)
+});
+```
+
+`defineConfig()` is an identity helper — it exists purely for type-safe authoring
+and autocompletion.
+
+The full set of options, generated straight from the `ActioConfig` type in source so
+this table can never drift from the code:
+
+<AutoTypeTable path="../packages/core/src/config.ts" name="ActioConfig" />
+
+## Precedence
+
+Settings resolve **explicit CLI flag → config file → built-in default**, in that
+order. Passing `--out-dir build/` always wins over the config's `outDir`, which in
+turn wins over the `.github/workflows` default. Positional file globs on the CLI
+override `files`/`include` from the config.
+
+## Custom passes
+
+The `passes` field is the headline feature: a pass you supply is **merged** into
+the built-in pipeline (not replacing it), and the final order is still derived by
+topologically sorting every pass's `runsAfter` — so your pass slots in wherever its
+dependencies say it should. A pass is a `{ name, runsAfter?, apply }` descriptor;
+`apply(ctx)` mutates `ctx.data` (the parsed workflow object) in place.
+
+```ts title="actio.config.ts"
+import { defineConfig, type Pass } from "actio-core";
+
+// Stamp a global env var onto every generated workflow.
+const stampEnv: Pass = {
+  name: "stamp-env",
+  runsAfter: ["fragments"],
+  apply: (ctx) => {
+    ctx.data.env = { BUILT_BY: "actio", ...(ctx.data.env as object) };
+  },
+};
+
+export default defineConfig({
+  passes: [stampEnv],
+});
+```
+
+Now `actio build` runs `stampEnv` as part of the pipeline — no fork of core
+required. Pass names must be unique (Actio throws on a collision with a built-in or
+another custom pass).
+
+<Callout title="Traversing jobs and steps?">
+  Prefer the typed-IR **visitor helpers** — `workflow`, `visitJobs`, `visitSteps`,
+  `transformSteps`, all exported from `actio-core` — over poking `ctx.data` by
+  hand. They give you typed nodes and handle the awkward shape-checking for you.
+</Callout>
+
+```ts title="actio.config.ts"
+// Preferred form once the typed-IR API is available.
+import { defineConfig, transformSteps, type Pass } from "actio-core";
+
+// Pin every actions/checkout to a specific SHA.
+const pinCheckout: Pass = {
+  name: "pin-checkout",
+  runsAfter: ["fragments"],
+  apply: (ctx) =>
+    transformSteps(ctx, (step) =>
+      step.uses?.startsWith("actions/checkout@")
+        ? { ...step, uses: "actions/checkout@<sha>" }
+        : step,
+    ),
+};
+
+export default defineConfig({ passes: [pinCheckout] });
+```

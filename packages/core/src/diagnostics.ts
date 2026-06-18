@@ -1,4 +1,4 @@
-export type Severity = "error" | "warning";
+export type Severity = "error" | "warning" | "info";
 
 export interface Position {
   /** 1-based line number. */
@@ -26,6 +26,8 @@ export interface Diagnostic {
   source: DiagnosticSource;
   /** Optional actionable hint. */
   hint?: string;
+  /** Optional stable diagnostic code (e.g. `param-definition-invalid`). */
+  code?: string;
 }
 
 /** Thrown when a caller prefers exceptions over a result object. */
@@ -39,7 +41,12 @@ export class ActioError extends Error {
 }
 
 function severityLabel(s: Severity): string {
-  return s === "error" ? "error" : "warning";
+  return s === "error" ? "error" : s === "warning" ? "warning" : "info";
+}
+
+/** The message body with the diagnostic code prefixed (`[code] message`) when set. */
+function displayMessage(d: Diagnostic): string {
+  return d.code ? `[${d.code}] ${d.message}` : d.message;
 }
 
 /**
@@ -55,7 +62,7 @@ export function formatDiagnostics(
 
 export function formatDiagnostic(d: Diagnostic, source?: string): string {
   const loc = d.range ? `:${d.range.start.line}:${d.range.start.col}` : "";
-  const head = `${d.file ?? "<input>"}${loc} ${severityLabel(d.severity)}: ${d.message}`;
+  const head = `${d.file ?? "<input>"}${loc} ${severityLabel(d.severity)}: ${displayMessage(d)}`;
   const frame = source && d.range ? codeFrame(source, d.range) : "";
   const hint = d.hint ? `\n  hint: ${d.hint}` : "";
   return `${head}${frame ? `\n${frame}` : ""}${hint}`;
@@ -77,7 +84,7 @@ function escapeProperty(s: string): string {
  * diagnostic's range already being source-mapped (see `transpile`'s `sourceMap`).
  */
 export function formatGithubAnnotation(d: Diagnostic): string {
-  const cmd = d.severity === "error" ? "error" : "warning";
+  const cmd = d.severity === "error" ? "error" : d.severity === "warning" ? "warning" : "notice";
   const props: string[] = [];
   if (d.file) props.push(`file=${escapeProperty(d.file)}`);
   if (d.range) {
@@ -86,7 +93,8 @@ export function formatGithubAnnotation(d: Diagnostic): string {
     if (multi) props.push(`endLine=${d.range.end.line}`, `endColumn=${d.range.end.col}`);
   }
   props.push(`title=${escapeProperty(`actio (${d.source})`)}`);
-  const message = d.hint ? `${d.message}\n\nhint: ${d.hint}` : d.message;
+  const body = displayMessage(d);
+  const message = d.hint ? `${body}\n\nhint: ${d.hint}` : body;
   return `::${cmd} ${props.join(",")}::${escapeData(message)}`;
 }
 

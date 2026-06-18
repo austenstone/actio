@@ -1,0 +1,17 @@
+name: When Compile Coexist Runtime If False
+on: [push]
+params:
+  deploy:
+    type: boolean
+    default: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: npm run build
+      - name: Publish preview
+        static_if: params.deploy
+        if: github.ref == 'refs/heads/main'
+        run: npm run publish:preview

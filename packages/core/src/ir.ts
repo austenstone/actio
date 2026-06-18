@@ -7,6 +7,16 @@ import {
   rangeOfPath,
   setKeyOrder,
 } from "./parser.js";
+import { isObject } from "./passes/helpers.js";
+
+export {
+  conservativeTaint,
+  type ParamType,
+  type SymbolDef,
+  type SymbolKind,
+  type SymbolTable,
+  type TaintFacet,
+} from "./symbols.js";
 
 export type { Origin };
 
@@ -32,13 +42,20 @@ export interface Step {
 
 export interface Job {
   "runs-on"?: unknown;
+  "timeout-minutes"?: unknown;
   needs?: string | string[];
   if?: string | boolean | number;
   steps?: Step[];
   strategy?: Record<string, unknown>;
   permissions?: unknown;
+  concurrency?: unknown;
   outputs?: Record<string, unknown>;
   env?: Record<string, unknown>;
+  container?: unknown;
+  services?: unknown;
+  defaults?: unknown;
+  uses?: string;
+  executor?: unknown;
   retry?: unknown;
   fallback?: unknown;
   dynamic_matrix?: unknown;
@@ -175,10 +192,6 @@ export interface StepView {
   index: number;
   path: Path;
   origin: Origin;
-}
-
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
 /** Visit each job, recording its origin on first sight. */

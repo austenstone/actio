@@ -1,0 +1,12 @@
+name: Params Enum
+on: [push]
+params:
+  target:
+    type: enum
+    values: [dev, staging, prod]
+    default: staging
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "{{ params.target }}"

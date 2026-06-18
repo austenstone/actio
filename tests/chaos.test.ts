@@ -14,11 +14,30 @@ function build(source: string) {
   return { result, errors, schemaErrors, doc: result.ok ? parse(result.yaml) : undefined };
 }
 
-// Bug I (numeric variant): retry drops a falsy *numeric* `if` on the first attempt.
-// The schema allows `if` to be a number (step def: ["string","boolean","number"]). The boolean
-// `if: false` case is covered in expressions.test.ts; this asserts the same defect for `if: 0`,
-// which retry likewise discards, emitting the first attempt with no condition so it runs anyway.
-describe("Bug I (numeric variant): retry drops a falsy `if: 0` gate", () => {
+// Bug E: retry drops a falsy non-string `if` on the first attempt.
+// The schema explicitly allows `if` to be a boolean/number (step def: ["string","boolean","number"]).
+// `if: false` means "never run", but retry only carries forward string conditions, so the first
+// attempt is emitted with NO `if` and `continue-on-error: true` -> it runs unconditionally and the
+// never-run gate is silently lost.
+describe("Bug E: retry drops a falsy boolean `if` gate", () => {
+  it("keeps the `if: false` gate on the first retry attempt", () => {
+    const { doc, schemaErrors } = build(`name: x
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo a
+        if: false
+        retry: 2
+`);
+    expect(schemaErrors).toEqual([]);
+    const first = doc.jobs.a.steps[0];
+    // A step gated `if: false` must never run; the first attempt must remain gated
+    // instead of being emitted with no condition (which makes it run unconditionally).
+    expect(first).toHaveProperty("if");
+  });
+
   it("keeps the falsy `if: 0` gate on the first retry attempt", () => {
     const { doc } = build(`name: x
 on: [push]
@@ -31,6 +50,28 @@ jobs:
         retry: 2
 `);
     expect(doc.jobs.a.steps[0]).toHaveProperty("if");
+  });
+});
+
+// Bug F: dynamic_matrix drops a boolean job-level `if`.
+// `combineIf` keeps only string conditions, so a job's `if: false` (schema allows job `if` to be
+// boolean/number) is discarded when the empty-matrix guard is combined in. The generated job `if`
+// becomes just the matrix guard, so a job the user gated off now runs whenever the matrix is non-empty.
+describe("Bug F: dynamic_matrix drops a boolean job `if` gate", () => {
+  it("preserves the original `if: false` gate on the matrix-consuming job", () => {
+    const { doc } = build(`name: x
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    if: false
+    dynamic_matrix:
+      script: echo '["x"]'
+    steps:
+      - run: echo \${{ matrix }}
+`);
+    // The user's never-run gate must survive into the generated condition.
+    expect(String(doc.jobs.a.if)).toContain("false");
   });
 });
 

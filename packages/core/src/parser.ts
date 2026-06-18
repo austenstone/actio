@@ -1,10 +1,23 @@
 import { type Document, LineCounter, parseDocument } from "yaml";
 import type { Diagnostic, Range } from "./diagnostics.js";
+import type { SymbolTable } from "./symbols.js";
 
 /** Plain-JS workflow model. Intentionally loose — we only type macro-relevant bits at use sites. */
 export type WorkflowData = Record<string, unknown>;
 
 export type Path = (string | number)[];
+
+export interface JobDefaultsInternalSnapshot {
+  jobDefaults?: Record<string, unknown>;
+  executors?: Record<string, unknown>;
+  inlineStrategyJobs?: Record<string, true>;
+  inlineStrategyFailFastJobs?: Record<string, true>;
+}
+
+export interface ParseContextInternal {
+  /** Preserved macro templates stripped from `ctx.data` after the job_defaults pass. */
+  jobDefaults?: JobDefaultsInternalSnapshot;
+}
 
 /**
  * Author key order, stashed on each mapping as a non-enumerable Symbol so passes
@@ -63,9 +76,13 @@ export interface ParseContext {
   lineCounter: LineCounter;
   /** Mutable plain-JS model that passes transform. */
   data: WorkflowData;
+  /** Unified symbol table shared across compile passes. */
+  symbols: SymbolTable;
   diagnostics: Diagnostic[];
   /** Per-node provenance side-table; never serialized. Populated by the IR layer. */
   origins: WeakMap<object, Origin>;
+  /** Non-serialized pass scratch space, namespaced by pass name (e.g. `internal.jobDefaults`). */
+  internal: ParseContextInternal;
 }
 
 function offsetToPosition(lc: LineCounter, offset: number) {
@@ -126,5 +143,15 @@ export function parseActio(source: string, fileName: string): ParseContext {
   // we then materialize plain objects that carry that order on KEY_ORDER.
   const js = doc.toJS({ maxAliasCount: -1, mapAsMap: true });
   const data = (mapTreeToData(js) ?? {}) as WorkflowData;
-  return { fileName, source, doc, lineCounter, data, diagnostics, origins: new WeakMap() };
+  return {
+    fileName,
+    source,
+    doc,
+    lineCounter,
+    data,
+    symbols: new Map(),
+    diagnostics,
+    origins: new WeakMap(),
+    internal: {},
+  };
 }

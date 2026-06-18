@@ -1,0 +1,70 @@
+---
+title: Supply-chain pinning
+description: Freeze mutable action refs to immutable digests with the pins surface.
+---
+
+Actio ships a dedicated pin-management surface for freezing mutable refs to
+immutable digests without introducing a foreign runtime. For action dependencies,
+this now serves as a **legacy bridge** while GitHub's native workflow
+`dependencies:` lock model rolls out.
+
+```bash
+# verify pin state
+npx -p actio-cli actio pins check .github/actio/ci.actio.yml
+
+# mechanical pin rewrite only (no build/config/custom-pass execution)
+npx -p actio-cli actio pins update .github/actio/ci.actio.yml --no-exec --delta-out .actio/pins-delta.json
+
+# privileged apply of a precomputed delta with strict allowlist checks
+npx -p actio-cli actio pins apply --constrained .actio/pins-delta.json
+```
+
+## Exit codes
+
+Exit codes are security-significant:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Clean. |
+| `1` | Resolvable drift (for example, a tag moved). |
+| `2` | Hard failure (including integrity mismatch); **never auto-heal**. |
+
+`pins apply --constrained` only accepts a single-action, three-artifact delta shape:
+
+1. source `.actio.yml` `uses: owner/repo@ref` bump,
+2. matching `actio.lock` digest update,
+3. matching generated `uses: owner/repo@<digest> # <ref>` substitution.
+
+Anything outside that shape is rejected with exit `2`.
+
+## Dependabot reconcile (safe two-phase pattern)
+
+Use a two-phase workflow split:
+
+1. **Phase 1 (`pull_request`, read-only token):** run `pins update --no-exec` on
+   the PR head and upload the delta artifact.
+2. **Phase 2 (`workflow_run`, write token):** download the trusted artifact and run
+   `pins apply --constrained`; never run `build` or `pins update` in this
+   privileged phase.
+
+This avoids executing PR-controlled config/passes in a write-privileged context
+while still keeping source, lockfile, and generated pins aligned.
+
+## Relationship to GitHub native `dependencies:`
+
+Actio has two action-locking modes selected by target capability:
+
+1. **Native preview target (`github-actions-native-dependencies-preview`):** Actio
+   resolves `uses:` actions to immutable SHAs + integrity and emits a top-level
+   `dependencies:` block in generated workflows.
+2. **Legacy target (`legacy`, default):** Actio keeps using `actio.lock` + `pins`
+   (`check` / `update --no-exec` / `apply --constrained`) as a transitional bridge.
+
+Why both exist:
+
+- Native `dependencies:` is the long-term destination because runner-side
+  pre-execution verification is stronger than compile-time-only pinning.
+- `actio.lock` remains for environments that don't yet support native workflow
+  dependencies.
+
+Set the target in config (or via `--target`) to choose behavior per repository.

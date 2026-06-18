@@ -1,0 +1,15 @@
+name: When Compile Step Omitted
+on: [push]
+params:
+  deploy:
+    type: boolean
+    default: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo start
+      - name: Publish preview
+        static_if: params.deploy
+        run: echo publish
+      - run: echo end
