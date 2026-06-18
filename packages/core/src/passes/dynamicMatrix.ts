@@ -227,6 +227,11 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
     : Object.keys(jobs);
 
   const allJobIds = new Set(order);
+  // Track setup ids we have already generated so two different dynamic_matrix
+  // jobs that resolve to the same setupId can't overwrite each other in the
+  // rebuild (the same silent-drop/dangling-needs failure mode as an original-id
+  // collision, just between two generated jobs).
+  const generatedSetupIds = new Set<string>();
   const rebuilt: Record<string, unknown> = {};
   const rebuiltOrder: string[] = [];
   for (const jobId of order) {
@@ -238,14 +243,17 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
     }
     const setupId = opt<string>(job.dynamic_matrix as DM, "id") ?? `actio_setup_${jobId}`;
     // The generated setup job is stored as `rebuilt[setupId]`; if that id equals
-    // the consuming job's own id or another existing job id, the plain-object
-    // rebuild would overwrite one with the other and silently drop the setup
-    // job, leaving `needs.<setupId>` dangling. Refuse rather than corrupt.
-    if (allJobIds.has(setupId)) {
+    // the consuming job's own id, another existing job id, or a setup id already
+    // generated for an earlier dynamic_matrix job, the plain-object rebuild would
+    // overwrite one with the other and silently drop a job, leaving
+    // `needs.<setupId>` dangling. Refuse rather than corrupt.
+    if (allJobIds.has(setupId) || generatedSetupIds.has(setupId)) {
       const reason =
         setupId === jobId
           ? `equals the consuming job's own id`
-          : `collides with an existing job "${setupId}"`;
+          : generatedSetupIds.has(setupId)
+            ? `collides with another generated setup job "${setupId}"`
+            : `collides with an existing job "${setupId}"`;
       pushDiagnostic(
         ctx,
         "error",
@@ -267,6 +275,7 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
       continue;
     }
     transformTargetJob(ctx, jobId, job as Job, setupId);
+    generatedSetupIds.add(setupId);
     rebuilt[setupId] = setup;
     rebuiltOrder.push(setupId);
     rebuilt[jobId] = job;

@@ -50,6 +50,37 @@ jobs:
     expect(collision, "expected an error diagnostic for self-collision").toBeDefined();
   });
 
+  it("errors when two different dynamic_matrix jobs resolve to the same generated setupId", () => {
+    // Both jobs request the same explicit setup id. The first generates
+    // `shared` fine (no original job owns it); without a generated-id guard the
+    // second's `rebuilt["shared"] = setup` silently overwrites the first setup
+    // job, so job `a` dangles on needs.shared. The guard must catch the second.
+    const { errors } = build(`name: x
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      id: shared
+      script: echo "[1,2,3]"
+    steps:
+      - run: echo \${{ matrix.value }}
+  b:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      id: shared
+      script: echo "[4,5,6]"
+    steps:
+      - run: echo \${{ matrix.value }}`);
+
+    const collision = errors.find((d) => /another generated setup job|collid/i.test(d.message));
+    expect(
+      collision,
+      "expected an error when a second dynamic_matrix reuses an already-generated setupId",
+    ).toBeDefined();
+    expect(collision?.message).toContain("shared");
+  });
+
   it("on collision leaves the input job untouched rather than emitting a broken workflow", () => {
     const { doc } = build(`name: x
 on: [push]
