@@ -27,16 +27,10 @@ export default defineConfig({
 `defineConfig()` is an identity helper — it exists purely for type-safe authoring
 and autocompletion.
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `outDir` | `string` | Output directory for generated workflows |
-| `validate` | `boolean` | Validate generated YAML against GitHub's schema |
-| `header` | `boolean` | Prepend the generated-by-Actio banner |
-| `target` | `"legacy" \| "github-actions-native-dependencies-preview"` | Capability profile for supply-chain output (`legacy` bridge mode vs native workflow `dependencies:` emission) |
-| `files` / `include` | `string[]` | Default glob patterns when no files are passed on the CLI |
-| `sourceMap` | `boolean` | Write a `.yml.map` source map beside each workflow (default `true`) |
-| `annotate` | `boolean` | Inject the `actio-annotate` runtime failure-mapping job (default `true`; needs `sourceMap`) |
-| `passes` | `Pass[]` | Custom transform passes, merged into the built-in pipeline |
+The full set of options, generated straight from the `ActioConfig` type in source so
+this table can never drift from the code:
+
+<AutoTypeTable path="../packages/core/src/config.ts" name="ActioConfig" />
 
 ## Precedence
 
