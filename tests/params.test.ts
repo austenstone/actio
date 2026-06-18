@@ -1,6 +1,7 @@
 import { applyPasses, builtinPasses, type Pass, parseActio, transpile } from "actio-core";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
+import { RUNTIME_CONTEXT_ROOTS } from "../packages/core/src/symbols.js";
 
 function errorsFor(source: string) {
   const result = transpile(source, { fileName: "t.actio.yml" });
@@ -194,6 +195,23 @@ jobs:
     expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
       true,
     );
+  });
+
+  it("keeps runtime-sigil root derivation aligned with shared runtime roots", () => {
+    for (const root of [...RUNTIME_CONTEXT_ROOTS, "params"]) {
+      const errors = errorsFor(`name: x
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ${root}.value }}"
+`);
+      const hasRuntimeSigil = errors.some((diagnostic) =>
+        diagnostic.message.includes("[params-runtime-sigil]"),
+      );
+      expect(hasRuntimeSigil).toBe(root === "params");
+    }
   });
 
   it("errors when runtime expressions nest params usage under fromJSON", () => {

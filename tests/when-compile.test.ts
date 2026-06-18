@@ -209,6 +209,25 @@ jobs:
     ).toBe(true);
   });
 
+  it("rejects wrapper syntax when runtime literals contain closing braces", () => {
+    const errors = transpileErrors(`name: x
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        when_compile: \${{ contains('a}}b', '}}') }}
+`);
+    expect(
+      errors.some(
+        (diagnostic) =>
+          diagnostic.message.includes("[when-compile-runtime-context]") &&
+          diagnostic.message.includes("bare compile-time expression"),
+      ),
+    ).toBe(true);
+  });
+
   it("errors on parse failures", () => {
     const errors = transpileErrors(`name: x
 on: [push]
