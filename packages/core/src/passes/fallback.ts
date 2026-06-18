@@ -1,5 +1,5 @@
 import { cloneNode, deriveNode, type Job, type Step, transformSteps, visitJobs } from "../ir.js";
-import type { ParseContext } from "../parser.js";
+import type { ParseContext, Path } from "../parser.js";
 import {
   asStepArray,
   collectUsedStepIds,
@@ -15,11 +15,34 @@ interface NormalizedFallback {
   recover: boolean;
 }
 
-function normalizeFallback(fb: unknown): NormalizedFallback {
+function normalizeFallback(ctx: ParseContext, fb: unknown, path?: Path): NormalizedFallback {
   if (Array.isArray(fb)) return { steps: asStepArray(fb), recover: false };
   if (isObject(fb)) {
+    if (fb.steps !== undefined && !Array.isArray(fb.steps)) {
+      pushDiagnostic(
+        ctx,
+        "warning",
+        `fallback.steps must be a list of steps (got ${typeof fb.steps}); ignoring fallback`,
+        path ? [...path, "steps"] : path,
+      );
+      return { steps: [], recover: false };
+    }
+    if (fb.recover !== undefined && typeof fb.recover !== "boolean") {
+      pushDiagnostic(
+        ctx,
+        "warning",
+        `fallback.recover must be a boolean (got ${typeof fb.recover}); treating as ${Boolean(fb.recover)}`,
+        path ? [...path, "recover"] : path,
+      );
+    }
     return { steps: asStepArray(fb.steps), recover: Boolean(fb.recover) };
   }
+  pushDiagnostic(
+    ctx,
+    "warning",
+    `fallback must be a list of steps or a mapping with "steps" (got ${fb === null ? "null" : typeof fb}); ignoring fallback`,
+    path,
+  );
   return { steps: [], recover: false };
 }
 
@@ -38,7 +61,13 @@ function expandStepFallback(
   used: Set<string>,
 ): Step[] {
   if (!isObject(step) || step.fallback == null) return [step];
-  const { steps: fbSteps, recover } = normalizeFallback(step.fallback);
+  const { steps: fbSteps, recover } = normalizeFallback(ctx, step.fallback, [
+    "jobs",
+    jobId,
+    "steps",
+    idx,
+    "fallback",
+  ]);
   delete step.fallback;
   if (fbSteps.length === 0) return [step];
 
@@ -69,7 +98,11 @@ function processStepFallbacks(ctx: ParseContext, jobId: string, job: Job): void 
 /** Expand a job-level `fallback:` block into notify steps gated on `failure()`. */
 function processJobFallback(ctx: ParseContext, job: Job, jobId: string): void {
   if (job.fallback == null) return;
-  const { steps: fbSteps, recover } = normalizeFallback(job.fallback);
+  const { steps: fbSteps, recover } = normalizeFallback(ctx, job.fallback, [
+    "jobs",
+    jobId,
+    "fallback",
+  ]);
   delete job.fallback;
   // A reusable-workflow job (`uses:`) cannot also declare `steps:`; appending
   // fallback steps would emit schema-invalid output. Skip and warn instead.

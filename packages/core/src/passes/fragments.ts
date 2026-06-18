@@ -8,16 +8,43 @@ type FragmentMap = Record<string, Step[]>;
 function getFragments(ctx: ParseContext): FragmentMap {
   const frags = ctx.data.fragments;
   const out: FragmentMap = {};
-  if (isObject(frags)) {
-    for (const [name, steps] of Object.entries(frags)) {
-      out[name] = asStepArray(steps);
+  if (frags === undefined) return out;
+  if (!isObject(frags)) {
+    pushDiagnostic(
+      ctx,
+      "warning",
+      `top-level "fragments" must be a mapping of name -> steps (got ${
+        frags === null ? "null" : Array.isArray(frags) ? "array" : typeof frags
+      }); ignoring`,
+      ["fragments"],
+    );
+    return out;
+  }
+  for (const [name, steps] of Object.entries(frags)) {
+    if (!Array.isArray(steps)) {
+      pushDiagnostic(
+        ctx,
+        "warning",
+        `fragment "${name}" must be a list of steps (got ${
+          steps === null ? "null" : typeof steps
+        }); treating as empty`,
+        ["fragments", name],
+      );
+      out[name] = [];
+      continue;
     }
+    out[name] = asStepArray(steps);
   }
   return out;
 }
 
 function isInject(step: unknown): step is Step & { inject: string } {
   return isObject(step) && typeof (step as Step).inject === "string";
+}
+
+/** A step carrying a non-string `inject:` is a malformed inject directive. */
+function hasBadInject(step: unknown): boolean {
+  return isObject(step) && "inject" in step && typeof (step as Step).inject !== "string";
 }
 
 /** Expand a list of steps, splicing in fragment steps for every `inject:` entry. */
@@ -29,6 +56,14 @@ function expandList(
 ): Step[] {
   const out: Step[] = [];
   for (const step of list) {
+    if (hasBadInject(step)) {
+      pushDiagnostic(
+        ctx,
+        "error",
+        `inject must name a fragment as a string (got ${typeof (step as Step).inject})`,
+      );
+      continue;
+    }
     if (isInject(step)) {
       const name = step.inject;
       const extraKeys = Object.keys(step).filter((k) => k !== "inject");

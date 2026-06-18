@@ -12,6 +12,23 @@ import type { Pass } from "./registry.js";
 
 type DM = Record<string, unknown>;
 
+const DM_KEYS = new Set([
+  "script",
+  "run",
+  "shell",
+  "checkout",
+  "compact",
+  "alias",
+  "as",
+  "id",
+  "runs-on",
+  "runs_on",
+  "before",
+  "setup_steps",
+  "fail-fast",
+  "fail_fast",
+]);
+
 function opt<T>(dm: DM, ...keys: string[]): T | undefined {
   for (const k of keys) {
     if (dm[k] !== undefined) return dm[k] as T;
@@ -115,6 +132,16 @@ function buildEvalRun(script: string, compact: boolean, family: ShellFamily): st
 
 function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefined {
   const dm = job.dynamic_matrix as DM;
+  for (const key of Object.keys(dm)) {
+    if (!DM_KEYS.has(key)) {
+      pushDiagnostic(ctx, "warning", `Job "${jobId}": dynamic_matrix has unknown key "${key}"`, [
+        "jobs",
+        jobId,
+        "dynamic_matrix",
+        key,
+      ]);
+    }
+  }
   const script = opt<string>(dm, "script", "run");
   if (typeof script !== "string" || script.trim() === "") {
     pushDiagnostic(ctx, "error", `Job "${jobId}": dynamic_matrix requires a "script" string`, [
@@ -236,6 +263,21 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
   for (const jobId of order) {
     const job = (jobs as Record<string, unknown>)[jobId];
     if (!isObject(job) || (job as Job).dynamic_matrix == null) {
+      rebuilt[jobId] = job;
+      rebuiltOrder.push(jobId);
+      continue;
+    }
+    if (!isObject((job as Job).dynamic_matrix)) {
+      const dmVal = (job as Job).dynamic_matrix;
+      pushDiagnostic(
+        ctx,
+        "error",
+        `Job "${jobId}": dynamic_matrix must be a mapping with a "script" (got ${
+          dmVal === null ? "null" : Array.isArray(dmVal) ? "array" : typeof dmVal
+        })`,
+        ["jobs", jobId, "dynamic_matrix"],
+      );
+      delete (job as Job).dynamic_matrix;
       rebuilt[jobId] = job;
       rebuiltOrder.push(jobId);
       continue;
