@@ -42,6 +42,17 @@ export interface BuildOptions {
 
 const DEFAULT_GLOBS = ["**/*.actio.yml"];
 const IGNORE = ["**/node_modules/**", "**/dist/**", "**/.git/**"];
+// When no patterns are given we recurse the whole tree, so also skip test and
+// fixture trees: they commonly hold many `input.actio.yml` files that all
+// flatten to `input.yml` and collide. An explicit pattern opts back in.
+const DEFAULT_IGNORE = [
+  ...IGNORE,
+  "**/tests/**",
+  "**/test/**",
+  "**/__tests__/**",
+  "**/fixtures/**",
+];
+
 const PINNED_SHA_RE = /^[0-9a-f]{40}$/i;
 const IMPORT_INTEGRITY_RE = /sha256:[0-9a-f]{64}/i;
 
@@ -307,9 +318,12 @@ function serializeMap(map: object): string {
 }
 
 export async function discover(patterns: string[], cwd: string): Promise<string[]> {
-  const globs = patterns.length > 0 ? patterns : DEFAULT_GLOBS;
-  // Allow passing explicit file paths as well as globs.
-  const expanded = await glob(globs, { cwd, ignore: IGNORE, dot: false, absolute: false });
+  const explicit = patterns.length > 0;
+  const globs = explicit ? patterns : DEFAULT_GLOBS;
+  // Allow passing explicit file paths as well as globs. A bare `actio build`
+  // also skips test/fixture trees to avoid flatten-collisions (DEFAULT_IGNORE).
+  const ignore = explicit ? IGNORE : DEFAULT_IGNORE;
+  const expanded = await glob(globs, { cwd, ignore, dot: false, absolute: false });
   return expanded.sort();
 }
 

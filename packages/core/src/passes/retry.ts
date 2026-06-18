@@ -1,5 +1,5 @@
 import { cloneNode, deriveNode, type Job, type Step, transformSteps, visitJobs } from "../ir.js";
-import type { ParseContext } from "../parser.js";
+import type { ParseContext, Path } from "../parser.js";
 import {
   collectUsedStepIds,
   combineIf,
@@ -34,26 +34,86 @@ function parseDelaySeconds(value: unknown): number | undefined {
   return undefined;
 }
 
-function normalizeRetry(raw: unknown): NormalizedRetry | null {
+const RETRY_KEYS = new Set(["attempts", "delay"]);
+
+/**
+ * Normalize and validate a `retry:` value. Malformed shapes emit a diagnostic
+ * (anchored at `path` when known) and return `null` so the caller leaves the
+ * step untouched, rather than silently dropping the macro.
+ */
+function normalizeRetry(ctx: ParseContext, raw: unknown, path?: Path): NormalizedRetry | null {
   if (typeof raw === "number") {
-    return raw >= 2 ? { attempts: Math.floor(raw) } : null;
+    if (!Number.isFinite(raw) || raw < 2) {
+      pushDiagnostic(
+        ctx,
+        "warning",
+        `retry attempts must be a number >= 2 (got ${JSON.stringify(raw)}); ignoring retry`,
+        path,
+        { hint: "use `retry: 3` or `retry: { attempts: 3 }`" },
+      );
+      return null;
+    }
+    return { attempts: Math.floor(raw) };
   }
   if (isObject(raw)) {
+    for (const key of Object.keys(raw)) {
+      if (!RETRY_KEYS.has(key)) {
+        pushDiagnostic(
+          ctx,
+          "warning",
+          `retry has unknown key "${key}"; supported keys are attempts, delay`,
+          path ? [...path, key] : undefined,
+        );
+      }
+    }
     const attemptsRaw = (raw as Step).attempts;
-    const attempts =
-      typeof attemptsRaw === "number" && attemptsRaw >= 1
-        ? Math.floor(attemptsRaw)
-        : DEFAULT_ATTEMPTS;
-    if (attempts < 2) return null;
-    const delaySeconds = parseDelaySeconds((raw as Step).delay);
+    let attempts = DEFAULT_ATTEMPTS;
+    if (attemptsRaw !== undefined) {
+      if (typeof attemptsRaw !== "number" || !Number.isFinite(attemptsRaw)) {
+        pushDiagnostic(
+          ctx,
+          "warning",
+          `retry.attempts must be a number (got ${JSON.stringify(attemptsRaw)}); ignoring retry`,
+          path ? [...path, "attempts"] : path,
+        );
+        return null;
+      }
+      if (attemptsRaw < 2) {
+        pushDiagnostic(
+          ctx,
+          "warning",
+          `retry.attempts must be >= 2 (got ${attemptsRaw}); ignoring retry`,
+          path ? [...path, "attempts"] : path,
+        );
+        return null;
+      }
+      attempts = Math.floor(attemptsRaw);
+    }
+    const delayRaw = (raw as Step).delay;
+    const delaySeconds = parseDelaySeconds(delayRaw);
+    if (delayRaw !== undefined && delaySeconds == null) {
+      pushDiagnostic(
+        ctx,
+        "warning",
+        `retry.delay ${JSON.stringify(delayRaw)} is not a positive duration (e.g. "10s", "2m", "1h", or seconds); ignoring delay`,
+        path ? [...path, "delay"] : path,
+      );
+    }
     const delayLabel =
-      typeof (raw as Step).delay === "string"
-        ? ((raw as Step).delay as string).trim()
+      typeof delayRaw === "string" && delaySeconds != null
+        ? delayRaw.trim()
         : delaySeconds != null
           ? `${delaySeconds}s`
           : undefined;
     return { attempts, delaySeconds, delayLabel };
   }
+  pushDiagnostic(
+    ctx,
+    "warning",
+    `retry must be a number or a mapping (got ${raw === null ? "null" : typeof raw}); ignoring retry`,
+    path,
+    { hint: 'use `retry: 3` or `retry: { attempts: 3, delay: "10s" }`' },
+  );
   return null;
 }
 
@@ -173,7 +233,7 @@ function expandRetryInList(
       out.push(step);
       return;
     }
-    const cfg = normalizeRetry(step.retry);
+    const cfg = normalizeRetry(ctx, step.retry);
     delete step.retry;
     if (cfg == null) {
       out.push(step);
@@ -201,7 +261,7 @@ function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
     transformSteps(ctx, jobId, job, (step, idx) => {
       if (isObject(step) && step.fallback != null) expandRetryInFallback(ctx, jobId, step, used);
       if (!isObject(step) || step.retry == null) return [step];
-      const cfg = normalizeRetry(step.retry);
+      const cfg = normalizeRetry(ctx, step.retry, ["jobs", jobId, "steps", idx, "retry"]);
       delete step.retry;
       if (cfg == null) return [step];
       return buildRetryAttempts(ctx, jobId, step, idx, used, cfg);

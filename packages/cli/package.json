@@ -3,21 +3,48 @@
   "version": "0.1.0",
   "description": "Actio CLI — compile .actio.yml files into GitHub Actions workflows",
   "license": "MIT",
+  "author": "Austen Stone",
+  "homepage": "https://github.com/austenstone/actio#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/austenstone/actio.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/austenstone/actio/issues"
+  },
+  "keywords": [
+    "actio",
+    "github-actions",
+    "ci",
+    "cd",
+    "yaml",
+    "transpiler",
+    "compiler",
+    "workflow",
+    "cli",
+    "codegen"
+  ],
   "type": "module",
   "bin": {
     "actio": "dist/cli.js"
   },
   "exports": {
     "./config": {
-      "import": "./dist/config-export.js",
-      "types": "./dist/config-export.d.ts"
+      "types": "./dist/config-export.d.ts",
+      "import": "./dist/config-export.js"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsup",
