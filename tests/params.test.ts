@@ -391,6 +391,28 @@ jobs:
     expect(result.ok).toBe(false);
   });
 
+  it("treats an even-length backslash run before a double quote as a real close (params root exposed at top level)", () => {
+    const source = `name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format("x\\\\", params.env) }}"
+`;
+    const result = transpile(source, { fileName: "t.actio.yml", validate: false });
+    const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+    expect(result.ok).toBe(false);
+  });
+
   it("resyncs after a closed runtime expression and still catches a later params root", () => {
     const source = `name: x
 on: [push]
