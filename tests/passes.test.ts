@@ -40,9 +40,10 @@ describe("sortPasses", () => {
     expect(() => sortPasses(passes)).toThrow(/cycle/i);
   });
 
-  it("declares params as an explicit dependency for fragments", () => {
+  it("declares explicit dependencies for fragments", () => {
     const fragmentsPass = builtinPasses.find((pass) => pass.name === "fragments");
     expect(fragmentsPass?.runsAfter ?? []).toContain("params");
+    expect(fragmentsPass?.runsAfter ?? []).toContain("when_compile");
   });
 
   it("keeps params before fragments because of dependency metadata", () => {
@@ -53,6 +54,21 @@ describe("sortPasses", () => {
     expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("retry"));
     expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
     expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("dynamic_matrix"));
+  });
+
+  it("keeps when_compile before fragments even when input order is shuffled", () => {
+    const byName = new Map(builtinPasses.map((pass) => [pass.name, pass]));
+    const shuffled = [
+      byName.get("fragments"),
+      byName.get("dynamic_matrix"),
+      byName.get("fallback"),
+      byName.get("retry"),
+      byName.get("when_compile"),
+      byName.get("params"),
+    ].filter((pass): pass is Pass => pass !== undefined);
+    const ordered = sortPasses(shuffled).map((pass) => pass.name);
+    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("when_compile"));
+    expect(ordered.indexOf("when_compile")).toBeLessThan(ordered.indexOf("fragments"));
   });
 
   it("ignores forward dependency references to not-yet-registered passes", () => {

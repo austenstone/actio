@@ -390,7 +390,7 @@ jobs:
     ).toBe(true);
   });
 
-  it("keeps non-step/job when_compile keys untouched", () => {
+  it("errors on residual non-structural when_compile keys", () => {
     const result = transpileResult(`name: x
 on: [push]
 params:
@@ -406,12 +406,39 @@ jobs:
           when_compile: params.deploy
           KEEP: yes
 `);
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(
+      result.diagnostics.some((diagnostic) =>
+        diagnostic.message.includes("[when-compile-residual]"),
+      ),
+    ).toBe(true);
     const output = parse(result.yaml) as {
       jobs: { build: { steps: Array<{ env?: { when_compile?: string; KEEP?: string } }> } };
     };
-    expect(output.jobs.build.steps[0]?.env?.when_compile).toBe("params.deploy");
+    expect(output.jobs.build.steps[0]?.env?.when_compile).toBeUndefined();
     expect(output.jobs.build.steps[0]?.env?.KEEP).toBe("yes");
+  });
+
+  it("errors when a fragment injects a residual when_compile directive", () => {
+    const errors = transpileErrors(`name: x
+on: [push]
+params:
+  deploy:
+    type: boolean
+    default: false
+fragments:
+  gated:
+    - run: echo hidden
+      when_compile: params.deploy
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: gated
+`);
+    expect(
+      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-residual]")),
+    ).toBe(true);
   });
 });
 

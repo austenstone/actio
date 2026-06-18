@@ -1,10 +1,12 @@
 import { cloneNode, type Job, type Step, visitJobs } from "../ir.js";
-import type { ParseContext } from "../parser.js";
+import type { ParseContext, Path } from "../parser.js";
 import { asStepArray, isObject, pushDiagnostic } from "./helpers.js";
 import { resolveCompileTimeTextBoundaries } from "./params.js";
 import type { Pass } from "./registry.js";
 
 type FragmentMap = Record<string, Step[]>;
+const FORM_B_KEY_RE = /^when_compile\([\s\S]+\)$/;
+const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
 
 function getFragments(ctx: ParseContext): FragmentMap {
   const frags = ctx.data.fragments;
@@ -79,10 +81,38 @@ function expandFallbackInPlace(
   }
 }
 
+function stripResidualWhenCompile(ctx: ParseContext, value: unknown, path: Path): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      stripResidualWhenCompile(ctx, item, [...path, index]);
+    });
+    return;
+  }
+  if (!isObject(value)) return;
+
+  for (const key of Object.keys(value)) {
+    if (key === "when_compile" || FORM_B_KEY_RE.test(key)) {
+      pushDiagnostic(
+        ctx,
+        "error",
+        diagnosticMessage(
+          "when-compile-residual",
+          "Residual when_compile directive is not allowed here; move it to a job/step structural position",
+        ),
+        [...path, key],
+      );
+      delete value[key];
+      continue;
+    }
+    stripResidualWhenCompile(ctx, value[key], [...path, key]);
+  }
+}
+
 /**
  * fragments pass: collect top-level `fragments:`, expand all `- inject: <name>`
  * entries (in job steps, job fallback, and step fallback), then strip the
- * `fragments:` key. Runs before other passes so later passes see real steps.
+ * `fragments:` key. Runs after when_compile and strips any residual when_compile
+ * directives that reach this stage.
  */
 export function fragmentsPass(ctx: ParseContext): void {
   const fragments = getFragments(ctx);
@@ -98,9 +128,14 @@ export function fragmentsPass(ctx: ParseContext): void {
       enforceNoResidualTokens: false,
       reportInterpolationErrors: false,
     });
+    stripResidualWhenCompile(ctx, job, ["jobs", id]);
   });
   delete ctx.data.fragments;
 }
 
 /** Splice reusable `inject:` steps in first, so later passes see real steps. */
-export const fragments: Pass = { name: "fragments", runsAfter: ["params"], apply: fragmentsPass };
+export const fragments: Pass = {
+  name: "fragments",
+  runsAfter: ["params", "when_compile"],
+  apply: fragmentsPass,
+};
