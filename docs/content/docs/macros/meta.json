@@ -4,6 +4,7 @@
     "params",
     "job-defaults",
     "fragments",
+    "static-if",
     "retry",
     "dynamic-matrix",
     "fallback"

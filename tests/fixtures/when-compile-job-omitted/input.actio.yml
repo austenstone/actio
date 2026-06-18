@@ -10,7 +10,7 @@ jobs:
     steps:
       - run: echo build
   release:
-    when_compile: params.deploy
+    static_if: params.deploy
     runs-on: ubuntu-latest
     steps:
       - run: echo release

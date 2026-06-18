@@ -95,7 +95,7 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
-  it("accepts when_compile directives on jobs and steps, including form B merge keys", () => {
+  it("accepts static_if directives on jobs and steps, including form B merge keys", () => {
     const doc = load(`on: [push]
 params:
   deploy:
@@ -103,12 +103,12 @@ params:
     default: true
 jobs:
   build:
-    when_compile: params.deploy
+    static_if: params.deploy
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: params.deploy
-        when_compile(params.deploy):
+        static_if: params.deploy
+        static_if(params.deploy):
           timeout-minutes: 5
 `);
     expect(validate(doc)).toBe(true);

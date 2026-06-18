@@ -17,7 +17,7 @@ function transpileResult(source: string) {
   return transpile(source, { fileName: "t.actio.yml" });
 }
 
-describe("when_compile diagnostics", () => {
+describe("static_if diagnostics", () => {
   it("pins the canonical runtime root allow-list", () => {
     expect([...RUNTIME_CONTEXT_ROOTS]).toEqual([
       "github",
@@ -42,14 +42,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: github.ref == 'refs/heads/main'
+        static_if: github.ref == 'refs/heads/main'
 `);
     expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-runtime-context]")),
+      errors.some((diagnostic) => diagnostic.message.includes("[static-if-runtime-context]")),
     ).toBe(true);
   });
 
-  it("keeps when_compile runtime-root checks in parity with the shared runtime root list", () => {
+  it("keeps static_if runtime-root checks in parity with the shared runtime root list", () => {
     for (const root of RUNTIME_CONTEXT_ROOTS) {
       const errors = transpileErrors(`name: x
 on: [push]
@@ -58,10 +58,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: ${root}.ref == 'x'
+        static_if: ${root}.ref == 'x'
 `);
       expect(
-        errors.some((diagnostic) => diagnostic.message.includes("[when-compile-runtime-context]")),
+        errors.some((diagnostic) => diagnostic.message.includes("[static-if-runtime-context]")),
       ).toBe(true);
     }
   });
@@ -78,10 +78,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: params.mode
+        static_if: params.mode
 `);
     expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-non-boolean]")),
+      errors.some((diagnostic) => diagnostic.message.includes("[static-if-non-boolean]")),
     ).toBe(true);
   });
 
@@ -97,10 +97,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: false && params.typoed
+        static_if: false && params.typoed
 `);
     expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-undefined-ref]")),
+      errors.some((diagnostic) => diagnostic.message.includes("[static-if-undefined-ref]")),
     ).toBe(true);
   });
 
@@ -113,7 +113,7 @@ params:
     default: false
 jobs:
   build:
-    when_compile: params.deploy
+    static_if: params.deploy
     runs-on: ubuntu-latest
     steps:
       - run: echo build
@@ -124,7 +124,7 @@ jobs:
       - run: echo publish
 `);
     expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-dangling-needs]")),
+      errors.some((diagnostic) => diagnostic.message.includes("[static-if-dangling-needs]")),
     ).toBe(true);
   });
 
@@ -136,9 +136,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: ""
+        static_if: ""
 `);
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[when-compile-empty]"))).toBe(
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[static-if-empty]"))).toBe(
       true,
     );
   });
@@ -155,11 +155,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: params.keep
+        static_if: params.keep
 `);
-    expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-empty-job]")),
-    ).toBe(true);
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[static-if-empty-job]"))).toBe(
+      true,
+    );
   });
 
   it("errors when form B value is not a map", () => {
@@ -175,14 +175,14 @@ jobs:
     steps:
       - run: echo hi
         env:
-          when_compile(params.keep): nope
+          static_if(params.keep): nope
 `);
     expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-merge-non-map]")),
+      errors.some((diagnostic) => diagnostic.message.includes("[static-if-merge-non-map]")),
     ).toBe(true);
   });
 
-  it("rejects runtime wrapper syntax in when_compile values", () => {
+  it("rejects runtime wrapper syntax in static_if values", () => {
     const errors = transpileErrors(`name: x
 on: [push]
 params:
@@ -194,9 +194,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: \${{ params.deploy }}
+        static_if: \${{ params.deploy }}
       - run: echo ok
-        when_compile: \${{ github.ref == 'refs/heads/main' }}
+        static_if: \${{ github.ref == 'refs/heads/main' }}
 `);
     expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
       true,
@@ -209,11 +209,11 @@ jobs:
       ),
     ).toBe(true);
     expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-runtime-context]")),
+      errors.some((diagnostic) => diagnostic.message.includes("[static-if-runtime-context]")),
     ).toBe(true);
   });
 
-  it("treats empty form B predicates as when_compile-empty and strips them from output", () => {
+  it("treats empty form B predicates as static-if-empty and strips them from output", () => {
     const result = transpileResult(`name: x
 on: [push]
 jobs:
@@ -222,21 +222,21 @@ jobs:
     steps:
       - run: echo hi
         env:
-          when_compile():
+          static_if():
             FLAG: "1"
           KEEP: yes
 `);
     expect(
-      result.diagnostics.some((diagnostic) => diagnostic.message.includes("[when-compile-empty]")),
+      result.diagnostics.some((diagnostic) => diagnostic.message.includes("[static-if-empty]")),
     ).toBe(true);
     const doc = parse(result.yaml) as {
       jobs: {
         build: {
-          steps: Array<{ env?: { KEEP?: string; "when_compile()"?: { FLAG?: string } } }>;
+          steps: Array<{ env?: { KEEP?: string; "static_if()"?: { FLAG?: string } } }>;
         };
       };
     };
-    expect(doc.jobs.build.steps[0]?.env?.["when_compile()"]).toBeUndefined();
+    expect(doc.jobs.build.steps[0]?.env?.["static_if()"]).toBeUndefined();
     expect(doc.jobs.build.steps[0]?.env?.KEEP).toBe("yes");
   });
 
@@ -248,12 +248,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: \${{ true }}
+        static_if: \${{ true }}
 `);
     expect(
       errors.some(
         (diagnostic) =>
-          diagnostic.message.includes("[when-compile-runtime-context]") &&
+          diagnostic.message.includes("[static-if-runtime-context]") &&
           diagnostic.message.includes("bare compile-time expression"),
       ),
     ).toBe(true);
@@ -267,12 +267,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: \${{ contains('a}}b', '}}') }}
+        static_if: \${{ contains('a}}b', '}}') }}
 `);
     expect(
       errors.some(
         (diagnostic) =>
-          diagnostic.message.includes("[when-compile-runtime-context]") &&
+          diagnostic.message.includes("[static-if-runtime-context]") &&
           diagnostic.message.includes("bare compile-time expression"),
       ),
     ).toBe(true);
@@ -290,9 +290,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: params.deploy &&
+        static_if: params.deploy &&
 `);
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[when-compile-empty]"))).toBe(
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[static-if-empty]"))).toBe(
       true,
     );
   });
@@ -305,7 +305,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: true false
+        static_if: true false
 `);
     const badBracket = transpileErrors(`name: x
 on: [push]
@@ -318,14 +318,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: params.deploy[foo]
+        static_if: params.deploy[foo]
 `);
-    expect(
-      leftovers.some((diagnostic) => diagnostic.message.includes("[when-compile-empty]")),
-    ).toBe(true);
-    expect(
-      badBracket.some((diagnostic) => diagnostic.message.includes("[when-compile-empty]")),
-    ).toBe(true);
+    expect(leftovers.some((diagnostic) => diagnostic.message.includes("[static-if-empty]"))).toBe(
+      true,
+    );
+    expect(badBracket.some((diagnostic) => diagnostic.message.includes("[static-if-empty]"))).toBe(
+      true,
+    );
   });
 
   it("errors on unknown function calls", () => {
@@ -336,12 +336,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: nope()
+        static_if: nope()
 `);
     expect(
       errors.some(
         (diagnostic) =>
-          diagnostic.message.includes("[when-compile-non-boolean]") &&
+          diagnostic.message.includes("[static-if-non-boolean]") &&
           diagnostic.message.includes("Unknown function"),
       ),
     ).toBe(true);
@@ -359,7 +359,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: "!params.mode"
+        static_if: "!params.mode"
 `);
     expect(
       errors.some((diagnostic) =>
@@ -380,7 +380,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: params.mode && true
+        static_if: params.mode && true
 `);
     expect(
       errors.some((diagnostic) => diagnostic.message.includes("&& requires boolean operands")),
@@ -399,7 +399,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: params.deploy < true
+        static_if: params.deploy < true
 `);
     expect(
       errors.some((diagnostic) => diagnostic.message.includes("< requires comparable operands")),
@@ -415,15 +415,15 @@ jobs:
     steps:
       - run: echo hi
         env:
-          when_compile(github.ref == 'refs/heads/main'):
+          static_if(github.ref == 'refs/heads/main'):
             FLAG: "1"
 `);
     expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-runtime-context]")),
+      errors.some((diagnostic) => diagnostic.message.includes("[static-if-runtime-context]")),
     ).toBe(true);
   });
 
-  it("errors when when_compile value is neither string nor boolean", () => {
+  it("errors when static_if value is neither string nor boolean", () => {
     const errors = transpileErrors(`name: x
 on: [push]
 jobs:
@@ -431,7 +431,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: 1
+        static_if: 1
 `);
     expect(
       errors.some((diagnostic) =>
@@ -440,7 +440,7 @@ jobs:
     ).toBe(true);
   });
 
-  it("errors on residual non-structural when_compile keys", () => {
+  it("errors on residual non-structural static_if keys", () => {
     const result = transpileResult(`name: x
 on: [push]
 params:
@@ -453,23 +453,21 @@ jobs:
     steps:
       - run: echo hi
         env:
-          when_compile: params.deploy
+          static_if: params.deploy
           KEEP: yes
 `);
     expect(result.ok).toBe(false);
     expect(
-      result.diagnostics.some((diagnostic) =>
-        diagnostic.message.includes("[when-compile-residual]"),
-      ),
+      result.diagnostics.some((diagnostic) => diagnostic.message.includes("[static-if-residual]")),
     ).toBe(true);
     const output = parse(result.yaml) as {
-      jobs: { build: { steps: Array<{ env?: { when_compile?: string; KEEP?: string } }> } };
+      jobs: { build: { steps: Array<{ env?: { static_if?: string; KEEP?: string } }> } };
     };
-    expect(output.jobs.build.steps[0]?.env?.when_compile).toBeUndefined();
+    expect(output.jobs.build.steps[0]?.env?.static_if).toBeUndefined();
     expect(output.jobs.build.steps[0]?.env?.KEEP).toBe("yes");
   });
 
-  it("fails loud on residual when_compile form B keys under top-level env", () => {
+  it("fails loud on residual static_if form B keys under top-level env", () => {
     const source = `name: t
 on: push
 params:
@@ -477,7 +475,7 @@ params:
     type: boolean
     default: true
 env:
-  when_compile(params.deploy):
+  static_if(params.deploy):
     DEPLOY_TOKEN: abc
 jobs:
   build:
@@ -488,14 +486,12 @@ jobs:
     const result = transpile(source, { fileName: "t.actio.yml" });
     expect(result.ok).toBe(false);
     expect(
-      result.diagnostics.some((diagnostic) =>
-        diagnostic.message.includes("[when-compile-residual]"),
-      ),
+      result.diagnostics.some((diagnostic) => diagnostic.message.includes("[static-if-residual]")),
     ).toBe(true);
-    expect(result.yaml.includes("when_compile")).toBe(false);
+    expect(result.yaml.includes("static_if")).toBe(false);
   });
 
-  it("fails loud on residual when_compile form B keys under top-level env with validate disabled", () => {
+  it("fails loud on residual static_if form B keys under top-level env with validate disabled", () => {
     const source = `name: t
 on: push
 params:
@@ -503,7 +499,7 @@ params:
     type: boolean
     default: true
 env:
-  when_compile(params.deploy):
+  static_if(params.deploy):
     DEPLOY_TOKEN: abc
 jobs:
   build:
@@ -514,14 +510,12 @@ jobs:
     const result = transpile(source, { fileName: "t.actio.yml", validate: false });
     expect(result.ok).toBe(false);
     expect(
-      result.diagnostics.some((diagnostic) =>
-        diagnostic.message.includes("[when-compile-residual]"),
-      ),
+      result.diagnostics.some((diagnostic) => diagnostic.message.includes("[static-if-residual]")),
     ).toBe(true);
-    expect(result.yaml.includes("when_compile")).toBe(false);
+    expect(result.yaml.includes("static_if")).toBe(false);
   });
 
-  it("allows top-level env without when_compile directives", () => {
+  it("allows top-level env without static_if directives", () => {
     const result = transpileResult(`name: t
 on: push
 env:
@@ -536,7 +530,7 @@ jobs:
     expect(result.diagnostics.some((diagnostic) => diagnostic.severity === "error")).toBe(false);
   });
 
-  it("errors when a fragment injects a residual when_compile directive", () => {
+  it("errors when a fragment injects a residual static_if directive", () => {
     const errors = transpileErrors(`name: x
 on: [push]
 params:
@@ -546,26 +540,26 @@ params:
 fragments:
   gated:
     - run: echo hidden
-      when_compile: params.deploy
+      static_if: params.deploy
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - inject: gated
 `);
-    expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-residual]")),
-    ).toBe(true);
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[static-if-residual]"))).toBe(
+      true,
+    );
   });
 
-  it("errors when a fragment injects an empty-paren residual when_compile() directive", () => {
+  it("errors when a fragment injects an empty-paren residual static_if() directive", () => {
     const errors = transpileErrors(`name: x
 on: [push]
 fragments:
   gated:
     - run: echo hidden
       env:
-        when_compile():
+        static_if():
           FLAG: "1"
 jobs:
   build:
@@ -573,13 +567,13 @@ jobs:
     steps:
       - inject: gated
 `);
-    expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-residual]")),
-    ).toBe(true);
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[static-if-residual]"))).toBe(
+      true,
+    );
   });
 });
 
-describe("when_compile behavior seams", () => {
+describe("static_if behavior seams", () => {
   it("warns on form B collisions and uses last writer", () => {
     const result = transpile(
       `name: x
@@ -597,9 +591,9 @@ jobs:
     steps:
       - run: echo hi
         env:
-          when_compile(params.first):
+          static_if(params.first):
             SHARED: first
-          when_compile(params.second):
+          static_if(params.second):
             SHARED: second
 `,
       { fileName: "t.actio.yml" },
@@ -620,13 +614,13 @@ jobs:
     steps:
       - run: echo hi
         env:
-          when_compile(params.first):
+          static_if(params.first):
             SHARED: first
-          when_compile(params.second):
+          static_if(params.second):
             SHARED: second
 `);
     expect(
-      warnings.some((diagnostic) => diagnostic.message.includes("[when-compile-merge-collision]")),
+      warnings.some((diagnostic) => diagnostic.message.includes("[static-if-merge-collision]")),
     ).toBe(true);
     const doc = parse(result.yaml) as {
       jobs: { build: { steps: Array<{ env?: { SHARED?: string } }> } };
@@ -661,7 +655,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo kept
-        when_compile: for_each.item.enabled
+        static_if: for_each.item.enabled
       - run: echo always
 `,
       {
@@ -702,19 +696,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo keep-a
-        when_compile: (params.count >= 3 && params.mode == 'prod') || false
+        static_if: (params.count >= 3 && params.mode == 'prod') || false
       - run: echo keep-b
-        when_compile: contains(params.labels, 'beta')
+        static_if: contains(params.labels, 'beta')
       - run: echo keep-c
-        when_compile: startsWith(params.mode, 'pr') && endsWith(params.mode, 'od')
+        static_if: startsWith(params.mode, 'pr') && endsWith(params.mode, 'od')
       - run: echo keep-d
-        when_compile: format('{0}-{1}', params.mode, params.count) == 'prod-3'
+        static_if: format('{0}-{1}', params.mode, params.count) == 'prod-3'
       - run: echo keep-e
-        when_compile: defined(params.profile.flags.ship)
+        static_if: defined(params.profile.flags.ship)
       - run: echo drop-f
-        when_compile: params.profile.score < 0
+        static_if: params.profile.score < 0
       - run: echo keep-g
-        when_compile: params.profile['flags']['ship'] == true
+        static_if: params.profile['flags']['ship'] == true
 `);
     expect(result.ok).toBe(true);
     const doc = parse(result.yaml) as {
@@ -748,11 +742,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo keep-decimal
-        when_compile: params.pi >= 3.14
+        static_if: params.pi >= 3.14
       - run: echo keep-double-quote
-        when_compile: params.quote == 'say "hi"'
+        static_if: params.quote == 'say "hi"'
       - run: echo keep-single-quote
-        when_compile: params.apostrophe == 'pro''d'
+        static_if: params.apostrophe == 'pro''d'
 `);
     expect(result.ok).toBe(true);
     const doc = parse(result.yaml) as {
@@ -779,11 +773,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo keep-null-key
-        when_compile: params.dict[null] == 'enabled'
+        static_if: params.dict[null] == 'enabled'
       - run: echo keep-true-key
-        when_compile: params.dict[true] == 'yes'
+        static_if: params.dict[true] == 'yes'
       - run: echo drop-defined-null
-        when_compile: defined(null)
+        static_if: defined(null)
 `);
     expect(result.ok).toBe(true);
     const doc = parse(result.yaml) as {
@@ -808,12 +802,12 @@ jobs:
     steps:
       - run: echo always
       - run: echo probe
-        when_compile: defined(params.profile.flags.ship)
+        static_if: defined(params.profile.flags.ship)
 `);
     expect(result.ok).toBe(true);
     expect(
       result.diagnostics.some((diagnostic) =>
-        diagnostic.message.includes("[when-compile-undefined-ref]"),
+        diagnostic.message.includes("[static-if-undefined-ref]"),
       ),
     ).toBe(false);
     const doc = parse(result.yaml) as {
@@ -835,12 +829,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        when_compile: params.values[2] == 'one'
+        static_if: params.values[2] == 'one'
 `);
     expect(
       errors.some(
         (diagnostic) =>
-          diagnostic.message.includes("[when-compile-undefined-ref]") &&
+          diagnostic.message.includes("[static-if-undefined-ref]") &&
           diagnostic.message.includes("params.values[2]"),
       ),
     ).toBe(true);
@@ -870,9 +864,9 @@ jobs:
 on: [push]
 jobs:
   build:
-    when_compile: flag
+    static_if: flag
     runs-on: ubuntu-latest
-    when_compile(flag):
+    static_if(flag):
       concurrency:
         group: ci
     steps:
@@ -900,13 +894,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo lt
-        when_compile: params.score < 3
+        static_if: params.score < 3
       - run: echo lte
-        when_compile: params.score <= 2
+        static_if: params.score <= 2
       - run: echo gt
-        when_compile: params.score > 1
+        static_if: params.score > 1
       - run: echo gte
-        when_compile: params.score >= 2
+        static_if: params.score >= 2
 `);
     expect(result.ok).toBe(true);
     const doc = parse(result.yaml) as {
@@ -928,7 +922,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo drop
-        when_compile: contains(42, 'x')
+        static_if: contains(42, 'x')
       - run: echo keep
 `);
     expect(result.ok).toBe(true);
@@ -938,7 +932,7 @@ jobs:
     expect(doc.jobs.build.steps.map((step) => step.run)).toEqual(["echo keep"]);
   });
 
-  it("accepts already-resolved boolean when_compile values from earlier passes", () => {
+  it("accepts already-resolved boolean static_if values from earlier passes", () => {
     const seedBoolean: Pass = {
       name: "for_each",
       runsAfter: ["params"],
@@ -951,7 +945,7 @@ jobs:
         if (!Array.isArray(steps)) return;
         const first = steps[0];
         if (typeof first !== "object" || first === null) return;
-        (first as Record<string, unknown>).when_compile = true;
+        (first as Record<string, unknown>).static_if = true;
       },
     };
     const result = transpileResult(`name: x
@@ -976,9 +970,9 @@ jobs:
     );
     expect(patched.ok).toBe(true);
     const doc = parse(patched.yaml) as {
-      jobs: { build: { steps: Array<{ run?: string; when_compile?: unknown }> } };
+      jobs: { build: { steps: Array<{ run?: string; static_if?: unknown }> } };
     };
     expect(doc.jobs.build.steps[0]?.run).toBe("echo hi");
-    expect(doc.jobs.build.steps[0]).not.toHaveProperty("when_compile");
+    expect(doc.jobs.build.steps[0]).not.toHaveProperty("static_if");
   });
 });
