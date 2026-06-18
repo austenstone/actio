@@ -3,6 +3,13 @@ on: [push]
 
 executors:
   hardened:
+    permissions:
+      contents: read
+    concurrency:
+      group: hardened-group
+    defaults:
+      run:
+        shell: bash
     env:
       HARDENED: "true"
     timeout-minutes: 10

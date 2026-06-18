@@ -9,6 +9,13 @@ jobs:
   release:
     steps:
       - run: echo release
+    permissions:
+      contents: read
+    concurrency:
+      group: hardened-group
+    defaults:
+      run:
+        shell: bash
     env:
       HARDENED: "true"
     timeout-minutes: 10
@@ -21,6 +28,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - run: echo tuned
+    permissions:
+      contents: read
+    concurrency:
+      group: hardened-group
+    defaults:
+      run:
+        shell: bash
     env:
       HARDENED: "true"
       FAST: "true"

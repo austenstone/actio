@@ -488,14 +488,7 @@ jobs:
   });
 
   it("rejects unsupported keys in executor definitions", () => {
-    for (const key of [
-      "strategy",
-      "if",
-      "permissions",
-      "concurrency",
-      "continue-on-error",
-      "environment",
-    ]) {
+    for (const key of ["strategy", "if", "continue-on-error", "environment"]) {
       const { result, errors } = build(`name: x
 on: [push]
 executors:
@@ -701,6 +694,13 @@ jobs:
 on: [push]
 executors:
   hardened:
+    permissions:
+      contents: read
+    concurrency:
+      group: hardened-group
+    defaults:
+      run:
+        shell: bash
     env:
       HARDENED: "true"
     timeout-minutes: 10
@@ -728,11 +728,17 @@ jobs:
     expect(errors).toEqual([]);
     expect(doc.jobs.release.env).toEqual({ HARDENED: "true" });
     expect(doc.jobs.release["timeout-minutes"]).toBe(10);
+    expect(doc.jobs.release.permissions).toEqual({ contents: "read" });
+    expect(doc.jobs.release.concurrency).toEqual({ group: "hardened-group" });
+    expect(doc.jobs.release.defaults).toEqual({ run: { shell: "bash" } });
     expect(doc.jobs.release["runs-on"]).toEqual(["self-hosted", "gpu"]);
     expect(doc.jobs.release.container).toEqual({ image: "nvidia/cuda:12.4.0-base" });
 
     expect(doc.jobs.tuned.env).toEqual({ HARDENED: "true", FAST: "true" });
     expect(doc.jobs.tuned["timeout-minutes"]).toBe(5);
+    expect(doc.jobs.tuned.permissions).toEqual({ contents: "read" });
+    expect(doc.jobs.tuned.concurrency).toEqual({ group: "hardened-group" });
+    expect(doc.jobs.tuned.defaults).toEqual({ run: { shell: "bash" } });
     expect(doc.jobs.tuned["runs-on"]).toBe("windows-latest");
   });
 

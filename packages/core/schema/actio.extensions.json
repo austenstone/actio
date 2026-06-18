@@ -180,6 +180,9 @@
         "timeout-minutes": {
           "$ref": "#/definitions/normalJob/properties/timeout-minutes"
         },
+        "permissions": { "$ref": "#/definitions/normalJob/properties/permissions" },
+        "concurrency": { "$ref": "#/definitions/normalJob/properties/concurrency" },
+        "defaults": { "$ref": "#/definitions/normalJob/properties/defaults" },
         "container": { "$ref": "#/definitions/normalJob/properties/container" },
         "services": { "$ref": "#/definitions/normalJob/properties/services" },
         "env": { "$ref": "#/definitions/env" }

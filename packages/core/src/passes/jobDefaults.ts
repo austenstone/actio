@@ -23,9 +23,12 @@ type JobDefaultKey = (typeof JOB_DEFAULT_KEYS)[number];
 export const EXECUTOR_KEYS = [
   "runs-on",
   "timeout-minutes",
+  "permissions",
+  "concurrency",
   "env",
   "container",
   "services",
+  "defaults",
 ] as const;
 
 const CALL_JOB_DEFAULT_KEYS = new Set<string>(["if", "permissions", "concurrency", "strategy"]);

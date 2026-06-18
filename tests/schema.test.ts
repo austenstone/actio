@@ -142,6 +142,13 @@ jobs:
     const doc = load(`on: [push]
 executors:
   hardened:
+    permissions:
+      contents: read
+    concurrency:
+      group: hardened-group
+    defaults:
+      run:
+        shell: bash
     env:
       HARDENED: "true"
     timeout-minutes: 10
@@ -171,12 +178,19 @@ jobs:
     expect(validate(doc)).toBe(false);
   });
 
-  it("accepts all allowlisted executor keys including continue-on-error and environment", () => {
+  it("accepts all allowlisted executor keys", () => {
     const doc = load(`on: [push]
 executors:
   full:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+    concurrency:
+      group: full-group
+    defaults:
+      run:
+        shell: bash
     container:
       image: node:20
     services:
@@ -211,14 +225,7 @@ jobs:
   });
 
   it("rejects job-only keys in executor definitions", () => {
-    for (const key of [
-      "strategy",
-      "if",
-      "permissions",
-      "concurrency",
-      "continue-on-error",
-      "environment",
-    ]) {
+    for (const key of ["strategy", "if", "continue-on-error", "environment"]) {
       const doc = load(`on: [push]
 executors:
   bad:
