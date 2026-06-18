@@ -1,6 +1,6 @@
 import { cloneNode, type Job, type Step, visitJobs } from "../ir.js";
 import type { ParseContext, Path } from "../parser.js";
-import { asStepArray, isObject, pushDiagnostic } from "./helpers.js";
+import { asStepArray, isObject, mapFallbackSteps, pushDiagnostic } from "./helpers.js";
 import { resolveCompileTimeTextBoundaries } from "./params.js";
 import type { Pass } from "./registry.js";
 
@@ -73,12 +73,7 @@ function expandFallbackInPlace(
   fragments: FragmentMap,
   stack: string[],
 ): void {
-  const fb = container.fallback;
-  if (Array.isArray(fb)) {
-    container.fallback = expandList(asStepArray(fb), ctx, fragments, stack);
-  } else if (isObject(fb) && Array.isArray(fb.steps)) {
-    fb.steps = expandList(asStepArray(fb.steps), ctx, fragments, stack);
-  }
+  mapFallbackSteps(container, (steps) => expandList(steps, ctx, fragments, stack));
 }
 
 function stripResidualWhenCompile(ctx: ParseContext, value: unknown, path: Path): void {

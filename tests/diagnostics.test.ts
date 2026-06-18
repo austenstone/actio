@@ -1,4 +1,4 @@
-import { type Diagnostic, formatGithubAnnotation } from "actio-core";
+import { type Diagnostic, formatDiagnostic, formatGithubAnnotation } from "actio-core";
 import { describe, expect, it } from "vitest";
 
 const base: Diagnostic = {
@@ -47,5 +47,22 @@ describe("formatGithubAnnotation", () => {
   it("omits file/line props when no range or file is present", () => {
     const d: Diagnostic = { severity: "error", source: "actio", message: "boom" };
     expect(formatGithubAnnotation(d)).toBe("::error title=actio (actio)::boom");
+  });
+
+  it("renders a [code] prefix in the message body when code is set", () => {
+    const out = formatGithubAnnotation({ ...base, code: "param-type-invalid" });
+    expect(out.endsWith("::[param-type-invalid] Unexpected value 'x'")).toBe(true);
+  });
+});
+
+describe("formatDiagnostic code rendering", () => {
+  it("renders [code] before the message when code is set", () => {
+    expect(formatDiagnostic({ ...base, code: "param-type-invalid" })).toContain(
+      "[param-type-invalid] Unexpected value 'x'",
+    );
+  });
+
+  it("omits the bracket prefix when code is absent", () => {
+    expect(formatDiagnostic(base)).not.toContain("[");
   });
 });

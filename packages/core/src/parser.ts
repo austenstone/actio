@@ -81,7 +81,7 @@ export interface ParseContext {
   diagnostics: Diagnostic[];
   /** Per-node provenance side-table; never serialized. Populated by the IR layer. */
   origins: WeakMap<object, Origin>;
-  /** Non-serialized pass scratch space. */
+  /** Non-serialized pass scratch space, namespaced by pass name (e.g. `internal.jobDefaults`). */
   internal: ParseContextInternal;
 }
 

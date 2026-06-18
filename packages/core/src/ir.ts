@@ -7,6 +7,7 @@ import {
   rangeOfPath,
   setKeyOrder,
 } from "./parser.js";
+import { isObject } from "./passes/helpers.js";
 
 export {
   conservativeTaint,
@@ -191,10 +192,6 @@ export interface StepView {
   index: number;
   path: Path;
   origin: Origin;
-}
-
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
 /** Visit each job, recording its origin on first sight. */
