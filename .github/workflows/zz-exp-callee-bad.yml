@@ -1,0 +1,11 @@
+# TEMPORARY experiment: deliberately broken reusable workflow.
+# `needs: [ghost]` references a non-existent job -> startup_failure IF validated.
+name: zz-exp-callee-bad
+on:
+  workflow_call:
+jobs:
+  a:
+    needs: [ghost]
+    runs-on: ubuntu-latest
+    steps:
+      - run: "true"
