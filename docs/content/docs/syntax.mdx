@@ -23,7 +23,7 @@ generated `.yml`.
 | [`executors`](#executors) | workflow | stripped; referenced via `executor` |
 | [`executor`](#executor) | job | stripped; preset merged into the job |
 | [`dynamic_matrix`](#dynamic_matrix) | job | setup job + matrix wiring |
-| [`when_compile`](#when_compile) | job, step | node kept or omitted at compile time |
+| [`static_if`](#static_if) | job, step | node kept or omitted at compile time |
 | [`inject`](#inject) | step | replaced by the fragment's steps |
 | [`retry`](#retry) | step | chain of conditional attempts |
 | [`fallback`](#fallback) | job, step | try/catch wiring |
@@ -39,7 +39,7 @@ Actio distinguishes compile-time from runtime expansion by the brace style:
 
 <Callout title="Don't mix them">
   `${{ params.* }}` is invalid — `params` only exist at compile time, so they must
-  use `{{ }}`. Conversely, `when_compile` takes a **bare** compile-time expression
+  use `{{ }}`. Conversely, `static_if` takes a **bare** compile-time expression
   and rejects `${{ }}` wrappers.
 </Callout>
 
@@ -211,7 +211,7 @@ jobs:
 
 `script` may be a path **or** an inline command. Full guide: [dynamic_matrix](/docs/macros/dynamic-matrix).
 
-### when_compile
+### static_if
 
 > Compile-time structural condition. The expression is evaluated by `actio build`;
 > if it's false, the entire job (or step) map is omitted from the emitted YAML.
@@ -236,7 +236,7 @@ jobs:
     steps:
       - run: ./build.sh
   publish:
-    when_compile: params.deploy
+    static_if: params.deploy
     runs-on: ubuntu-latest
     steps:
       - run: ./publish.sh
@@ -252,7 +252,7 @@ jobs:
       - run: ./build.sh
 ```
 
-**Conditional merge (form B).** A key shaped like `when_compile(<expr>)` maps to an
+**Conditional merge (form B).** A key shaped like `static_if(<expr>)` maps to an
 object that is merged into the parent only when the expression is true:
 
 ```yaml title=".actio.yml"
@@ -265,13 +265,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: npm test
-        when_compile(params.debug):
+        static_if(params.debug):
           env:
             RUNNER_DEBUG: "1"
 ```
 
 <Callout title="Compile-time only">
-  `when_compile` cannot reference runtime contexts like `github.*`, `env.*`, or
+  `static_if` cannot reference runtime contexts like `github.*`, `env.*`, or
   `secrets.*`, and rejects `${{ }}` wrappers. For runtime conditions, use the
   standard [`if:`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idif)
   key instead.
