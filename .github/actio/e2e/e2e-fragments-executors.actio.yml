@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/austenstone/actio/main/packages/core/schema/actio.schema.json
+
+# E2E: structural sugar smoke test. job_defaults supplies runs-on, an executor
+# injects job-level env, and a fragment injects a step. The assert proves all
+# three were applied at runtime.
+name: E2E Fragments + Executors
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+job_defaults:
+  runs-on: ubuntu-latest
+
+executors:
+  hardened:
+    env:
+      ACTIO_EXECUTOR: applied
+    timeout-minutes: 5
+
+fragments:
+  setup:
+    - name: Fragment step
+      run: echo "ACTIO_FRAGMENT=ran" >> "$GITHUB_ENV"
+
+jobs:
+  smoke:
+    executor: hardened
+    steps:
+      - inject: setup
+      - name: Assert fragment + executor applied
+        run: |
+          test "$ACTIO_FRAGMENT" = "ran"
+          test "$ACTIO_EXECUTOR" = "applied"
+          echo "structural sugar verified: job_defaults + executor + fragment applied"

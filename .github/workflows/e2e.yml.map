@@ -1,0 +1,472 @@
+{
+  "version": 1,
+  "generator": "actio",
+  "file": ".github/actio/e2e.yml",
+  "sources": [
+    ".github/actio/e2e.actio.yml"
+  ],
+  "mappings": [
+    {
+      "generated": {
+        "line": 5
+      },
+      "source": 0,
+      "original": {
+        "line": 5,
+        "col": 7
+      },
+      "path": "name"
+    },
+    {
+      "generated": {
+        "line": 7
+      },
+      "source": 0,
+      "original": {
+        "line": 7,
+        "col": 21
+      },
+      "path": "on.workflow_dispatch"
+    },
+    {
+      "generated": {
+        "line": 9
+      },
+      "source": 0,
+      "original": {
+        "line": 9,
+        "col": 13
+      },
+      "path": "on.schedule.0.cron"
+    },
+    {
+      "generated": {
+        "line": 11
+      },
+      "source": 0,
+      "original": {
+        "line": 11,
+        "col": 5
+      },
+      "path": "on.pull_request"
+    },
+    {
+      "generated": {
+        "line": 12
+      },
+      "source": 0,
+      "original": {
+        "line": 12,
+        "col": 9
+      },
+      "path": "on.pull_request.paths.0"
+    },
+    {
+      "generated": {
+        "line": 13
+      },
+      "source": 0,
+      "original": {
+        "line": 13,
+        "col": 9
+      },
+      "path": "on.pull_request.paths.1"
+    },
+    {
+      "generated": {
+        "line": 14
+      },
+      "source": 0,
+      "original": {
+        "line": 14,
+        "col": 9
+      },
+      "path": "on.pull_request.paths.2"
+    },
+    {
+      "generated": {
+        "line": 15
+      },
+      "source": 0,
+      "original": {
+        "line": 15,
+        "col": 9
+      },
+      "path": "on.pull_request.paths.3"
+    },
+    {
+      "generated": {
+        "line": 17
+      },
+      "source": 0,
+      "original": {
+        "line": 18,
+        "col": 13
+      },
+      "path": "permissions.contents"
+    },
+    {
+      "generated": {
+        "line": 19
+      },
+      "source": 0,
+      "original": {
+        "line": 21,
+        "col": 3
+      },
+      "path": "jobs"
+    },
+    {
+      "generated": {
+        "line": 20
+      },
+      "source": 0,
+      "original": {
+        "line": 22,
+        "col": 14
+      },
+      "path": "jobs.check.runs-on"
+    },
+    {
+      "generated": {
+        "line": 22
+      },
+      "source": 0,
+      "original": {
+        "line": 24,
+        "col": 15
+      },
+      "path": "jobs.check.steps.0.uses"
+    },
+    {
+      "generated": {
+        "line": 23
+      },
+      "source": 0,
+      "original": {
+        "line": 25,
+        "col": 15
+      },
+      "path": "jobs.check.steps.1.uses"
+    },
+    {
+      "generated": {
+        "line": 25
+      },
+      "source": 0,
+      "original": {
+        "line": 27,
+        "col": 25
+      },
+      "path": "jobs.check.steps.1.with.node-version"
+    },
+    {
+      "generated": {
+        "line": 26
+      },
+      "source": 0,
+      "original": {
+        "line": 28,
+        "col": 18
+      },
+      "path": "jobs.check.steps.1.with.cache"
+    },
+    {
+      "generated": {
+        "line": 27
+      },
+      "source": 0,
+      "original": {
+        "line": 29,
+        "col": 14
+      },
+      "path": "jobs.check.steps.2.run"
+    },
+    {
+      "generated": {
+        "line": 28
+      },
+      "source": 0,
+      "original": {
+        "line": 30,
+        "col": 14
+      },
+      "path": "jobs.check.steps.3.run"
+    },
+    {
+      "generated": {
+        "line": 29
+      },
+      "source": 0,
+      "original": {
+        "line": 31,
+        "col": 15
+      },
+      "path": "jobs.check.steps.4.name"
+    },
+    {
+      "generated": {
+        "line": 30
+      },
+      "source": 0,
+      "original": {
+        "line": 32,
+        "col": 14
+      },
+      "path": "jobs.check.steps.4.run"
+    },
+    {
+      "generated": {
+        "line": 32
+      },
+      "source": 0,
+      "original": {
+        "line": 35,
+        "col": 12
+      },
+      "path": "jobs.retry.needs"
+    },
+    {
+      "generated": {
+        "line": 33
+      },
+      "source": 0,
+      "original": {
+        "line": 36,
+        "col": 11
+      },
+      "path": "jobs.retry.uses"
+    },
+    {
+      "generated": {
+        "line": 35
+      },
+      "source": 0,
+      "original": {
+        "line": 39,
+        "col": 12
+      },
+      "path": "jobs.fallback_recover.needs"
+    },
+    {
+      "generated": {
+        "line": 36
+      },
+      "source": 0,
+      "original": {
+        "line": 40,
+        "col": 11
+      },
+      "path": "jobs.fallback_recover.uses"
+    },
+    {
+      "generated": {
+        "line": 38
+      },
+      "source": 0,
+      "original": {
+        "line": 43,
+        "col": 12
+      },
+      "path": "jobs.fallback_notify.needs"
+    },
+    {
+      "generated": {
+        "line": 39
+      },
+      "source": 0,
+      "original": {
+        "line": 44,
+        "col": 11
+      },
+      "path": "jobs.fallback_notify.uses"
+    },
+    {
+      "generated": {
+        "line": 41
+      },
+      "source": 0,
+      "original": {
+        "line": 47,
+        "col": 12
+      },
+      "path": "jobs.dynamic_matrix.needs"
+    },
+    {
+      "generated": {
+        "line": 42
+      },
+      "source": 0,
+      "original": {
+        "line": 48,
+        "col": 11
+      },
+      "path": "jobs.dynamic_matrix.uses"
+    },
+    {
+      "generated": {
+        "line": 44
+      },
+      "source": 0,
+      "original": {
+        "line": 51,
+        "col": 12
+      },
+      "path": "jobs.fragments_executors.needs"
+    },
+    {
+      "generated": {
+        "line": 45
+      },
+      "source": 0,
+      "original": {
+        "line": 52,
+        "col": 11
+      },
+      "path": "jobs.fragments_executors.uses"
+    },
+    {
+      "generated": {
+        "line": 47
+      },
+      "source": 0,
+      "original": {
+        "line": 55,
+        "col": 12
+      },
+      "path": "jobs.when_params.needs"
+    },
+    {
+      "generated": {
+        "line": 48
+      },
+      "source": 0,
+      "original": {
+        "line": 56,
+        "col": 11
+      },
+      "path": "jobs.when_params.uses"
+    },
+    {
+      "generated": {
+        "line": 50
+      },
+      "source": 0,
+      "original": {
+        "line": 59,
+        "col": 14
+      },
+      "path": "jobs.result.runs-on"
+    },
+    {
+      "generated": {
+        "line": 52
+      },
+      "source": 0,
+      "original": {
+        "line": 61,
+        "col": 9
+      },
+      "path": "jobs.result.needs.0"
+    },
+    {
+      "generated": {
+        "line": 53
+      },
+      "source": 0,
+      "original": {
+        "line": 62,
+        "col": 9
+      },
+      "path": "jobs.result.needs.1"
+    },
+    {
+      "generated": {
+        "line": 54
+      },
+      "source": 0,
+      "original": {
+        "line": 63,
+        "col": 9
+      },
+      "path": "jobs.result.needs.2"
+    },
+    {
+      "generated": {
+        "line": 55
+      },
+      "source": 0,
+      "original": {
+        "line": 64,
+        "col": 9
+      },
+      "path": "jobs.result.needs.3"
+    },
+    {
+      "generated": {
+        "line": 56
+      },
+      "source": 0,
+      "original": {
+        "line": 65,
+        "col": 9
+      },
+      "path": "jobs.result.needs.4"
+    },
+    {
+      "generated": {
+        "line": 57
+      },
+      "source": 0,
+      "original": {
+        "line": 66,
+        "col": 9
+      },
+      "path": "jobs.result.needs.5"
+    },
+    {
+      "generated": {
+        "line": 58
+      },
+      "source": 0,
+      "original": {
+        "line": 67,
+        "col": 9
+      },
+      "path": "jobs.result.needs.6"
+    },
+    {
+      "generated": {
+        "line": 59
+      },
+      "source": 0,
+      "original": {
+        "line": 68,
+        "col": 9
+      },
+      "path": "jobs.result.if"
+    },
+    {
+      "generated": {
+        "line": 61
+      },
+      "source": 0,
+      "original": {
+        "line": 70,
+        "col": 15
+      },
+      "path": "jobs.result.steps.0.name"
+    },
+    {
+      "generated": {
+        "line": 62
+      },
+      "source": 0,
+      "original": {
+        "line": 71,
+        "col": 14
+      },
+      "path": "jobs.result.steps.0.run"
+    }
+  ]
+}

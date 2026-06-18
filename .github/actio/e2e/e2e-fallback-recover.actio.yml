@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/austenstone/actio/main/packages/core/schema/actio.schema.json
+
+# E2E: step-level fallback with recover:true swallows the failure so the job
+# stays green, and the recover branch actually runs.
+name: E2E Fallback Recover
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Flaky
+        run: exit 1
+        fallback:
+          recover: true
+          steps:
+            - name: Recover
+              id: recover_step
+              run: echo "recovered=yes" >> "$GITHUB_OUTPUT"
+      - name: Assert recovery ran
+        run: |
+          test "${{ steps.recover_step.outputs.recovered }}" = "yes"
+          echo "fallback recover verified: failing step recovered, job green"

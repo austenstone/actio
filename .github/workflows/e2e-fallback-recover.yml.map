@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "generator": "actio",
+  "file": ".github/actio/e2e/e2e-fallback-recover.yml",
+  "sources": [
+    ".github/actio/e2e/e2e-fallback-recover.actio.yml"
+  ],
+  "mappings": [
+    {
+      "generated": {
+        "line": 5
+      },
+      "source": 0,
+      "original": {
+        "line": 5,
+        "col": 7
+      },
+      "path": "name"
+    },
+    {
+      "generated": {
+        "line": 7
+      },
+      "source": 0,
+      "original": {
+        "line": 7,
+        "col": 17
+      },
+      "path": "on.workflow_call"
+    },
+    {
+      "generated": {
+        "line": 8
+      },
+      "source": 0,
+      "original": {
+        "line": 8,
+        "col": 21
+      },
+      "path": "on.workflow_dispatch"
+    },
+    {
+      "generated": {
+        "line": 10
+      },
+      "source": 0,
+      "original": {
+        "line": 11,
+        "col": 13
+      },
+      "path": "permissions.contents"
+    },
+    {
+      "generated": {
+        "line": 12
+      },
+      "source": 0,
+      "original": {
+        "line": 14,
+        "col": 3
+      },
+      "path": "jobs"
+    },
+    {
+      "generated": {
+        "line": 13
+      },
+      "source": 0,
+      "original": {
+        "line": 15,
+        "col": 14
+      },
+      "path": "jobs.recover.runs-on"
+    },
+    {
+      "generated": {
+        "line": 15
+      },
+      "source": 0,
+      "original": {
+        "line": 17,
+        "col": 15
+      },
+      "path": "jobs.recover.steps.0.name"
+    },
+    {
+      "generated": {
+        "line": 16
+      },
+      "source": 0,
+      "original": {
+        "line": 18,
+        "col": 14
+      },
+      "path": "jobs.recover.steps.0.run"
+    },
+    {
+      "generated": {
+        "line": 19
+      },
+      "source": 0,
+      "original": {
+        "line": 17,
+        "col": 15
+      },
+      "path": "jobs.recover.steps.1.name"
+    },
+    {
+      "generated": {
+        "line": 20
+      },
+      "source": 0,
+      "original": {
+        "line": 17,
+        "col": 9
+      },
+      "path": "jobs.recover.steps.1.id"
+    },
+    {
+      "generated": {
+        "line": 21
+      },
+      "source": 0,
+      "original": {
+        "line": 18,
+        "col": 14
+      },
+      "path": "jobs.recover.steps.1.run"
+    },
+    {
+      "generated": {
+        "line": 22
+      },
+      "source": 0,
+      "original": {
+        "line": 17,
+        "col": 9
+      },
+      "path": "jobs.recover.steps.1.if"
+    },
+    {
+      "generated": {
+        "line": 23
+      },
+      "source": 0,
+      "original": {
+        "line": 25,
+        "col": 15
+      },
+      "path": "jobs.recover.steps.2.name"
+    },
+    {
+      "generated": {
+        "line": 24
+      },
+      "source": 0,
+      "original": {
+        "line": 26,
+        "col": 14
+      },
+      "path": "jobs.recover.steps.2.run"
+    }
+  ]
+}

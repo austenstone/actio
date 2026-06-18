@@ -368,6 +368,50 @@
         "col": 14
       },
       "path": "jobs.workflows.steps.4.run"
+    },
+    {
+      "generated": {
+        "line": 50
+      },
+      "source": 0,
+      "original": {
+        "line": 54,
+        "col": 14
+      },
+      "path": "jobs.lint-workflows.runs-on"
+    },
+    {
+      "generated": {
+        "line": 52
+      },
+      "source": 0,
+      "original": {
+        "line": 56,
+        "col": 15
+      },
+      "path": "jobs.lint-workflows.steps.0.uses"
+    },
+    {
+      "generated": {
+        "line": 53
+      },
+      "source": 0,
+      "original": {
+        "line": 57,
+        "col": 15
+      },
+      "path": "jobs.lint-workflows.steps.1.name"
+    },
+    {
+      "generated": {
+        "line": 54
+      },
+      "source": 0,
+      "original": {
+        "line": 58,
+        "col": 14
+      },
+      "path": "jobs.lint-workflows.steps.1.run"
     }
   ]
 }
