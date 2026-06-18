@@ -42,7 +42,17 @@ function stripExprWrapper(cond: string): string {
 }
 
 function needsParens(expr: string): boolean {
-  return /\s\|\|\s/.test(expr);
+  // Wrap only when a `||` sits at the top level (depth 0). GitHub allows the
+  // spaceless `a||b` form, so a whitespace check misses it; tracking paren depth
+  // also avoids double-wrapping an already-grouped `(a||b)`.
+  let depth = 0;
+  for (let i = 0; i < expr.length; i++) {
+    const ch = expr[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if (depth === 0 && ch === "|" && expr[i + 1] === "|") return true;
+  }
+  return false;
 }
 
 /** Combine GitHub `if` conditions with `&&`, normalizing `${{ }}` wrappers. */
