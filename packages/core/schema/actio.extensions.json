@@ -47,8 +47,14 @@
         "dynamic_matrix": { "$ref": "#/definitions/dynamicMatrix" },
         "fallback": { "$ref": "#/definitions/fallback" },
         "executor": {
-          "type": "string",
-          "description": "Actio macro. Name of an entry under top-level `executors:`. Expanded during compile and stripped from output."
+          "description": "Actio macro. Name (or ordered list of names) from top-level `executors:`. Expanded during compile and stripped from output.",
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          ]
         }
       }
     }
@@ -153,9 +159,15 @@
       "additionalProperties": false,
       "properties": {
         "runs-on": { "$ref": "#/definitions/normalJob/properties/runs-on" },
+        "timeout-minutes": {
+          "$ref": "#/definitions/normalJob/properties/timeout-minutes"
+        },
+        "permissions": { "$ref": "#/definitions/normalJob/properties/permissions" },
+        "concurrency": { "$ref": "#/definitions/normalJob/properties/concurrency" },
         "container": { "$ref": "#/definitions/normalJob/properties/container" },
         "services": { "$ref": "#/definitions/normalJob/properties/services" },
-        "env": { "$ref": "#/definitions/env" }
+        "env": { "$ref": "#/definitions/env" },
+        "defaults": { "$ref": "#/definitions/normalJob/properties/defaults" }
       }
     },
     "retry": {

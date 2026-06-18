@@ -124,6 +124,24 @@ jobs:
     steps:
       - run: echo hi`);
     expect(validate(doc)).toBe(false);
+});
+
+  it("accepts executor arrays and executor definitions with timeout/permissions", () => {
+    const doc = load(`on: [push]
+executors:
+  hardened:
+    permissions:
+      contents: read
+    timeout-minutes: 10
+  gpu:
+    runs-on: [self-hosted, gpu]
+jobs:
+  release:
+    executor: [hardened, gpu]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo release`);
+    expect(validate(doc)).toBe(true);
   });
 
   it("starter still transpiles cleanly with the modeline present", () => {

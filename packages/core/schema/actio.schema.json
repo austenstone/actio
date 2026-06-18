@@ -1033,8 +1033,18 @@
           "$ref": "#/definitions/fallback"
         },
         "executor": {
-          "type": "string",
-          "description": "Actio macro. Name of an entry under top-level `executors:`. Expanded during compile and stripped from output."
+          "description": "Actio macro. Name (or ordered list of names) from top-level `executors:`. Expanded during compile and stripped from output.",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
         }
       },
       "required": [
@@ -1349,6 +1359,15 @@
         "runs-on": {
           "$ref": "#/definitions/normalJob/properties/runs-on"
         },
+        "timeout-minutes": {
+          "$ref": "#/definitions/normalJob/properties/timeout-minutes"
+        },
+        "permissions": {
+          "$ref": "#/definitions/normalJob/properties/permissions"
+        },
+        "concurrency": {
+          "$ref": "#/definitions/normalJob/properties/concurrency"
+        },
         "container": {
           "$ref": "#/definitions/normalJob/properties/container"
         },
@@ -1357,6 +1376,9 @@
         },
         "env": {
           "$ref": "#/definitions/env"
+        },
+        "defaults": {
+          "$ref": "#/definitions/normalJob/properties/defaults"
         }
       }
     },
