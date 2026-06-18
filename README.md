@@ -41,13 +41,13 @@ Requires Node ≥ 20.
 
 ```bash
 # scaffold a starter source file
-npx actio init ci.actio.yml
+npx actio-cli init ci.actio.yml
 
 # compile *.actio.yml → .github/workflows/*.yml
-npx actio build
+npx actio-cli build
 
 # CI drift check (fails if generated output is stale)
-npx actio check
+npx actio-cli check
 ```
 
 **Recommended layout:** keep sources in `.github/actio/` and compile them into
