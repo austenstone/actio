@@ -281,9 +281,17 @@ const findParamsRootRuntimeExpressions = (value: string): string[] => {
             index += 2;
             continue;
           }
-          if (quote === '"' && value[index - 1] === "\\") {
-            index++;
-            continue;
+          if (quote === '"') {
+            let bs = 0;
+            let j = index - 1;
+            while (j >= bodyStart && value[j] === "\\") {
+              bs++;
+              j--;
+            }
+            if (bs % 2 === 1) {
+              index++;
+              continue;
+            }
           }
           quote = undefined;
         }

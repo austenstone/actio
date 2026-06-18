@@ -311,6 +311,207 @@ jobs:
     );
   });
 
+  it("detects params after even backslash run closes a double-quoted string", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format("a\\\\", params.env) }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
+  it("does not flag params inside an odd-backslash-escaped double quote", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format("a\\"b", github.ref) }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      false,
+    );
+  });
+
+  it("handles trailing backslash in string without regression on normal close", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format("path\\\\end", params.env) }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
+  it("catches params after a single-quoted literal containing }} (format)", () => {
+    const errors = noValidateErrorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format('}}', params.env) }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
+  it("catches params after a single-quoted literal containing }} (startsWith)", () => {
+    const errors = noValidateErrorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ startsWith('a}}b', params.env) }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
+  it("catches params after a double-quoted literal containing }} (format)", () => {
+    const errors = noValidateErrorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo '\${{ format("}}", params.env) }}'
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
+  it("catches params after a double-quoted literal containing }} (startsWith)", () => {
+    const errors = noValidateErrorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo '\${{ startsWith("a}}b", params.env) }}'
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
+  it("honors '' escaping inside a single-quoted literal containing }}", () => {
+    const errors = noValidateErrorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format('a''}}b', params.env) }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
+  it("resyncs across a benign expression to catch a later }}-in-literal evasion", () => {
+    const errors = noValidateErrorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ github.sha }} \${{ format('}}', params.env) }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
+  it("does not flag a }}-bearing literal that has no params root", () => {
+    const errors = noValidateErrorsFor(`name: x
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format('}}', github.ref) }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      false,
+    );
+  });
+
+  it("catches params after an escaped double quote inside a }}-bearing literal", () => {
+    const errors = noValidateErrorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo '\${{ format("a\\"}}", params.env) }}'
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
   it("does not treat compile-time sigils as runtime params usage", () => {
     const errors = errorsFor(`name: x
 on: [push]
