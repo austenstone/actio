@@ -108,6 +108,45 @@ jobs:
     expect(job.if).toContain("!= ''");
   });
 
+  it("keeps inline strategy over dynamic_matrix while dynamic_matrix still overrides inherited defaults", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+job_defaults:
+  strategy:
+    matrix:
+      from_default: [a, b]
+    fail-fast: true
+jobs:
+  inline_wins:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      script: echo '["x"]'
+      alias: shard
+    strategy:
+      matrix:
+        keep: [manual]
+      fail-fast: true
+    steps:
+      - run: echo \${{ matrix.keep }}
+  defaults_overridden:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      script: echo '["y"]'
+      alias: shard
+    steps:
+      - run: echo \${{ matrix.shard }}
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.inline_wins.strategy).toEqual({
+      matrix: { keep: ["manual"] },
+      "fail-fast": true,
+    });
+    expect(doc.jobs.defaults_overridden.strategy).toEqual({
+      matrix: { shard: "${{ fromJSON(needs.actio_setup_defaults_overridden.outputs.matrix) }}" },
+      "fail-fast": true,
+    });
+  });
+
   it("auto-adds checkout when the script is a local path", () => {
     const { doc } = build(src);
     expect(doc.jobs.actio_setup_test.steps[0]).toEqual({ uses: "actions/checkout@v4" });
@@ -485,6 +524,28 @@ jobs:
     ).toBe(true);
   });
 
+  it("warns when executor is an empty list", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+executors:
+  linux:
+    runs-on: ubuntu-latest
+jobs:
+  test:
+    executor: []
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(true);
+    expect(errors).toEqual([]);
+    expect(
+      result.diagnostics.some(
+        (d) => d.severity === "warning" && d.message.includes("[executor-empty]"),
+      ),
+    ).toBe(true);
+  });
+
   it("exports helper APIs and preserves stripped templates for downstream passes", () => {
     expect(typeof applyDefaults).toBe("function");
     expect(typeof applyExecutor).toBe("function");
@@ -534,6 +595,11 @@ jobs:
     applyExecutor(singleJob, { permissions: { contents: "read" } });
     expect(singleJob["timeout-minutes"]).toBe(22);
     expect(singleJob.permissions).toEqual({ contents: "read" });
+
+    const blankIfJob: Job = { if: "" };
+    applyDefaults(blankIfJob, { if: "" });
+    expect(blankIfJob.if).toBeUndefined();
+    expect(Object.hasOwn(blankIfJob, "if")).toBe(false);
   });
 
   it("AND-combines wrapped expressions without mangling runtime syntax", () => {
@@ -613,6 +679,32 @@ jobs:
     expect(doc.jobs.tuned.permissions).toEqual({ "pull-requests": "write" });
     expect(doc.jobs.tuned["timeout-minutes"]).toBe(5);
     expect(doc.jobs.tuned["runs-on"]).toBe("ubuntu-latest");
+  });
+
+  it("replaces runs-on objects for REPLACE_KEYS across executor compose and apply", () => {
+    const { result, errors, doc } = build(`name: x
+on: [push]
+job_defaults:
+  runs-on:
+    group: default-group
+    labels: default-label
+executors:
+  base:
+    runs-on:
+      group: base-group
+      labels: base-label
+  final:
+    runs-on:
+      group: final-group
+jobs:
+  test:
+    executor: [base, final]
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(true);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.test["runs-on"]).toEqual({ group: "final-group" });
   });
 
   it("rejects structural keys in job_defaults", () => {

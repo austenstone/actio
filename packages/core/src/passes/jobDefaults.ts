@@ -23,7 +23,7 @@ const EXECUTOR_KEYS = JOB_DEFAULT_KEYS.filter(
 );
 
 const CALL_JOB_DEFAULT_KEYS = new Set<string>(["if", "permissions", "concurrency", "strategy"]);
-const REPLACE_ON_PRESENCE_KEYS = new Set(["permissions", "concurrency"]);
+const REPLACE_ON_PRESENCE_KEYS = new Set(["permissions", "concurrency", "strategy"]);
 const REPLACE_KEYS = new Set(["runs-on", "timeout-minutes"]);
 const REJECTED_TEMPLATE_KEYS = new Set([
   "steps",
@@ -277,6 +277,14 @@ function parseExecutorRefs(
     }
     refs.push(value.trim());
   });
+  if (valid && refs.length === 0) {
+    pushDiagnostic(
+      ctx,
+      "warning",
+      `[executor-empty] Job "${jobId}": executor list is empty; no executor settings will be applied`,
+      ["jobs", jobId, "executor"],
+    );
+  }
   return valid ? refs : undefined;
 }
 
@@ -304,6 +312,14 @@ export function jobDefaultsPass(ctx: ParseContext): void {
   const availableExecutors = Object.keys(executors);
 
   visitJobs(ctx, ({ id: jobId, job }) => {
+    if (Object.hasOwn(job, "strategy")) {
+      if (!ctx.internal.jobDefaults) ctx.internal.jobDefaults = {};
+      if (!ctx.internal.jobDefaults.inlineStrategyJobs) {
+        ctx.internal.jobDefaults.inlineStrategyJobs = {};
+      }
+      ctx.internal.jobDefaults.inlineStrategyJobs[jobId] = true;
+    }
+
     const usesJob = isReusableCallJob(job);
     const inlineKeys = collectInlineKeys(job);
 

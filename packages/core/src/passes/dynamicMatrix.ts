@@ -180,19 +180,31 @@ function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId:
   const dm = job.dynamic_matrix as DM;
   const alias = opt<string>(dm, "alias", "as");
   const matrixExpr = `\${{ fromJSON(needs.${setupId}.outputs.matrix) }}`;
+  const inlineStrategy = ctx.internal.jobDefaults?.inlineStrategyJobs?.[jobId] === true;
 
   job.needs = mergeNeeds(job.needs, [setupId]);
 
   const strategy: Record<string, unknown> = isObject(job.strategy) ? job.strategy : {};
   if (strategy.matrix !== undefined) {
-    pushDiagnostic(
-      ctx,
-      "warning",
-      `Job "${jobId}": existing strategy.matrix is overwritten by dynamic_matrix`,
-      ["jobs", jobId, "strategy", "matrix"],
-    );
+    if (inlineStrategy) {
+      pushDiagnostic(
+        ctx,
+        "warning",
+        `Job "${jobId}": inline strategy.matrix is preserved; dynamic_matrix matrix output is ignored`,
+        ["jobs", jobId, "strategy", "matrix"],
+      );
+    } else {
+      pushDiagnostic(
+        ctx,
+        "warning",
+        `Job "${jobId}": existing strategy.matrix is overwritten by dynamic_matrix`,
+        ["jobs", jobId, "strategy", "matrix"],
+      );
+      strategy.matrix = alias ? { [alias]: matrixExpr } : matrixExpr;
+    }
+  } else {
+    strategy.matrix = alias ? { [alias]: matrixExpr } : matrixExpr;
   }
-  strategy.matrix = alias ? { [alias]: matrixExpr } : matrixExpr;
 
   const failFast = opt<boolean>(dm, "fail-fast", "fail_fast");
   if (failFast !== undefined) {
