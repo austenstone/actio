@@ -8,6 +8,8 @@ const JOB_DEFAULT_KEYS = [
   "permissions",
   "concurrency",
   "strategy",
+  "continue-on-error",
+  "environment",
   "timeout-minutes",
   "runs-on",
   "env",
@@ -19,12 +21,12 @@ const JOB_DEFAULT_KEYS = [
 type JobDefaultKey = (typeof JOB_DEFAULT_KEYS)[number];
 
 const EXECUTOR_KEYS = JOB_DEFAULT_KEYS.filter(
-  (key): key is Exclude<JobDefaultKey, "if"> => key !== "if",
+  (key): key is Exclude<JobDefaultKey, "if" | "strategy"> => key !== "if" && key !== "strategy",
 );
 
 const CALL_JOB_DEFAULT_KEYS = new Set<string>(["if", "permissions", "concurrency", "strategy"]);
 const REPLACE_ON_PRESENCE_KEYS = new Set(["permissions", "concurrency", "strategy"]);
-const REPLACE_KEYS = new Set(["runs-on", "timeout-minutes"]);
+const REPLACE_KEYS = new Set(["runs-on", "timeout-minutes", "continue-on-error", "environment"]);
 const REJECTED_TEMPLATE_KEYS = new Set([
   "steps",
   "needs",

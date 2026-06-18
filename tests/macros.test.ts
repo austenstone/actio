@@ -487,6 +487,27 @@ jobs:
     expect(errors.some((d) => d.message.includes('Executor "bad" must be a mapping'))).toBe(true);
   });
 
+  it("rejects unsupported keys in executor definitions", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+executors:
+  bad:
+    strategy:
+      fail-fast: false
+jobs:
+  test:
+    executor: bad
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes("executor-rejected-key"))).toBe(true);
+    expect(errors.some((d) => d.message.includes('Key "strategy" is not supported here'))).toBe(
+      true,
+    );
+  });
+
   it("errors when executor is used on a reusable-workflow call job", () => {
     const { result, errors } = build(`name: x
 on: [push]
@@ -638,6 +659,33 @@ jobs:
     expect(result.ok).toBe(true);
     expect(errors).toEqual([]);
     expect(doc.jobs.test.permissions).toEqual({ issues: "write" });
+  });
+
+  it("applies and replaces continue-on-error/environment from job_defaults", () => {
+    const { result, errors, doc } = build(`name: x
+on: [push]
+job_defaults:
+  continue-on-error: true
+  environment: staging
+jobs:
+  inherit:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo inherit
+  replace:
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    environment:
+      name: production
+    steps:
+      - run: echo replace
+`);
+    expect(result.ok).toBe(true);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.inherit["continue-on-error"]).toBe(true);
+    expect(doc.jobs.inherit.environment).toBe("staging");
+    expect(doc.jobs.replace["continue-on-error"]).toBe(false);
+    expect(doc.jobs.replace.environment).toEqual({ name: "production" });
   });
 
   it("composes executor arrays left-to-right and keeps job inline keys authoritative", () => {

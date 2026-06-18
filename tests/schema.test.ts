@@ -144,6 +144,52 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
+  it("rejects strategy in executor definitions", () => {
+    const doc = load(`on: [push]
+executors:
+  bad:
+    strategy:
+      fail-fast: false
+jobs:
+  test:
+    executor: bad
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("accepts all allowlisted executor keys including continue-on-error and environment", () => {
+    const doc = load(`on: [push]
+executors:
+  full:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    environment: staging
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    concurrency:
+      group: ci
+    container:
+      image: node:20
+    services:
+      redis:
+        image: redis:7
+    env:
+      CI: "true"
+    defaults:
+      run:
+        shell: bash
+jobs:
+  test:
+    executor: full
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(true);
+  });
+
   it("accepts job_defaults strategy for reusable-workflow caller jobs", () => {
     const doc = load(`on: [push]
 job_defaults:
@@ -154,6 +200,19 @@ job_defaults:
 jobs:
   call:
     uses: org/repo/.github/workflows/reuse.yml@main`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts continue-on-error and environment in job_defaults", () => {
+    const doc = load(`on: [push]
+job_defaults:
+  continue-on-error: true
+  environment: staging
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
     expect(validate(doc)).toBe(true);
   });
 
