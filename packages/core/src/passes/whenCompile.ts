@@ -355,6 +355,55 @@ const collectRefNodes = (expr: ExprNode, refs: RefNode[] = []): RefNode[] => {
   return refs;
 };
 
+interface RefUsage {
+  segments: PathSegment[];
+  hasStrictUsage: boolean;
+  hasDefinedProbeUsage: boolean;
+}
+
+const collectRefUsage = (
+  expr: ExprNode,
+  usage = new Map<string, RefUsage>(),
+  options: { inDefinedProbeArg: boolean } = { inDefinedProbeArg: false },
+): Map<string, RefUsage> => {
+  if (expr.kind === "ref") {
+    const key = refToString(expr.segments);
+    const existing = usage.get(key);
+    if (existing) {
+      if (options.inDefinedProbeArg) existing.hasDefinedProbeUsage = true;
+      else existing.hasStrictUsage = true;
+      return usage;
+    }
+    usage.set(key, {
+      segments: expr.segments,
+      hasStrictUsage: !options.inDefinedProbeArg,
+      hasDefinedProbeUsage: options.inDefinedProbeArg,
+    });
+    return usage;
+  }
+
+  if (expr.kind === "unary") {
+    collectRefUsage(expr.expr, usage, options);
+    return usage;
+  }
+
+  if (expr.kind === "binary") {
+    collectRefUsage(expr.left, usage, options);
+    collectRefUsage(expr.right, usage, options);
+    return usage;
+  }
+
+  if (expr.kind === "call") {
+    expr.args.forEach((arg, index) => {
+      const inDefinedProbeArg = expr.name === "defined" && index === 0 && arg.kind === "ref";
+      collectRefUsage(arg, usage, { inDefinedProbeArg });
+    });
+    return usage;
+  }
+
+  return usage;
+};
+
 const normalizePathSegment = (segment: PathSegment): string | number => {
   if (typeof segment === "number") return segment;
   if (typeof segment === "string") return segment;
@@ -620,16 +669,19 @@ const evaluateWhenCompile = (
     return undefined;
   }
 
+  const refUsage = collectRefUsage(parsed);
   const resolvedRefs = new Map<string, unknown>();
   let hadUndefinedReference = false;
-  for (const ref of refs) {
-    const refKey = refToString(ref.segments);
-    if (resolvedRefs.has(refKey)) continue;
-    const resolved = resolveSymbolReference(ctx, ref.segments);
+  for (const [refKey, usage] of refUsage) {
+    const resolved = resolveSymbolReference(ctx, usage.segments);
     if (!resolved.resolved) {
+      if (usage.hasDefinedProbeUsage && !usage.hasStrictUsage) {
+        resolvedRefs.set(refKey, undefined);
+        continue;
+      }
       hadUndefinedReference = true;
-      const root = ref.segments[0];
-      const second = ref.segments[1];
+      const root = usage.segments[0];
+      const second = usage.segments[1];
       const maybeSuggestion =
         root === "params" && typeof second === "string" ? suggestParamName(ctx, second) : undefined;
       pushDiagnostic(

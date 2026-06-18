@@ -46,17 +46,7 @@ describe("sortPasses", () => {
     expect(fragmentsPass?.runsAfter ?? []).toContain("when_compile");
   });
 
-  it("keeps params before fragments because of dependency metadata", () => {
-    const ordered = sortPasses(builtinPasses).map((pass) => pass.name);
-    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("fragments"));
-    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("when_compile"));
-    expect(ordered.indexOf("when_compile")).toBeLessThan(ordered.indexOf("fragments"));
-    expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("retry"));
-    expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
-    expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("dynamic_matrix"));
-  });
-
-  it("keeps when_compile before fragments even when input order is shuffled", () => {
+  it("enforces when_compile before fragments from metadata even with shuffled input", () => {
     const byName = new Map(builtinPasses.map((pass) => [pass.name, pass]));
     const shuffled = [
       byName.get("fragments"),
@@ -69,6 +59,9 @@ describe("sortPasses", () => {
     const ordered = sortPasses(shuffled).map((pass) => pass.name);
     expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("when_compile"));
     expect(ordered.indexOf("when_compile")).toBeLessThan(ordered.indexOf("fragments"));
+    expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("retry"));
+    expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
+    expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("dynamic_matrix"));
   });
 
   it("ignores forward dependency references to not-yet-registered passes", () => {

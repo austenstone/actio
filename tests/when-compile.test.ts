@@ -658,6 +658,33 @@ jobs:
     ]);
   });
 
+  it("treats unresolved refs in defined() as false without undefined-ref diagnostics", () => {
+    const result = transpileResult(`name: x
+on: [push]
+params:
+  profile:
+    type: object
+    default: {}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo always
+      - run: echo probe
+        when_compile: defined(params.profile.flags.ship)
+`);
+    expect(result.ok).toBe(true);
+    expect(
+      result.diagnostics.some((diagnostic) =>
+        diagnostic.message.includes("[when-compile-undefined-ref]"),
+      ),
+    ).toBe(false);
+    const doc = parse(result.yaml) as {
+      jobs: { build: { steps: Array<{ run?: string }> } };
+    };
+    expect(doc.jobs.build.steps.map((step) => step.run)).toEqual(["echo always"]);
+  });
+
   it("reports undefined refs for out-of-range array access", () => {
     const errors = transpileErrors(`name: x
 on: [push]
