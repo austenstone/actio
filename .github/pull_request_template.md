@@ -16,8 +16,7 @@
 - [ ] `npm run build` passes.
 - [ ] `npm test` passes.
 - [ ] `npm run test:coverage` passes.
-- [ ] `npm run test:mutation` passes.
+- [ ] Macro or transpiler PR: `npm run test:mutation` passes locally or the manual `Mutation` workflow is green.
 - [ ] `npm run build:workflows && npm run check:workflows` passes when workflow sources changed.
 
 ## Notes
-
