@@ -55,6 +55,6 @@ export function annotatePass(ctx: ParseContext): void {
  */
 export const annotate: Pass = {
   name: "annotate",
-  runsAfter: ["fragments", "retry", "fallback", "dynamic_matrix"],
+  runsAfter: ["fragments", "retry", "fallback", "dynamic_matrix", "lifecycle"],
   apply: annotatePass,
 };

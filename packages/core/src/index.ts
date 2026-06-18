@@ -60,6 +60,7 @@ export {
   fragments,
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,
+  lifecycle,
   type Pass,
   type PassFn,
   PassRegistry,

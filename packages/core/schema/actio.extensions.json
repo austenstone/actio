@@ -30,6 +30,12 @@
       "type": "object",
       "description": "Actio macro. Named runner/container/service presets referenced by `jobs.<id>.executor`. Stripped from generated workflow YAML.",
       "additionalProperties": { "$ref": "#/definitions/executorDefinition" }
+    },
+    "finally": {
+      "$ref": "#/definitions/finallyBlock",
+      "title": "finally (Actio macro)",
+      "description": "Actio macro. Workflow-scoped teardown. Each named entry compiles to an aggregator job that `needs:` every real job and runs on the normal path (`if: !cancelled()`), plus an auto cancel-companion (`if: cancelled()`, `timeout-minutes: 5`). Nest `on_success`/`on_failure`/`on_abort` for outcome-branch jobs. Use `ensure:` for job/step-scoped teardown, not `finally:`.",
+      "markdownDescription": "**Actio macro**: workflow-scoped teardown (sibling to `jobs:`).\n\nEach named entry compiles to an aggregator job that `needs:` every real job and runs on the normal path (`if: !cancelled()`), plus an auto cancel-companion (`if: cancelled()`, `timeout-minutes: 5`). Nest `on_success`/`on_failure`/`on_abort` for outcome-branch jobs; `on_abort: []` opts out of the cancel job.\n\n```yaml\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./deploy.sh\nfinally:\n  teardown:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./cleanup.sh\n```\n\nFor job/step teardown use `ensure:` instead."
     }
   },
   "patchDefinitions": {
@@ -49,7 +55,27 @@
         },
         "retry": { "$ref": "#/definitions/retry" },
         "fallback": { "$ref": "#/definitions/fallback" },
-        "share": { "$ref": "#/definitions/share" }
+        "share": { "$ref": "#/definitions/share" },
+        "ensure": {
+          "$ref": "#/definitions/lifecycleHook",
+          "title": "ensure (Actio macro)",
+          "description": "Actio macro. Same-step teardown. The listed steps are spliced in right after this step, each guarded with `if: always()`, so they run even if the step fails or is cancelled."
+        },
+        "on_success": {
+          "$ref": "#/definitions/lifecycleHook",
+          "title": "on_success (Actio macro)",
+          "description": "Actio macro. Steps to run after this step only when the step succeeded. Guarded with `if: success() && steps.<id>.outcome == 'success'`."
+        },
+        "on_failure": {
+          "$ref": "#/definitions/lifecycleHook",
+          "title": "on_failure (Actio macro)",
+          "description": "Actio macro. Steps to run after this step only when the step failed. Guarded with `if: !cancelled() && steps.<id>.outcome == 'failure'` (keys on outcome, pre-continue-on-error)."
+        },
+        "on_abort": {
+          "$ref": "#/definitions/lifecycleHook",
+          "title": "on_abort (Actio macro)",
+          "description": "Actio macro. Steps to run after this step on cancellation. At step scope this only sees step-level cancellation; run-level cancel belongs in a workflow `finally:`."
+        }
       },
       "patternProperties": {
         "^static_if\\(.+\\)$": {
@@ -69,6 +95,26 @@
         },
         "dynamic_matrix": { "$ref": "#/definitions/dynamicMatrix" },
         "fallback": { "$ref": "#/definitions/fallback" },
+        "ensure": {
+          "$ref": "#/definitions/lifecycleHook",
+          "title": "ensure (Actio macro)",
+          "description": "Actio macro. Same-job teardown. The listed steps are appended to this job, each guarded with `if: always()`, so they run even if earlier steps fail or the job is cancelled (bounded by the job timeout)."
+        },
+        "on_success": {
+          "$ref": "#/definitions/lifecycleHook",
+          "title": "on_success (Actio macro)",
+          "description": "Actio macro. Steps appended to this job that run only when the job succeeded. Guarded with `if: success()`."
+        },
+        "on_failure": {
+          "$ref": "#/definitions/lifecycleHook",
+          "title": "on_failure (Actio macro)",
+          "description": "Actio macro. Steps appended to this job that run only when the job failed. Guarded with `if: failure()`."
+        },
+        "on_abort": {
+          "$ref": "#/definitions/lifecycleHook",
+          "title": "on_abort (Actio macro)",
+          "description": "Actio macro. Steps appended to this job that run only when the job was cancelled. Guarded with `if: cancelled()` (bounded by the job timeout)."
+        },
         "executor": {
           "description": "Actio macro. Name (or ordered list of names) from top-level `executors:`. Expanded during compile and stripped from output.",
           "oneOf": [
@@ -387,6 +433,56 @@
           "description": "Value for `strategy.fail-fast` on the matrix job. Defaults to false."
         },
         "id": { "type": "string", "description": "Override the generated setup job id." }
+      }
+    },
+    "lifecycleHook": {
+      "type": "array",
+      "title": "lifecycle hook (Actio macro)",
+      "description": "Actio macro. An ordered list of teardown/outcome steps attached to a step or job. Compiled into guarded steps and stripped from the generated workflow.",
+      "items": { "$ref": "#/definitions/step" }
+    },
+    "finallyBlock": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/finallyJob" },
+      "properties": {
+        "on_success": {
+          "$ref": "#/definitions/finallyBranchGroup",
+          "description": "Actio macro. Named teardown jobs that run only when the workflow succeeded (`if: success()`)."
+        },
+        "on_failure": {
+          "$ref": "#/definitions/finallyBranchGroup",
+          "description": "Actio macro. Named teardown jobs that run only when the workflow failed (`if: failure()`)."
+        },
+        "on_abort": {
+          "description": "Actio macro. Cancel-path teardown. A mapping of named jobs replaces the auto cancel-companion; an empty list (`[]`) opts out of any cancel job while the normal-path aggregator still runs.",
+          "oneOf": [
+            { "$ref": "#/definitions/finallyBranchGroup" },
+            {
+              "type": "array",
+              "maxItems": 0,
+              "description": "Explicit opt-out: emit no cancel-path job."
+            }
+          ]
+        }
+      }
+    },
+    "finallyBranchGroup": {
+      "type": "object",
+      "description": "Actio macro. A mapping of named teardown jobs for one outcome branch.",
+      "additionalProperties": { "$ref": "#/definitions/finallyJob" }
+    },
+    "finallyJob": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Actio macro. A teardown job. Accepts standard job keys plus the Actio `when:` sugar; Actio injects `needs:` over all real jobs and the appropriate outcome guard at compile time.",
+      "properties": {
+        "when": {
+          "type": "string",
+          "title": "when (Actio macro)",
+          "description": "Actio sugar inside a finally job. Gate on another job's result, e.g. `deploy.failed` → `needs.deploy.result == 'failure'`. States: failed, succeeded, cancelled, skipped. The referenced job is force-added to this job's `needs:`."
+        },
+        "runs-on": { "$ref": "#/definitions/normalJob/properties/runs-on" },
+        "steps": { "$ref": "#/definitions/normalJob/properties/steps" }
       }
     }
   }
