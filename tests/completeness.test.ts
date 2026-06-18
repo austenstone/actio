@@ -17,6 +17,7 @@ const fixtureDirsByPassName: Record<string, string[]> = {
     "job-defaults-if-combine",
     "job-defaults-shape-aware",
     "executors-expansion",
+    "executors-compose",
   ],
   retry: ["retry-basic", "retry-delay", "retry-shorthand"],
 };

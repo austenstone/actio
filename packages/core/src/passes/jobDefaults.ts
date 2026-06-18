@@ -3,11 +3,64 @@ import type { ParseContext } from "../parser.js";
 import { combineIf, isObject, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
-const CALL_JOB_DEFAULT_KEYS = new Set(["if", "permissions", "strategy", "concurrency"]);
+const JOB_DEFAULT_KEYS = [
+  "if",
+  "permissions",
+  "concurrency",
+  "timeout-minutes",
+  "runs-on",
+  "env",
+  "container",
+  "services",
+  "defaults",
+] as const;
+
+const EXECUTOR_KEYS = [
+  "permissions",
+  "concurrency",
+  "timeout-minutes",
+  "runs-on",
+  "env",
+  "container",
+  "services",
+  "defaults",
+] as const;
+
+const CALL_JOB_DEFAULT_KEYS = new Set<string>(["if", "permissions", "concurrency"]);
 const REPLACE_ON_PRESENCE_KEYS = new Set(["permissions", "concurrency"]);
-const EXECUTOR_KEYS = ["runs-on", "container", "services", "env"] as const;
+const REPLACE_KEYS = new Set(["runs-on", "timeout-minutes"]);
+const REJECTED_TEMPLATE_KEYS = new Set([
+  "steps",
+  "needs",
+  "uses",
+  "with",
+  "secrets",
+  "strategy",
+  "name",
+  "outputs",
+]);
+const MACRO_KEYS = new Set([
+  "inject",
+  "retry",
+  "fallback",
+  "dynamic_matrix",
+  "for_each",
+  "executor",
+]);
+
+export const JOB_DEFAULTS_SAFE_SUBSET = new Set<string>([
+  "if",
+  "permissions",
+  "concurrency",
+  "env",
+  "timeout-minutes",
+]);
 
 type ExecutorKey = (typeof EXECUTOR_KEYS)[number];
+type JobDefaultKey = (typeof JOB_DEFAULT_KEYS)[number];
+type InlinePresence = Record<JobDefaultKey | ExecutorKey, boolean>;
+
+const EXECUTOR_KEY_SET = new Set<string>(EXECUTOR_KEYS);
 
 function clone<T>(value: T): T {
   return structuredClone(value);
@@ -40,12 +93,15 @@ function mergeDefaultValue(key: string, inherited: unknown, current: unknown): u
   if (REPLACE_ON_PRESENCE_KEYS.has(key)) {
     return current === undefined ? clone(inherited) : current;
   }
+  if (current !== undefined && REPLACE_KEYS.has(key)) {
+    return current;
+  }
   if (current === undefined) return clone(inherited);
   if (isObject(inherited) && isObject(current)) return deepMerge(inherited, current);
   return current;
 }
 
-function applyDefaults(
+export function applyDefaults(
   job: Job,
   defaults: Record<string, unknown>,
   allowedKeys?: Set<string>,
@@ -67,34 +123,50 @@ function applyDefaults(
   return skipped;
 }
 
-function getExecutorTemplate(ctx: ParseContext): Record<string, Record<string, unknown>> {
-  const raw = ctx.data.executors;
-  if (raw === undefined) return {};
-  if (!isObject(raw)) {
-    pushDiagnostic(ctx, "error", '"executors" must be a mapping', ["executors"]);
-    return {};
+function mergeExecutorValue(key: string, current: unknown, incoming: unknown): unknown {
+  if (REPLACE_ON_PRESENCE_KEYS.has(key) || REPLACE_KEYS.has(key)) {
+    return clone(incoming);
   }
-
-  const out: Record<string, Record<string, unknown>> = {};
-  for (const [name, value] of Object.entries(raw)) {
-    if (!isObject(value)) {
-      pushDiagnostic(ctx, "error", `Executor "${name}" must be a mapping`, ["executors", name]);
-      continue;
-    }
-    out[name] = value;
+  if (isObject(current) && isObject(incoming)) {
+    return deepMerge(current, incoming);
   }
-  return out;
+  return clone(incoming);
 }
 
-function applyExecutor(
+function isExecutorKey(key: string): key is ExecutorKey {
+  return EXECUTOR_KEY_SET.has(key);
+}
+
+function composeExecutors(
+  executorNames: string[],
+  executors: Record<string, Record<string, unknown>>,
+): Record<string, unknown> {
+  let composed: Record<string, unknown> = {};
+  for (const executorName of executorNames) {
+    const executor = executors[executorName];
+    if (!executor) continue;
+    const next = clone(composed);
+    for (const [key, value] of Object.entries(executor)) {
+      next[key] = mergeExecutorValue(key, next[key], value);
+    }
+    composed = next;
+  }
+  return composed;
+}
+
+export function applyExecutor(
   job: Job,
   executor: Record<string, unknown>,
-  inlineKeys: Record<ExecutorKey, boolean>,
-) {
-  for (const key of EXECUTOR_KEYS) {
-    const incoming = executor[key];
+  inlineKeys: Partial<Record<JobDefaultKey | ExecutorKey, boolean>> = {},
+): void {
+  for (const [key, incoming] of Object.entries(executor)) {
+    if (!isExecutorKey(key)) continue;
     if (incoming === undefined || inlineKeys[key]) continue;
     const current = job[key];
+    if (REPLACE_ON_PRESENCE_KEYS.has(key) || REPLACE_KEYS.has(key)) {
+      job[key] = clone(incoming) as Job[ExecutorKey];
+      continue;
+    }
     if (isObject(current) && isObject(incoming)) {
       job[key] = deepMerge(current, incoming) as Job[ExecutorKey];
       continue;
@@ -107,6 +179,133 @@ function isReusableCallJob(job: Job): boolean {
   return typeof job.uses === "string" && job.uses.length > 0;
 }
 
+function preserveRawTemplates(ctx: ParseContext): void {
+  const rawJobDefaults = asMap(ctx.data.job_defaults);
+  const rawExecutors = asMap(ctx.data.executors);
+  ctx.internal.jobDefaults = {
+    jobDefaults: rawJobDefaults ? clone(rawJobDefaults) : undefined,
+    executors: rawExecutors ? clone(rawExecutors) : undefined,
+  };
+}
+
+function validateTemplateKey(
+  ctx: ParseContext,
+  key: string,
+  path: (string | number)[],
+  allowedKeys: Set<string>,
+  code: string,
+): boolean {
+  if (allowedKeys.has(key)) return true;
+  const message =
+    REJECTED_TEMPLATE_KEYS.has(key) || MACRO_KEYS.has(key)
+      ? `[${code}] Key "${key}" is not allowed here`
+      : `[${code}] Key "${key}" is not supported here`;
+  pushDiagnostic(ctx, "error", message, path, {
+    hint: `Allowed keys: ${[...allowedKeys].join(", ")}`,
+  });
+  return false;
+}
+
+function validateJobDefaults(ctx: ParseContext): Record<string, unknown> | undefined {
+  const raw = ctx.data.job_defaults;
+  if (raw === undefined) return undefined;
+  if (!isObject(raw)) {
+    pushDiagnostic(ctx, "error", '"job_defaults" must be a mapping', ["job_defaults"]);
+    return undefined;
+  }
+  const allowed = new Set<string>(JOB_DEFAULT_KEYS);
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (
+      !validateTemplateKey(ctx, key, ["job_defaults", key], allowed, "job-defaults-rejected-key")
+    ) {
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+function getExecutorTemplate(ctx: ParseContext): Record<string, Record<string, unknown>> {
+  const raw = ctx.data.executors;
+  if (raw === undefined) return {};
+  if (!isObject(raw)) {
+    pushDiagnostic(ctx, "error", '"executors" must be a mapping', ["executors"]);
+    return {};
+  }
+
+  const allowed = new Set<string>(EXECUTOR_KEYS);
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const [name, value] of Object.entries(raw)) {
+    if (!isObject(value)) {
+      pushDiagnostic(ctx, "error", `Executor "${name}" must be a mapping`, ["executors", name]);
+      continue;
+    }
+    const executor: Record<string, unknown> = {};
+    for (const [key, field] of Object.entries(value)) {
+      if (
+        !validateTemplateKey(ctx, key, ["executors", name, key], allowed, "executor-rejected-key")
+      ) {
+        continue;
+      }
+      executor[key] = field;
+    }
+    out[name] = executor;
+  }
+  return out;
+}
+
+function parseExecutorRefs(
+  ctx: ParseContext,
+  jobId: string,
+  rawExecutor: unknown,
+): string[] | undefined {
+  if (typeof rawExecutor === "string") {
+    const executor = rawExecutor.trim();
+    if (executor.length > 0) return [executor];
+    pushDiagnostic(ctx, "error", `Job "${jobId}": executor must be a non-empty string`, [
+      "jobs",
+      jobId,
+      "executor",
+    ]);
+    return undefined;
+  }
+
+  if (!Array.isArray(rawExecutor)) {
+    pushDiagnostic(ctx, "error", `Job "${jobId}": executor must be a string or list of strings`, [
+      "jobs",
+      jobId,
+      "executor",
+    ]);
+    return undefined;
+  }
+
+  const refs: string[] = [];
+  let valid = true;
+  rawExecutor.forEach((value, index) => {
+    if (typeof value !== "string" || value.trim().length === 0) {
+      valid = false;
+      pushDiagnostic(ctx, "error", `Job "${jobId}": executor entries must be non-empty strings`, [
+        "jobs",
+        jobId,
+        "executor",
+        index,
+      ]);
+      return;
+    }
+    refs.push(value.trim());
+  });
+  return valid ? refs : undefined;
+}
+
+function collectInlineKeys(job: Job): InlinePresence {
+  const out: InlinePresence = {} as InlinePresence;
+  for (const key of EXECUTOR_KEYS) {
+    out[key] = Object.hasOwn(job, key);
+  }
+  return out;
+}
+
 /**
  * Apply top-level `job_defaults` and `executors` to jobs.
  *
@@ -117,21 +316,14 @@ function isReusableCallJob(job: Job): boolean {
  * - executors expand runner keys; job inline runner keys win
  */
 export function jobDefaultsPass(ctx: ParseContext): void {
-  const defaults = asMap(ctx.data.job_defaults);
-  if (ctx.data.job_defaults !== undefined && !defaults) {
-    pushDiagnostic(ctx, "error", '"job_defaults" must be a mapping', ["job_defaults"]);
-  }
+  preserveRawTemplates(ctx);
+  const defaults = validateJobDefaults(ctx);
   const executors = getExecutorTemplate(ctx);
   const availableExecutors = Object.keys(executors);
 
   visitJobs(ctx, ({ id: jobId, job }) => {
     const usesJob = isReusableCallJob(job);
-    const inlineKeys: Record<ExecutorKey, boolean> = {
-      "runs-on": Object.hasOwn(job, "runs-on"),
-      container: Object.hasOwn(job, "container"),
-      services: Object.hasOwn(job, "services"),
-      env: Object.hasOwn(job, "env"),
-    };
+    const inlineKeys = collectInlineKeys(job);
 
     if (defaults) {
       const skipped = usesJob
@@ -161,22 +353,15 @@ export function jobDefaultsPass(ctx: ParseContext): void {
       return;
     }
 
-    if (typeof rawExecutor !== "string" || rawExecutor.trim().length === 0) {
-      pushDiagnostic(ctx, "error", `Job "${jobId}": executor must be a non-empty string`, [
-        "jobs",
-        jobId,
-        "executor",
-      ]);
-      return;
-    }
+    const executorRefs = parseExecutorRefs(ctx, jobId, rawExecutor);
+    if (!executorRefs) return;
 
-    const executorName = rawExecutor.trim();
-    const executor = executors[executorName];
-    if (!executor) {
+    const missing = executorRefs.find((name) => !executors[name]);
+    if (missing) {
       pushDiagnostic(
         ctx,
         "error",
-        `[executor-unknown] Job "${jobId}" references unknown executor "${executorName}"`,
+        `[executor-unknown] Job "${jobId}" references unknown executor "${missing}"`,
         ["jobs", jobId, "executor"],
         {
           hint:
@@ -188,7 +373,11 @@ export function jobDefaultsPass(ctx: ParseContext): void {
       return;
     }
 
-    applyExecutor(job, executor, inlineKeys);
+    const composed = composeExecutors(
+      executorRefs,
+      executors as Record<string, Record<string, unknown>>,
+    );
+    applyExecutor(job, composed, inlineKeys);
   });
 
   delete ctx.data.job_defaults;

@@ -3,7 +3,12 @@ import { dynamicMatrix } from "./dynamicMatrix.js";
 import { fallback } from "./fallback.js";
 import { fragments } from "./fragments.js";
 import { params } from "./params.js";
-import { jobDefaults } from "./jobDefaults.js";
+import {
+  applyDefaults,
+  applyExecutor,
+  JOB_DEFAULTS_SAFE_SUBSET,
+  jobDefaults,
+} from "./jobDefaults.js";
 import { applyPasses, type Pass, PassRegistry } from "./registry.js";
 import { retry } from "./retry.js";
 
@@ -39,4 +44,14 @@ export {
   PassRegistry,
   sortPasses,
 } from "./registry.js";
-export { dynamicMatrix, fallback, fragments, jobDefaults, params, retry };
+export {
+  applyDefaults,
+  applyExecutor,
+  dynamicMatrix,
+  fallback,
+  fragments,
+  JOB_DEFAULTS_SAFE_SUBSET,
+  jobDefaults,
+  params,
+  retry,
+};

@@ -1,4 +1,12 @@
-import { transpile } from "actio-core";
+import {
+  applyDefaults,
+  applyExecutor,
+  JOB_DEFAULTS_SAFE_SUBSET,
+  type Job,
+  parseActio,
+  runPasses,
+  transpile,
+} from "actio-core";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
@@ -347,30 +355,28 @@ describe("job_defaults + executors", () => {
     const { result, errors, doc } = build(`name: x
 on: [push]
 job_defaults:
-  if: github.ref == 'refs/heads/main'
+  if: \${{ github.ref == 'refs/heads/main' }}
   permissions:
     contents: read
-  strategy:
-    matrix:
-      node: [20]
   concurrency:
     group: ci
   runs-on: ubuntu-latest
+  timeout-minutes: 15
   env:
     CI: "true"
 jobs:
   call:
     uses: org/repo/.github/workflows/reuse.yml@main
-    if: success()
+    if: \${{ success() }}
 `);
     expect(errors).toEqual([]);
     expect(result.ok).toBe(true);
     expect(doc.jobs.call.uses).toBe("org/repo/.github/workflows/reuse.yml@main");
     expect(doc.jobs.call["runs-on"]).toBeUndefined();
     expect(doc.jobs.call.env).toBeUndefined();
+    expect(doc.jobs.call["timeout-minutes"]).toBeUndefined();
     expect(doc.jobs.call.if).toBe("github.ref == 'refs/heads/main' && success()");
     expect(doc.jobs.call.permissions).toEqual({ contents: "read" });
-    expect(doc.jobs.call.strategy).toEqual({ matrix: { node: [20] } });
     expect(doc.jobs.call.concurrency).toEqual({ group: "ci" });
 
     const infos = result.diagnostics.filter((d) => d.severity === "info");
@@ -445,7 +451,7 @@ jobs:
     ).toBe(true);
   });
 
-  it("errors when executor is not a non-empty string", () => {
+  it("errors when executor entries are not non-empty strings", () => {
     const { result, errors } = build(`name: x
 on: [push]
 executors:
@@ -453,46 +459,160 @@ executors:
     runs-on: ubuntu-latest
 jobs:
   test:
-    executor: "   "
+    executor: [linux, "  ", 1]
     steps:
       - run: echo hi
 `);
     expect(result.ok).toBe(false);
-    expect(errors.some((d) => d.message.includes("executor must be a non-empty string"))).toBe(
-      true,
-    );
+    expect(
+      errors.some((d) => d.message.includes("executor entries must be non-empty strings")),
+    ).toBe(true);
   });
 
-  it("deep-merges nested strategy maps and drops empty merged if conditions", () => {
+  it("exports helper APIs and preserves stripped templates for downstream passes", () => {
+    expect(typeof applyDefaults).toBe("function");
+    expect(typeof applyExecutor).toBe("function");
+    expect(JOB_DEFAULTS_SAFE_SUBSET).toEqual(
+      new Set(["if", "permissions", "concurrency", "env", "timeout-minutes"]),
+    );
+
+    const source = `name: x
+on: [push]
+job_defaults:
+  timeout-minutes: 11
+  env:
+    CI: "true"
+executors:
+  hardened:
+    permissions:
+      contents: read
+jobs:
+  test:
+    executor: hardened
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+`;
+    const ctx = parseActio(source, "t.actio.yml");
+    runPasses(ctx);
+
+    expect(ctx.internal.jobDefaults?.jobDefaults).toEqual({
+      "timeout-minutes": 11,
+      env: { CI: "true" },
+    });
+    expect(ctx.internal.jobDefaults?.executors).toEqual({
+      hardened: { permissions: { contents: "read" } },
+    });
+    expect(ctx.data.job_defaults).toBeUndefined();
+    expect(ctx.data.executors).toBeUndefined();
+
+    const emitted = parse(transpile(source, { fileName: "t.actio.yml" }).yaml);
+    expect(emitted.job_defaults).toBeUndefined();
+    expect(emitted.executors).toBeUndefined();
+
+    const singleJob: Job = {
+      "runs-on": "ubuntu-latest",
+      steps: [{ run: "echo hi" }],
+    };
+    applyDefaults(singleJob, { "timeout-minutes": 22 });
+    applyExecutor(singleJob, { permissions: { contents: "read" } });
+    expect(singleJob["timeout-minutes"]).toBe(22);
+    expect(singleJob.permissions).toEqual({ contents: "read" });
+  });
+
+  it("AND-combines wrapped expressions without mangling runtime syntax", () => {
     const { result, errors, doc } = build(`name: x
 on: [push]
 job_defaults:
-  if: ""
-  strategy:
-    matrix:
-      node: [20]
-      os: [ubuntu-latest]
+  if: \${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        os: [ubuntu-22.04]
-        shard: [1, 2]
-      fail-fast: false
+    if: \${{ success() || cancelled() }}
     steps:
       - run: echo hi
 `);
     expect(result.ok).toBe(true);
     expect(errors).toEqual([]);
-    expect(doc.jobs.test.if).toBeUndefined();
-    expect(doc.jobs.test.strategy).toEqual({
-      matrix: {
-        node: [20],
-        os: ["ubuntu-22.04"],
-        shard: [1, 2],
-      },
-      "fail-fast": false,
-    });
+    expect(doc.jobs.test.if).toBe(
+      "(github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && (success() || cancelled())",
+    );
+  });
+
+  it("replaces permissions map when a job defines its own permissions", () => {
+    const { result, errors, doc } = build(`name: x
+on: [push]
+job_defaults:
+  runs-on: ubuntu-latest
+  permissions:
+    contents: read
+jobs:
+  test:
+    permissions:
+      issues: write
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(true);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.test.permissions).toEqual({ issues: "write" });
+  });
+
+  it("composes executor arrays left-to-right and keeps job inline keys authoritative", () => {
+    const { result, errors, doc } = build(`name: x
+on: [push]
+executors:
+  hardened:
+    permissions:
+      contents: read
+    timeout-minutes: 10
+  gpu:
+    runs-on: [self-hosted, gpu]
+    container:
+      image: nvidia/cuda:12.4.0-base
+  fast:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    timeout-minutes: 5
+jobs:
+  release:
+    executor: [hardened, gpu]
+    steps:
+      - run: echo release
+  tuned:
+    executor: [hardened, fast]
+    permissions:
+      pull-requests: write
+    steps:
+      - run: echo tuned
+`);
+    expect(result.ok).toBe(true);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.release.permissions).toEqual({ contents: "read" });
+    expect(doc.jobs.release["timeout-minutes"]).toBe(10);
+    expect(doc.jobs.release["runs-on"]).toEqual(["self-hosted", "gpu"]);
+    expect(doc.jobs.release.container).toEqual({ image: "nvidia/cuda:12.4.0-base" });
+
+    expect(doc.jobs.tuned.permissions).toEqual({ "pull-requests": "write" });
+    expect(doc.jobs.tuned["timeout-minutes"]).toBe(5);
+    expect(doc.jobs.tuned["runs-on"]).toBe("ubuntu-latest");
+  });
+
+  it("rejects structural keys in job_defaults", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+job_defaults:
+  steps:
+    - run: echo nope
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes("job-defaults-rejected-key"))).toBe(true);
+    expect(errors.some((d) => d.message.includes('Key "steps" is not allowed here'))).toBe(true);
   });
 });

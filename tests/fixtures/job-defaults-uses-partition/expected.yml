@@ -11,10 +11,6 @@ jobs:
     if: github.ref == 'refs/heads/main' && success()
     permissions:
       contents: read
-    strategy:
-      matrix:
-        node:
-          - 20
     concurrency:
       group: default-group
       cancel-in-progress: true
@@ -25,10 +21,6 @@ jobs:
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
-    strategy:
-      matrix:
-        node:
-          - 20
     concurrency:
       group: default-group
       cancel-in-progress: true
