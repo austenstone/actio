@@ -1,0 +1,349 @@
+---
+title: Syntax reference
+description: Every .actio.yml macro keyword — scope, type, and what it compiles to.
+---
+
+Actio is a strict **superset** of GitHub Actions workflow syntax. Every standard
+key, event, and value works exactly as it does in a normal workflow — see GitHub's
+[workflow syntax reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)
+for those. A macro-free `.actio.yml` file *is* a normal workflow.
+
+This page is the dictionary for the keywords Actio **adds**. Each entry lists where
+the keyword is valid, its type, a minimal example, and what `actio build` compiles
+it into. Every macro is stripped or expanded at compile time — none survive in the
+generated `.yml`.
+
+## Where each keyword is valid
+
+| Keyword | Scope | Compiles to |
+|---|---|---|
+| [`params`](#params) | workflow | stripped; `{{ params.* }}` tokens resolved |
+| [`fragments`](#fragments) | workflow | stripped; `inject` expanded in place |
+| [`job_defaults`](#job_defaults) | workflow | stripped; merged into every job |
+| [`executors`](#executors) | workflow | stripped; referenced via `executor` |
+| [`executor`](#executor) | job | stripped; preset merged into the job |
+| [`dynamic_matrix`](#dynamic_matrix) | job | setup job + matrix wiring |
+| [`when_compile`](#when_compile) | job, step | node kept or omitted at compile time |
+| [`inject`](#inject) | step | replaced by the fragment's steps |
+| [`retry`](#retry) | step | chain of conditional attempts |
+| [`fallback`](#fallback) | job, step | try/catch wiring |
+
+## Interpolation tokens
+
+Actio distinguishes compile-time from runtime expansion by the brace style:
+
+- `{{ ... }}` — **compile-time**. Resolved by `actio build` and baked into the
+  output (e.g. `{{ params.env }}`, `{{ toJSON(params.matrix) }}`).
+- `${{ ... }}` — **runtime passthrough**. Emitted verbatim for the GitHub Actions
+  runner to evaluate.
+
+<Callout title="Don't mix them">
+  `${{ params.* }}` is invalid — `params` only exist at compile time, so they must
+  use `{{ }}`. Conversely, `when_compile` takes a **bare** compile-time expression
+  and rejects `${{ }}` wrappers.
+</Callout>
+
+---
+
+## Workflow keys
+
+### params
+
+> Typed compile-time parameters. References are resolved with `{{ params.<name> }}`
+> or `{{ toJSON(params.<name>) }}` and stripped from emitted workflow YAML.
+
+- **Scope:** top-level
+- **Type:** map of name → param definition (`type`, plus `values`/`default`)
+
+```yaml title=".actio.yml"
+params:
+  env:
+    type: enum
+    values: [dev, staging, prod]
+    default: staging
+  retries:
+    type: number
+    default: 3
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "env={{ params.env }} retries={{ params.retries }}"
+```
+
+```yaml title="generated .yml"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "env=staging retries=3"
+```
+
+Full guide: [params](/docs/macros/params).
+
+### fragments
+
+> Reusable, named lists of steps. Splice a fragment into a job with
+> `- inject: <name>`. The `fragments` key is stripped from the generated workflow.
+
+- **Scope:** top-level
+- **Type:** map of name → list of steps
+
+```yaml title=".actio.yml"
+fragments:
+  setup:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: setup
+      - run: npm ci
+```
+
+See [`inject`](#inject) for the call site. Full guide: [fragments + inject](/docs/macros/fragments).
+
+### job_defaults
+
+> Default job-level settings merged into every job at compile time. Stripped from
+> generated workflow YAML.
+
+- **Scope:** top-level
+- **Type:** map of job-level keys (`runs-on`, `env`, `timeout-minutes`, `if`, …)
+
+Merge semantics vary by key: `if` is **AND-combined** (`default && inline`);
+`permissions`/`concurrency`/`strategy` **replace on presence**; `runs-on`,
+`timeout-minutes`, `continue-on-error`, `environment` are **inline-wins**; `env`,
+`container`, `services`, `defaults` are **deep-merged**.
+
+```yaml title=".actio.yml"
+job_defaults:
+  runs-on: ubuntu-latest
+  timeout-minutes: 30
+jobs:
+  test:
+    steps:
+      - run: npm test
+```
+
+```yaml title="generated .yml"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - run: npm test
+```
+
+<Callout title="Reusable-workflow call jobs">
+  Jobs with `uses:` only receive the call-compatible subset: `if`, `permissions`,
+  `concurrency`, and `strategy`. Runner keys are skipped, and `executor:` is not
+  supported on call jobs.
+</Callout>
+
+Full guide: [job_defaults](/docs/macros/job-defaults).
+
+### executors
+
+> Named runner/container/service presets referenced by `jobs.<id>.executor`.
+> Stripped from generated workflow YAML.
+
+- **Scope:** top-level
+- **Type:** map of name → executor definition (job runner keys)
+
+```yaml title=".actio.yml"
+executors:
+  hardened:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+jobs:
+  test:
+    executor: hardened
+    steps:
+      - run: npm test
+```
+
+See [`executor`](#executor) for the call site. Full guide: [executors](/docs/macros/job-defaults#executors).
+
+---
+
+## Job keys
+
+### executor
+
+> Name (or ordered list of names) from top-level `executors:`. Expanded during
+> compile and stripped from output.
+
+- **Scope:** `jobs.<job_id>`
+- **Type:** string, or list of strings (composed left-to-right; later entries win;
+  inline job keys always win)
+
+```yaml title=".actio.yml"
+jobs:
+  build:
+    executor: [base, gpu]
+    steps:
+      - run: ./build.sh
+```
+
+### dynamic_matrix
+
+> Generate a job's `strategy.matrix` at runtime from a script. Splits into a setup
+> job that prints JSON to `$GITHUB_OUTPUT` and a matrix job wired with `needs` +
+> `fromJSON()` + an empty-matrix guard.
+
+- **Scope:** `jobs.<job_id>`
+- **Type:** map. Options: `script` (required), `alias`, `checkout` (default `true`
+  for local-path scripts), `runs-on`, `shell` (`bash`/`sh`/`pwsh`/`python`),
+  `compact` (default `true`), `fail-fast` (default `false`), `id`.
+
+```yaml title=".actio.yml"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      script: ./scripts/list.sh
+      alias: shard
+    steps:
+      - run: ./run-shard.sh ${{ matrix.shard }}
+```
+
+`script` may be a path **or** an inline command. Full guide: [dynamic_matrix](/docs/macros/dynamic-matrix).
+
+### when_compile
+
+> Compile-time structural condition. The expression is evaluated by `actio build`;
+> if it's false, the entire job (or step) map is omitted from the emitted YAML.
+
+- **Scope:** `jobs.<job_id>` and `jobs.<job_id>.steps[*]`
+- **Type:** string — a bare compile-time boolean expression
+- **Expression language:** references (`params.*` and compile-time symbols),
+  comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), boolean operators (`&&`, `||`,
+  `!`), literals, and function calls.
+
+Use it to switch jobs or steps on a `param` at build time, instead of smearing a
+runtime `if:` across the workflow:
+
+```yaml title=".actio.yml"
+params:
+  deploy:
+    type: boolean
+    default: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build.sh
+  publish:
+    when_compile: params.deploy
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./publish.sh
+```
+
+With `deploy` false, the whole `publish` job disappears:
+
+```yaml title="generated .yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build.sh
+```
+
+**Conditional merge (form B).** A key shaped like `when_compile(<expr>)` maps to an
+object that is merged into the parent only when the expression is true:
+
+```yaml title=".actio.yml"
+params:
+  debug:
+    type: boolean
+    default: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test
+        when_compile(params.debug):
+          env:
+            RUNNER_DEBUG: "1"
+```
+
+<Callout title="Compile-time only">
+  `when_compile` cannot reference runtime contexts like `github.*`, `env.*`, or
+  `secrets.*`, and rejects `${{ }}` wrappers. For runtime conditions, use the
+  standard [`if:`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idif)
+  key instead.
+</Callout>
+
+---
+
+## Step keys
+
+### inject
+
+> Splice in the steps of the named fragment (defined under top-level `fragments:`)
+> at this position. Replaced inline by `actio build`.
+
+- **Scope:** `jobs.<job_id>.steps[*]`
+- **Type:** string (a fragment name)
+
+```yaml title=".actio.yml"
+steps:
+  - inject: setup
+  - run: npm test
+```
+
+See [`fragments`](#fragments).
+
+### retry
+
+> Retry a flaky step with optional backoff; expands into a chain of conditional
+> attempts where attempt N runs only if attempt N-1 failed. Works with `run:` and
+> `uses:` steps.
+
+- **Scope:** `jobs.<job_id>.steps[*]`
+- **Type:** integer (≥ 2), or map. Options: `attempts` (required, ≥ 2), `delay`
+  (optional, e.g. `10s`, `2m`, `1h` — injects `sleep` steps). Shorthand
+  `retry: 3` == `retry: { attempts: 3 }`.
+
+```yaml title=".actio.yml"
+steps:
+  - run: flaky-command
+    retry:
+      attempts: 3
+      delay: 10s
+```
+
+Full guide: [retry](/docs/macros/retry).
+
+### fallback
+
+> A native try/catch. Default (**notify**): the fallback runs on failure via
+> `if: failure()` but the job still fails. With `recover: true` the guarded step
+> gets `continue-on-error: true` and the fallback keys off `outcome`, so the job
+> can pass.
+
+- **Scope:** `jobs.<job_id>.steps[*]` and `jobs.<job_id>` (job-level)
+- **Type:** list of steps (notify mode), or map with `recover` + `steps`
+
+```yaml title=".actio.yml"
+steps:
+  - run: deploy
+    fallback:
+      recover: true
+      steps:
+        - run: ./rollback.sh
+```
+
+Full guide: [fallback](/docs/macros/fallback).
+
+## See also
+
+<Cards>
+  <Card title="Macros" href="/docs/macros/params" description="Tutorial-style walkthroughs of each keyword." />
+  <Card title="Configuration" href="/docs/configuration" description="Config file, precedence, and custom passes." />
+  <Card title="Editor support" href="/docs/editor-support" description="JSON Schema autocomplete + the modeline." />
+  <Card title="API reference" href="/docs/api" description="Generated TypeDoc for the compiler internals." />
+</Cards>
