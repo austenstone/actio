@@ -8,6 +8,35 @@ export type WorkflowData = Record<string, any>;
 export type Path = (string | number)[];
 
 /**
+ * Author key order, stashed on each mapping as a non-enumerable Symbol so passes
+ * (which see plain objects) ignore it, while emit can restore the original order.
+ * Plain JS objects hoist integer-like keys, so this is the only faithful record.
+ */
+export const KEY_ORDER: unique symbol = Symbol("actio.keyOrder");
+
+/** Convert an order-preserving `toJS({ mapAsMap })` tree into plain objects that carry KEY_ORDER. */
+function mapTreeToData(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(mapTreeToData);
+  if (value instanceof Map) {
+    const obj: Record<string, unknown> = {};
+    const order: string[] = [];
+    for (const [k, v] of value) {
+      const key = String(k);
+      obj[key] = mapTreeToData(v);
+      order.push(key);
+    }
+    Object.defineProperty(obj, KEY_ORDER, {
+      value: order,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    });
+    return obj;
+  }
+  return value;
+}
+
+/**
  * Where an IR node came from in the original source. `path` indexes the parsed
  * document and stays stable as passes mutate `ctx.data`, so it remains a valid
  * argument to `rangeOfPath` even after a node is moved. This is the hook source
@@ -55,7 +84,9 @@ export function rangeOfPath(ctx: ParseContext, path: Path): Range | undefined {
 /** Parse `.actio.yml` source into a transform context. YAML syntax errors land in `diagnostics`. */
 export function parseActio(source: string, fileName: string): ParseContext {
   const lineCounter = new LineCounter();
-  const doc = parseDocument(source, { lineCounter, keepSourceTokens: true });
+  // `merge: true` resolves YAML merge keys (`<<: *anchor`) so they collapse into
+  // the host mapping. GitHub Actions rejects literal `<<`, so they must not survive.
+  const doc = parseDocument(source, { lineCounter, keepSourceTokens: true, merge: true });
   const diagnostics: Diagnostic[] = [];
 
   for (const err of doc.errors) {
@@ -82,6 +113,9 @@ export function parseActio(source: string, fileName: string): ParseContext {
     });
   }
 
-  const data = (doc.toJS({ maxAliasCount: -1 }) ?? {}) as WorkflowData;
+  // `mapAsMap` keeps author key order (plain objects hoist integer-like keys);
+  // we then materialize plain objects that carry that order on KEY_ORDER.
+  const js = doc.toJS({ maxAliasCount: -1, mapAsMap: true });
+  const data = (mapTreeToData(js) ?? {}) as WorkflowData;
   return { fileName, source, doc, lineCounter, data, diagnostics, origins: new WeakMap() };
 }
