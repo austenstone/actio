@@ -325,6 +325,188 @@ jobs:
     );
   });
 
+  it("hard-errors on a params root hidden behind a }} in a string literal, even with validation disabled", () => {
+    const source = `name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format('}}', params.env) }}"
+`;
+    const result = transpile(source, { fileName: "t.actio.yml", validate: false });
+    const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("hard-errors on a params root after a }} inside startsWith, with validation disabled", () => {
+    const source = `name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ startsWith('a}}b', params.env) }}"
+`;
+    const result = transpile(source, { fileName: "t.actio.yml", validate: false });
+    const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("hard-errors on a params root after a }} inside a double-quoted literal with an escaped quote", () => {
+    const source = `name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format("a\\"}}", params.env) }}"
+`;
+    const result = transpile(source, { fileName: "t.actio.yml", validate: false });
+    const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("resyncs after a closed runtime expression and still catches a later params root", () => {
+    const source = `name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format('}}', github.ref) }} \${{ params.env }}"
+`;
+    const result = transpile(source, { fileName: "t.actio.yml", validate: false });
+    const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
+  it("does not flag a runtime expression whose only }} lives inside a string literal", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format('}}', github.ref) }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      false,
+    );
+  });
+
+  it("catches a params root when the runtime sigil starts at offset 0 of the value", () => {
+    const source = `name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: \${{ params.env }}
+`;
+    const result = transpile(source, { fileName: "t.actio.yml", validate: false });
+    const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("does not flag an unterminated runtime sigil that never reaches a top-level }}", () => {
+    const source = `name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ params.env"
+`;
+    const result = transpile(source, { fileName: "t.actio.yml", validate: false });
+    const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      false,
+    );
+  });
+
+  it("does not flag a dotted params access even with whitespace around the dots", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ steps . params . outputs.x }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      false,
+    );
+  });
+
+  it("catches a params root after a doubled-single-quote escape inside a literal", () => {
+    const source = `name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ format('a''b', params.env) }}"
+`;
+    const result = transpile(source, { fileName: "t.actio.yml", validate: false });
+    const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+    expect(result.ok).toBe(false);
+  });
+
   it("errors when interpolating non-scalars without toJSON", () => {
     const errors = errorsFor(`name: x
 on: [push]
