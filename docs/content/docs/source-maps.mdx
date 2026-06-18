@@ -1,0 +1,81 @@
+---
+title: Source maps & annotations
+description: Map generated YAML back to your .actio.yml — at build time and in live runs.
+---
+
+`build` writes a sidecar `<name>.yml.map` next to each generated workflow (opt out
+with `--no-source-map`; `--stdout` never emits one). It maps **generated lines back
+to `.actio.yml` source positions**, so when a line fails — in a real Actions run or
+in our own schema validation — the error can point at the source you actually wrote
+instead of machine-generated YAML.
+
+The format is a small, line-oriented JSON (Source Map v3-ish field names, no VLQ, no
+inline comments — the generated YAML stays byte-for-byte unchanged):
+
+```jsonc
+{
+  "version": 1,
+  "generator": "actio",
+  "file": "ci.yml",              // generated workflow
+  "sources": ["ci.actio.yml"],   // original source(s)
+  "mappings": [                  // sparse: only confidently-resolved lines
+    { "generated": { "line": 12 }, "source": 0, "original": { "line": 5, "col": 7 }, "path": "jobs.test.steps.0" }
+  ]
+}
+```
+
+Mappings are **reconstructed at emit time** rather than threaded through the passes:
+the emitted YAML is re-parsed for generated line numbers, and each node is resolved
+back to its source through the typed IR's provenance side-table. `originOf` returns
+a node's **true source range even after a macro moved it** (a fragment-injected
+step, a retry-fanned attempt, the `dynamic_matrix` setup job), because the IR pins
+each origin before mutation and carries it across clones.
+
+The library exposes this too: `transpile(source, { sourceMap: true })` returns a
+`map` field, and with it on, schema-validation diagnostics are remapped back to
+source ranges so code frames line up with your `.actio.yml`.
+
+## Build-time annotations
+
+When `build`/`check` runs **inside GitHub Actions** (`GITHUB_ACTIONS=true`), every
+diagnostic is also emitted as a `::error file=…,line=…,col=…::` workflow command, so
+a bad `.actio.yml` lights up **inline on the exact line you wrote** — no extra job,
+no runtime, no config:
+
+```text
+::error file=.github/actio/ci.actio.yml,line=8,col=26,title=actio (schema)::Unexpected value 'not-a-number'
+```
+
+This is automatic and always on in CI. Locally you still get the colored code frame
+on stderr. The formatter is `formatGithubAnnotation`, exported from `actio-core` if
+you want to wire it into your own tooling.
+
+## Runtime annotations
+
+When source maps are on, `build` appends a small `actio-annotate` job at the bottom
+of every workflow (opt out with `--no-annotate`, or `annotate: false` in config):
+
+```yaml
+actio-annotate:
+  name: Actio annotate
+  runs-on: ubuntu-latest
+  needs: [build, workflows]   # every real job
+  if: failure()
+  permissions: { contents: read, actions: read }
+  steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/actio-annotate
+      with: { token: ${{ github.token }} }
+```
+
+When any job fails, that job runs `.github/actions/actio-annotate` — a tiny bundled
+TypeScript action. It reads the run's jobs via the API, matches each failed step
+back to its generated path, **prefix-matches the `.yml.map`**, and emits
+`::error file=…,line=…::` workflow commands. The result: a failed step lights up on
+the exact line of the `.actio.yml` **you** wrote, not the compiled YAML. It never
+fails the run itself — reporting that breaks would only add noise.
+
+<Callout type="info">
+  Injection is gated on source maps (it needs them to resolve lines); requesting
+  `annotate` without a source map logs a warning and skips.
+</Callout>

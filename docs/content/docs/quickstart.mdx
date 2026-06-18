@@ -1,0 +1,32 @@
+---
+title: Quickstart
+description: Scaffold, compile, and drift-check your first .actio.yml source.
+---
+
+```bash
+# scaffold a starter source file
+npx -p actio-cli actio init ci.actio.yml
+
+# compile *.actio.yml → .github/workflows/*.yml
+npx -p actio-cli actio build
+
+# CI drift check (fails if generated output is stale)
+npx -p actio-cli actio check
+```
+
+## Recommended layout
+
+Keep sources in `.github/actio/` and compile them into `.github/workflows/` — the
+directory GitHub actually reads. Sources nested outside `.github/workflows/` won't
+be mistaken for real workflows. Think of `.github/workflows/` as your `dist`:
+
+```text
+.github/
+  actio/        # source: *.actio.yml (+ actio.config.ts)
+  workflows/    # generated: *.yml (committed, GitHub runs these)
+```
+
+<Callout type="info">
+  Commit the generated `.yml` files. GitHub runs what's in `.github/workflows/`,
+  and [`actio check`](/docs/cli) keeps them honest in CI.
+</Callout>

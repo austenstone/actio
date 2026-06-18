@@ -1,0 +1,44 @@
+---
+title: fallback
+description: A native try/catch for steps and jobs.
+---
+
+A native try/catch. Attach `fallback:` to a step (or a job).
+
+## Default = notify
+
+The error is *not* swallowed; fallback runs via `if: failure()`, the job still fails.
+
+```yaml title=".actio.yml"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy
+        run: ./deploy.sh
+        fallback:
+          - name: Notify
+            run: ./notify.sh failure
+```
+
+The guarded step gets an `id`; the fallback is gated on its `conclusion`:
+
+```yaml title="generated .yml"
+steps:
+  - name: Deploy
+    run: ./deploy.sh
+    id: step_deploy
+  - name: Notify
+    run: ./notify.sh failure
+    if: failure() && steps.step_deploy.conclusion == 'failure'
+```
+
+## recover: true
+
+`recover: true` = true try/catch: the guarded step gets `continue-on-error: true`
+and the fallback uses `steps.<id>.outcome == 'failure'`, so the job can continue.
+
+<Callout title="outcome vs conclusion">
+  With `continue-on-error`, a failed step's `conclusion` becomes `success`, so
+  recovery must key off `outcome`. Actio gets this right for you.
+</Callout>

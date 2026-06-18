@@ -1,0 +1,15 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "installation",
+    "quickstart",
+    "macros",
+    "cli",
+    "configuration",
+    "supply-chain",
+    "source-maps",
+    "editor-support",
+    "architecture"
+  ]
+}
