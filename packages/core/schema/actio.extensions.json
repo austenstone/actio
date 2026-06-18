@@ -3,7 +3,7 @@
   "meta": {
     "$id": "https://raw.githubusercontent.com/austenstone/actio/main/packages/core/schema/actio.schema.json",
     "title": "Actio workflow (.actio.yml)",
-    "description": "Source language for the Actio transpiler: the official GitHub Actions workflow schema (inherited wholesale from SchemaStore) plus Actio macro keywords (fragments/inject, retry, dynamic_matrix, fallback) that compile into standard workflow YAML. Every standard GitHub Actions key, event, and value is validated and autocompleted from the upstream schema; the macro keys are additive. See https://github.com/austenstone/actio."
+    "description": "Source language for the Actio transpiler: the official GitHub Actions workflow schema (inherited wholesale from SchemaStore) plus Actio macro keywords (fragments/inject, retry, dynamic_matrix, fallback, for_each) that compile into standard workflow YAML. Every standard GitHub Actions key, event, and value is validated and autocompleted from the upstream schema; the macro keys are additive. See https://github.com/austenstone/actio."
   },
   "rootProperties": {
     "fragments": {

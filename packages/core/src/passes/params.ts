@@ -216,6 +216,26 @@ const lookupSymbolValue = (
   return { symbol, value: current, resolved: current !== undefined };
 };
 
+export interface CompileTimeExpressionResolution {
+  symbol?: SymbolDef;
+  value?: unknown;
+  resolved: boolean;
+}
+
+export const resolveCompileTimeExpressionValue = (
+  ctx: ParseContext,
+  expression: string,
+): CompileTimeExpressionResolution => {
+  const parsed = parseCompileExpr(expression.trim());
+  if (!parsed) return { resolved: false };
+  const lookedUp = lookupSymbolValue(ctx, parsed.segments);
+  return {
+    symbol: lookedUp.symbol,
+    value: lookedUp.value,
+    resolved: lookedUp.resolved,
+  };
+};
+
 const isIdentifierStart = (char: string): boolean => /[A-Za-z_]/.test(char);
 
 const isIdentifierPart = (char: string): boolean => /[A-Za-z0-9_]/.test(char);

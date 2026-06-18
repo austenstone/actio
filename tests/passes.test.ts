@@ -1,5 +1,12 @@
 import type { ParseContext } from "actio-core";
-import { applyPasses, builtinPasses, type Pass, PassRegistry, sortPasses } from "actio-core";
+import {
+  applyPasses,
+  builtinPasses,
+  createRegistry,
+  type Pass,
+  PassRegistry,
+  sortPasses,
+} from "actio-core";
 import { describe, expect, it } from "vitest";
 
 /** A no-op pass that records the order it ran in. */
@@ -54,10 +61,15 @@ describe("sortPasses", () => {
       byName.get("fallback"),
       byName.get("retry"),
       byName.get("when_compile"),
+      byName.get("for_each"),
       byName.get("params"),
+      byName.get("job_defaults"),
     ].filter((pass): pass is Pass => pass !== undefined);
     const ordered = sortPasses(shuffled).map((pass) => pass.name);
+    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("job_defaults"));
+    expect(ordered.indexOf("job_defaults")).toBeLessThan(ordered.indexOf("for_each"));
     expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("when_compile"));
+    expect(ordered.indexOf("for_each")).toBeLessThan(ordered.indexOf("when_compile"));
     expect(ordered.indexOf("when_compile")).toBeLessThan(ordered.indexOf("fragments"));
     expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("retry"));
     expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
@@ -78,6 +90,7 @@ describe("sortPasses", () => {
     expect(sortPasses(builtinPasses).map((p) => p.name)).toEqual([
       "params",
       "job_defaults",
+      "for_each",
       "when_compile",
       "fragments",
       "retry",
@@ -103,6 +116,7 @@ describe("PassRegistry", () => {
     expect(registry.list().map((p) => p.name)).toEqual([
       "params",
       "job_defaults",
+      "for_each",
       "when_compile",
       "fragments",
       "retry",
@@ -124,5 +138,33 @@ describe("PassRegistry", () => {
     expect(registry.has("temp")).toBe(true);
     expect(registry.unregister("temp")).toBe(true);
     expect(registry.has("temp")).toBe(false);
+  });
+});
+
+describe("createRegistry", () => {
+  it("seeds the built-in pipeline in dependency order", () => {
+    expect(
+      createRegistry()
+        .list()
+        .map((p) => p.name),
+    ).toEqual([
+      "params",
+      "job_defaults",
+      "for_each",
+      "when_compile",
+      "fragments",
+      "retry",
+      "fallback",
+      "dynamic_matrix",
+    ]);
+  });
+
+  it("lets a caller-supplied pass override a same-named built-in", () => {
+    const log: string[] = [];
+    const override = recorder("for_each", ["params"], log);
+    const baseline = createRegistry().list().length;
+    const registry = createRegistry([override]);
+    expect(registry.list().filter((p) => p.name === "for_each")).toEqual([override]);
+    expect(registry.list().length).toBe(baseline);
   });
 });

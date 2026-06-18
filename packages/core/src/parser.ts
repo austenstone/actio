@@ -14,9 +14,23 @@ export interface JobDefaultsInternalSnapshot {
   inlineStrategyFailFastJobs?: Record<string, true>;
 }
 
+export interface ForEachShareContractEntry {
+  keySlug: string;
+  outputName: string;
+}
+
+export interface ForEachShareContract {
+  jobId: string;
+  mode: "serial-step" | "serial-jobs" | "parallel-matrix";
+  dynamic: boolean;
+  entries: ForEachShareContractEntry[];
+}
+
 export interface ParseContextInternal {
   /** Preserved macro templates stripped from `ctx.data` after the job_defaults pass. */
   jobDefaults?: JobDefaultsInternalSnapshot;
+  /** v1 handoff contract for #18 share integration. */
+  forEachShareContracts?: ForEachShareContract[];
 }
 
 /**
