@@ -10,6 +10,7 @@
     "supply-chain",
     "source-maps",
     "editor-support",
-    "architecture"
+    "architecture",
+    "api"
   ]
 }
