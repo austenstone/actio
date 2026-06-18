@@ -61,6 +61,44 @@ outside `.github/workflows/` won't be mistaken for real workflows. Think of
   workflows/    # generated: *.yml (committed, GitHub runs these)
 ```
 
+## Supply-chain pinning (`pins`)
+
+Actio ships a dedicated pin-management surface for freezing mutable refs to immutable digests without introducing a foreign runtime.
+
+```bash
+# verify pin state
+npx actio-cli pins check .github/actio/ci.actio.yml
+
+# mechanical pin rewrite only (no build/config/custom-pass execution)
+npx actio-cli pins update .github/actio/ci.actio.yml --no-exec --delta-out .actio/pins-delta.json
+
+# privileged apply of a precomputed delta with strict allowlist checks
+npx actio-cli pins apply --constrained .actio/pins-delta.json
+```
+
+Exit codes are security-significant:
+
+1. `0` = clean.
+2. `1` = resolvable drift (for example, a tag moved).
+3. `2` = hard failure (including integrity mismatch); never auto-heal.
+
+`pins apply --constrained` only accepts a single-action, three-artifact delta shape:
+
+1. source `.actio.yml` `uses: owner/repo@ref` bump,
+2. matching `actio.lock` digest update,
+3. matching generated `uses: owner/repo@<digest> # <ref>` substitution.
+
+Anything outside that shape is rejected with exit `2`.
+
+### Dependabot reconcile (safe two-phase pattern)
+
+Use a two-phase workflow split:
+
+1. **Phase 1 (`pull_request`, read-only token):** run `pins update --no-exec` on the PR head and upload the delta artifact.
+2. **Phase 2 (`workflow_run`, write token):** download the trusted artifact and run `pins apply --constrained`; never run `build` or `pins update` in this privileged phase.
+
+This avoids executing PR-controlled config/passes in a write-privileged context while still keeping source, lockfile, and generated pins aligned.
+
 
 ## Macros
 
