@@ -190,7 +190,7 @@ function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId:
       pushDiagnostic(
         ctx,
         "warning",
-        `Job "${jobId}": inline strategy.matrix is preserved; dynamic_matrix will not override strategy.matrix, but setup/needs/guard transforms still apply`,
+        `Job "${jobId}": inline strategy.matrix is preserved; dynamic_matrix skips only the inherited/default strategy.matrix override while setup/needs/guard transforms still apply`,
         ["jobs", jobId, "strategy", "matrix"],
       );
     } else {

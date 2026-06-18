@@ -3,8 +3,8 @@ on: [push]
 
 executors:
   hardened:
-    permissions:
-      contents: read
+    env:
+      HARDENED: "true"
     timeout-minutes: 10
   gpu:
     runs-on: [self-hosted, gpu]
@@ -12,8 +12,8 @@ executors:
       image: nvidia/cuda:12.4.0-base
   fast:
     runs-on: ubuntu-latest
-    permissions:
-      issues: write
+    env:
+      FAST: "true"
     timeout-minutes: 5
 
 jobs:
@@ -23,7 +23,6 @@ jobs:
       - run: echo release
   tuned:
     executor: [hardened, fast]
-    permissions:
-      pull-requests: write
+    runs-on: windows-latest
     steps:
       - run: echo tuned

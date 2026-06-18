@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { actioSchema, transpile } from "actio-core";
+import { actioSchema, EXECUTOR_KEYS, transpile } from "actio-core";
 import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
@@ -8,6 +8,18 @@ import { STARTER_ACTIO } from "../packages/cli/src/starter.js";
 
 const ajv = new Ajv({ strict: false, allErrors: true });
 const validate = ajv.compile(actioSchema());
+const extensionsSchema = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL("../packages/core/schema/actio.extensions.json", import.meta.url)),
+    "utf8",
+  ),
+) as {
+  addDefinitions: {
+    executorDefinition: {
+      properties: Record<string, unknown>;
+    };
+  };
+};
 
 function load(source: string) {
   return parse(source) as unknown;
@@ -126,12 +138,12 @@ jobs:
     expect(validate(doc)).toBe(false);
   });
 
-  it("accepts executor arrays and executor definitions with timeout/permissions", () => {
+  it("accepts executor arrays and executor definitions with runtime executor keys", () => {
     const doc = load(`on: [push]
 executors:
   hardened:
-    permissions:
-      contents: read
+    env:
+      HARDENED: "true"
     timeout-minutes: 10
   gpu:
     runs-on: [self-hosted, gpu]
@@ -164,13 +176,7 @@ jobs:
 executors:
   full:
     runs-on: ubuntu-latest
-    continue-on-error: true
-    environment: staging
     timeout-minutes: 10
-    permissions:
-      contents: read
-    concurrency:
-      group: ci
     container:
       image: node:20
     services:
@@ -178,9 +184,6 @@ executors:
         image: redis:7
     env:
       CI: "true"
-    defaults:
-      run:
-        shell: bash
 jobs:
   test:
     executor: full
@@ -188,6 +191,46 @@ jobs:
     steps:
       - run: echo hi`);
     expect(validate(doc)).toBe(true);
+  });
+
+  it("keeps executorDefinition in lockstep with runtime EXECUTOR_KEYS", () => {
+    const runtimeKeys = [...EXECUTOR_KEYS].sort();
+    const mergedKeys = Object.keys(
+      (
+        actioSchema() as {
+          definitions: { executorDefinition: { properties: Record<string, unknown> } };
+        }
+      ).definitions.executorDefinition.properties,
+    ).sort();
+    const sourceKeys = Object.keys(
+      extensionsSchema.addDefinitions.executorDefinition.properties,
+    ).sort();
+
+    expect(mergedKeys).toEqual(runtimeKeys);
+    expect(sourceKeys).toEqual(runtimeKeys);
+  });
+
+  it("rejects job-only keys in executor definitions", () => {
+    for (const key of [
+      "strategy",
+      "if",
+      "permissions",
+      "concurrency",
+      "continue-on-error",
+      "environment",
+    ]) {
+      const doc = load(`on: [push]
+executors:
+  bad:
+    ${key}: value
+jobs:
+  test:
+    executor: bad
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+      expect(validate(doc)).toBe(false);
+    }
   });
 
   it("accepts job_defaults strategy for reusable-workflow caller jobs", () => {

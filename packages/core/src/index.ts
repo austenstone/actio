@@ -54,6 +54,7 @@ export {
   builtinPasses,
   createRegistry,
   dynamicMatrix,
+  EXECUTOR_KEYS,
   fallback,
   fragments,
   JOB_DEFAULTS_SAFE_SUBSET,

@@ -5,6 +5,7 @@ import { fragments } from "./fragments.js";
 import {
   applyDefaults,
   applyExecutor,
+  EXECUTOR_KEYS,
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,
 } from "./jobDefaults.js";
@@ -48,6 +49,7 @@ export {
   applyDefaults,
   applyExecutor,
   dynamicMatrix,
+  EXECUTOR_KEYS,
   fallback,
   fragments,
   JOB_DEFAULTS_SAFE_SUBSET,

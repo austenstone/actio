@@ -9,8 +9,8 @@ jobs:
   release:
     steps:
       - run: echo release
-    permissions:
-      contents: read
+    env:
+      HARDENED: "true"
     timeout-minutes: 10
     runs-on:
       - self-hosted
@@ -18,9 +18,10 @@ jobs:
     container:
       image: nvidia/cuda:12.4.0-base
   tuned:
-    permissions:
-      pull-requests: write
+    runs-on: windows-latest
     steps:
       - run: echo tuned
+    env:
+      HARDENED: "true"
+      FAST: "true"
     timeout-minutes: 5
-    runs-on: ubuntu-latest

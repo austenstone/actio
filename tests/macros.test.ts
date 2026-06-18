@@ -488,12 +488,19 @@ jobs:
   });
 
   it("rejects unsupported keys in executor definitions", () => {
-    const { result, errors } = build(`name: x
+    for (const key of [
+      "strategy",
+      "if",
+      "permissions",
+      "concurrency",
+      "continue-on-error",
+      "environment",
+    ]) {
+      const { result, errors } = build(`name: x
 on: [push]
 executors:
   bad:
-    strategy:
-      fail-fast: false
+    ${key}: bad
 jobs:
   test:
     executor: bad
@@ -501,11 +508,12 @@ jobs:
     steps:
       - run: echo hi
 `);
-    expect(result.ok).toBe(false);
-    expect(errors.some((d) => d.message.includes("executor-rejected-key"))).toBe(true);
-    expect(errors.some((d) => d.message.includes('Key "strategy" is not supported here'))).toBe(
-      true,
-    );
+      expect(result.ok).toBe(false);
+      expect(errors.some((d) => d.message.includes("executor-rejected-key"))).toBe(true);
+      expect(errors.some((d) => d.message.includes(`Key "${key}" is not supported here`))).toBe(
+        true,
+      );
+    }
   });
 
   it("errors when executor is used on a reusable-workflow call job", () => {
@@ -582,8 +590,8 @@ job_defaults:
     CI: "true"
 executors:
   hardened:
-    permissions:
-      contents: read
+    env:
+      HARDENED: "true"
 jobs:
   test:
     executor: hardened
@@ -599,7 +607,7 @@ jobs:
       env: { CI: "true" },
     });
     expect(ctx.internal.jobDefaults?.executors).toEqual({
-      hardened: { permissions: { contents: "read" } },
+      hardened: { env: { HARDENED: "true" } },
     });
     expect(ctx.data.job_defaults).toBeUndefined();
     expect(ctx.data.executors).toBeUndefined();
@@ -613,9 +621,9 @@ jobs:
       steps: [{ run: "echo hi" }],
     };
     applyDefaults(singleJob, { "timeout-minutes": 22 });
-    applyExecutor(singleJob, { permissions: { contents: "read" } });
+    applyExecutor(singleJob, { env: { EXECUTOR: "true" } });
     expect(singleJob["timeout-minutes"]).toBe(22);
-    expect(singleJob.permissions).toEqual({ contents: "read" });
+    expect(singleJob.env).toEqual({ EXECUTOR: "true" });
 
     const blankIfJob: Job = { if: "" };
     applyDefaults(blankIfJob, { if: "" });
@@ -693,8 +701,8 @@ jobs:
 on: [push]
 executors:
   hardened:
-    permissions:
-      contents: read
+    env:
+      HARDENED: "true"
     timeout-minutes: 10
   gpu:
     runs-on: [self-hosted, gpu]
@@ -702,8 +710,8 @@ executors:
       image: nvidia/cuda:12.4.0-base
   fast:
     runs-on: ubuntu-latest
-    permissions:
-      issues: write
+    env:
+      FAST: "true"
     timeout-minutes: 5
 jobs:
   release:
@@ -712,21 +720,20 @@ jobs:
       - run: echo release
   tuned:
     executor: [hardened, fast]
-    permissions:
-      pull-requests: write
+    runs-on: windows-latest
     steps:
       - run: echo tuned
 `);
     expect(result.ok).toBe(true);
     expect(errors).toEqual([]);
-    expect(doc.jobs.release.permissions).toEqual({ contents: "read" });
+    expect(doc.jobs.release.env).toEqual({ HARDENED: "true" });
     expect(doc.jobs.release["timeout-minutes"]).toBe(10);
     expect(doc.jobs.release["runs-on"]).toEqual(["self-hosted", "gpu"]);
     expect(doc.jobs.release.container).toEqual({ image: "nvidia/cuda:12.4.0-base" });
 
-    expect(doc.jobs.tuned.permissions).toEqual({ "pull-requests": "write" });
+    expect(doc.jobs.tuned.env).toEqual({ HARDENED: "true", FAST: "true" });
     expect(doc.jobs.tuned["timeout-minutes"]).toBe(5);
-    expect(doc.jobs.tuned["runs-on"]).toBe("ubuntu-latest");
+    expect(doc.jobs.tuned["runs-on"]).toBe("windows-latest");
   });
 
   it("replaces runs-on objects for REPLACE_KEYS across executor compose and apply", () => {

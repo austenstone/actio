@@ -20,9 +20,13 @@ const JOB_DEFAULT_KEYS = [
 
 type JobDefaultKey = (typeof JOB_DEFAULT_KEYS)[number];
 
-const EXECUTOR_KEYS = JOB_DEFAULT_KEYS.filter(
-  (key): key is Exclude<JobDefaultKey, "if" | "strategy"> => key !== "if" && key !== "strategy",
-);
+export const EXECUTOR_KEYS = [
+  "runs-on",
+  "timeout-minutes",
+  "env",
+  "container",
+  "services",
+] as const;
 
 const CALL_JOB_DEFAULT_KEYS = new Set<string>(["if", "permissions", "concurrency", "strategy"]);
 const REPLACE_ON_PRESENCE_KEYS = new Set(["permissions", "concurrency", "strategy"]);

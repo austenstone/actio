@@ -177,19 +177,12 @@
       "additionalProperties": false,
       "properties": {
         "runs-on": { "$ref": "#/definitions/normalJob/properties/runs-on" },
-        "continue-on-error": {
-          "$ref": "#/definitions/normalJob/properties/continue-on-error"
-        },
-        "environment": { "$ref": "#/definitions/normalJob/properties/environment" },
         "timeout-minutes": {
           "$ref": "#/definitions/normalJob/properties/timeout-minutes"
         },
-        "permissions": { "$ref": "#/definitions/normalJob/properties/permissions" },
-        "concurrency": { "$ref": "#/definitions/normalJob/properties/concurrency" },
         "container": { "$ref": "#/definitions/normalJob/properties/container" },
         "services": { "$ref": "#/definitions/normalJob/properties/services" },
-        "env": { "$ref": "#/definitions/env" },
-        "defaults": { "$ref": "#/definitions/normalJob/properties/defaults" }
+        "env": { "$ref": "#/definitions/env" }
       }
     },
     "retry": {
