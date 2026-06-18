@@ -1,6 +1,6 @@
 import type { ParamType, SymbolDef, SymbolKind } from "../ir.js";
 import type { ParseContext, Path } from "../parser.js";
-import { collectExpressionRoots, conservativeTaint, RUNTIME_CONTEXT_ROOTS } from "../symbols.js";
+import { conservativeTaint } from "../symbols.js";
 import { isObject, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
@@ -234,24 +234,106 @@ const lookupSymbolValue = (
   return { symbol, value: current, resolved: current !== undefined };
 };
 
-const findRuntimeExpressions = (value: string): string[] => {
-  const expressions: string[] = [];
+const isIdentifierStart = (char: string): boolean => /[A-Za-z_]/.test(char);
+
+const isIdentifierPart = (char: string): boolean => /[A-Za-z0-9_]/.test(char);
+
+/**
+ * Scan a text boundary for runtime `${{ ... }}` expressions whose body references
+ * the `params` root context. Params are compile-time only, so a `params` root
+ * inside a runtime sigil is a hard error.
+ *
+ * This is a single quote-aware tokenizer. For each `${{`, it walks to the REAL
+ * top-level closing `}}`, skipping `}}` that appear inside single- or
+ * double-quoted GHA string literals (honoring `''` and `\"` escaping), and scans
+ * the body for a `params` root in the same pass. Locating the close with a naive
+ * `indexOf("}}")` is unsound: a `}}` inside a literal — e.g. `format('}}',
+ * params.env)` — truncates the body before the `params` root and silently bypasses
+ * the guard, so the contract must not depend on a separate, non-quote-aware close
+ * finder. Dotted access (`steps.params.outputs.x`) and substrings (`vars.myparams`)
+ * are correctly ignored.
+ *
+ * Returns the trimmed body of every offending expression (one diagnostic each).
+ */
+const findParamsRootRuntimeExpressions = (value: string): string[] => {
+  const offending: string[] = [];
   let cursor = 0;
   while (cursor < value.length) {
     const open = value.indexOf("${{", cursor);
     if (open < 0) break;
-    const close = value.indexOf("}}", open + 3);
+
+    const bodyStart = open + 3;
+    let index = bodyStart;
+    let quote: "'" | '"' | undefined;
+    let hasParamsRoot = false;
+    let close = -1;
+
+    while (index < value.length) {
+      const char = value[index];
+      if (!char) {
+        index++;
+        continue;
+      }
+
+      if (quote) {
+        if (char === quote) {
+          if (quote === "'" && value[index + 1] === "'") {
+            index += 2;
+            continue;
+          }
+          if (quote === '"') {
+            let bs = 0;
+            let j = index - 1;
+            while (j >= bodyStart && value[j] === "\\") {
+              bs++;
+              j--;
+            }
+            if (bs % 2 === 1) {
+              index++;
+              continue;
+            }
+          }
+          quote = undefined;
+        }
+        index++;
+        continue;
+      }
+
+      if (char === "'" || char === '"') {
+        quote = char;
+        index++;
+        continue;
+      }
+
+      if (char === "}" && value[index + 1] === "}") {
+        close = index;
+        break;
+      }
+
+      if (isIdentifierStart(char)) {
+        const idStart = index;
+        let end = index + 1;
+        while (end < value.length && isIdentifierPart(value[end] ?? "")) end++;
+        index = end;
+        if (value.slice(idStart, end) === "params") {
+          let prev = idStart - 1;
+          while (prev >= bodyStart && /\s/.test(value[prev] ?? "")) prev--;
+          if (!(prev >= bodyStart && value[prev] === ".")) {
+            hasParamsRoot = true;
+          }
+        }
+        continue;
+      }
+
+      index++;
+    }
+
     if (close < 0) break;
-    expressions.push(value.slice(open + 3, close).trim());
+    if (hasParamsRoot) offending.push(value.slice(bodyStart, close).trim());
     cursor = close + 2;
   }
-  return expressions;
+  return offending;
 };
-
-const RUNTIME_SIGIL_ROOTS = new Set<string>([...RUNTIME_CONTEXT_ROOTS, "params"]);
-
-const containsParamsRootReference = (expr: string): boolean =>
-  collectExpressionRoots(expr, RUNTIME_SIGIL_ROOTS).has("params");
 
 const hasCompileToken = (value: string): boolean => {
   let cursor = 0;
@@ -400,18 +482,16 @@ export const resolveCompileTimeText = (
   options: ResolveTextOptions = {},
 ): string => {
   if (options.validateRuntimeExpressions !== false) {
-    for (const expr of findRuntimeExpressions(value)) {
-      if (containsParamsRootReference(expr)) {
-        pushDiagnostic(
-          ctx,
-          "error",
-          diagnosticMessage(
-            "params-runtime-sigil",
-            `Runtime expression "\${{ ${expr} }}" is invalid for params; use "{{ params.* }}"`,
-          ),
-          path,
-        );
-      }
+    for (const expr of findParamsRootRuntimeExpressions(value)) {
+      pushDiagnostic(
+        ctx,
+        "error",
+        diagnosticMessage(
+          "params-runtime-sigil",
+          `Runtime expression "\${{ ${expr} }}" is invalid for params; use "{{ params.* }}"`,
+        ),
+        path,
+      );
     }
   }
 

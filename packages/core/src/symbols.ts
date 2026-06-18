@@ -36,7 +36,16 @@ export const RUNTIME_CONTEXT_ROOTS = [
 ] as const;
 
 export const RUNTIME_CONTEXT_ROOT_SET: ReadonlySet<string> = new Set(RUNTIME_CONTEXT_ROOTS);
-
+/**
+ * Conservative taint for COMPILE-TIME params: they are resolved and spliced at
+ * compile time and are never derived from runtime-tainted inputs, so the safe
+ * (conservative) facet here is `{ tainted: false }`.
+ *
+ * NOTE: the name describes the compile-time-param stance, NOT a general "assume
+ * tainted" helper. Downstream runtime / shared-output passes (e.g. #23) must NOT
+ * assume this propagates taint — they have to compute and thread taint through
+ * their own derivations rather than reuse this constant.
+ */
 export function conservativeTaint(): TaintFacet {
   return { tainted: false, derivedFrom: [] };
 }
