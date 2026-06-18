@@ -9,7 +9,9 @@ function errorsFor(source: string) {
 }
 
 function errorMessages(source: string): string[] {
-  return errorsFor(source).map((diagnostic) => diagnostic.message);
+  return errorsFor(source).map((diagnostic) =>
+    diagnostic.code ? `[${diagnostic.code}] ${diagnostic.message}` : diagnostic.message,
+  );
 }
 
 function noValidateErrorsFor(source: string) {
@@ -197,9 +199,7 @@ jobs:
       - run: echo "\${{ params.env }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("keeps runtime-sigil root derivation aligned with shared runtime roots", () => {
@@ -212,8 +212,8 @@ jobs:
     steps:
       - run: echo "\${{ ${root}.value }}"
 `);
-      const hasRuntimeSigil = errors.some((diagnostic) =>
-        diagnostic.message.includes("[params-runtime-sigil]"),
+      const hasRuntimeSigil = errors.some(
+        (diagnostic) => diagnostic.code === "params-runtime-sigil",
       );
       expect(hasRuntimeSigil).toBe(root === "params");
     }
@@ -234,9 +234,7 @@ jobs:
       - run: echo "\${{ fromJSON(params.config).image }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("errors when params root is used inside runtime function arguments", () => {
@@ -257,8 +255,8 @@ jobs:
       - run: echo "\${{ contains(params.targets, 'x') }}"
 `);
 
-    const runtimeSigilErrors = errors.filter((diagnostic) =>
-      diagnostic.message.includes("[params-runtime-sigil]"),
+    const runtimeSigilErrors = errors.filter(
+      (diagnostic) => diagnostic.code === "params-runtime-sigil",
     );
     expect(runtimeSigilErrors.length).toBe(2);
   });
@@ -277,9 +275,7 @@ jobs:
       - run: echo "\${{ format('{0}', params.name) }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("does not flag params when it is a non-root path segment in runtime expressions", () => {
@@ -294,9 +290,7 @@ jobs:
       - run: echo "\${{ steps.params.outputs.x }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      false,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(false);
   });
 
   it("does not flag identifiers that only contain params as a substring", () => {
@@ -309,9 +303,7 @@ jobs:
       - run: echo "\${{ vars.myparams }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      false,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(false);
   });
 
   it("does not flag params text inside runtime string literals", () => {
@@ -324,9 +316,7 @@ jobs:
       - run: echo "\${{ format('params.x', github.ref) }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      false,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(false);
   });
 
   it("detects params after even backslash run closes a double-quoted string", () => {
@@ -343,9 +333,7 @@ jobs:
       - run: echo "\${{ format("a\\\\", params.env) }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("does not flag params inside an odd-backslash-escaped double quote", () => {
@@ -358,9 +346,7 @@ jobs:
       - run: echo "\${{ format("a\\"b", github.ref) }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      false,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(false);
   });
 
   it("handles trailing backslash in string without regression on normal close", () => {
@@ -377,9 +363,7 @@ jobs:
       - run: echo "\${{ format("path\\\\end", params.env) }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("catches params after a single-quoted literal containing }} (format)", () => {
@@ -396,9 +380,7 @@ jobs:
       - run: echo "\${{ format('}}', params.env) }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("catches params after a single-quoted literal containing }} (startsWith)", () => {
@@ -415,9 +397,7 @@ jobs:
       - run: echo "\${{ startsWith('a}}b', params.env) }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("catches params after a double-quoted literal containing }} (format)", () => {
@@ -434,9 +414,7 @@ jobs:
       - run: echo '\${{ format("}}", params.env) }}'
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("catches params after a double-quoted literal containing }} (startsWith)", () => {
@@ -453,9 +431,7 @@ jobs:
       - run: echo '\${{ startsWith("a}}b", params.env) }}'
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("honors '' escaping inside a single-quoted literal containing }}", () => {
@@ -472,9 +448,7 @@ jobs:
       - run: echo "\${{ format('a''}}b', params.env) }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("resyncs across a benign expression to catch a later }}-in-literal evasion", () => {
@@ -491,9 +465,7 @@ jobs:
       - run: echo "\${{ github.sha }} \${{ format('}}', params.env) }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("does not flag a }}-bearing literal that has no params root", () => {
@@ -506,9 +478,7 @@ jobs:
       - run: echo "\${{ format('}}', github.ref) }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      false,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(false);
   });
 
   it("catches params after an escaped double quote inside a }}-bearing literal", () => {
@@ -525,9 +495,7 @@ jobs:
       - run: echo '\${{ format("a\\"}}", params.env) }}'
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("does not treat compile-time sigils as runtime params usage", () => {
@@ -544,9 +512,7 @@ jobs:
       - run: echo "{{ params.x }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      false,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(false);
   });
 
   it("hard-errors on a params root hidden behind a }} in a string literal, even with validation disabled", () => {
@@ -565,9 +531,7 @@ jobs:
     const result = transpile(source, { fileName: "t.actio.yml", validate: false });
     const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
     expect(result.ok).toBe(false);
   });
 
@@ -587,9 +551,7 @@ jobs:
     const result = transpile(source, { fileName: "t.actio.yml", validate: false });
     const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
     expect(result.ok).toBe(false);
   });
 
@@ -609,9 +571,7 @@ jobs:
     const result = transpile(source, { fileName: "t.actio.yml", validate: false });
     const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
     expect(result.ok).toBe(false);
   });
 
@@ -631,9 +591,7 @@ jobs:
     const result = transpile(source, { fileName: "t.actio.yml", validate: false });
     const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
   });
 
   it("does not flag a runtime expression whose only }} lives inside a string literal", () => {
@@ -646,9 +604,7 @@ jobs:
       - run: echo "\${{ format('}}', github.ref) }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      false,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(false);
   });
 
   it("catches a params root when the runtime sigil starts at offset 0 of the value", () => {
@@ -667,9 +623,7 @@ jobs:
     const result = transpile(source, { fileName: "t.actio.yml", validate: false });
     const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
     expect(result.ok).toBe(false);
   });
 
@@ -689,9 +643,7 @@ jobs:
     const result = transpile(source, { fileName: "t.actio.yml", validate: false });
     const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      false,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(false);
   });
 
   it("does not flag a dotted params access even with whitespace around the dots", () => {
@@ -704,9 +656,7 @@ jobs:
       - run: echo "\${{ steps . params . outputs.x }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      false,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(false);
   });
 
   it("catches a params root after a doubled-single-quote escape inside a literal", () => {
@@ -725,9 +675,7 @@ jobs:
     const result = transpile(source, { fileName: "t.actio.yml", validate: false });
     const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "params-runtime-sigil")).toBe(true);
     expect(result.ok).toBe(false);
   });
 
@@ -746,9 +694,7 @@ jobs:
       - run: echo "{{ params.config }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[interp-non-scalar]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "interp-non-scalar")).toBe(true);
   });
 
   it("errors on unresolved compile-time interpolation", () => {
@@ -761,9 +707,7 @@ jobs:
       - run: echo "{{ params.missing }}"
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[interp-unresolved]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "interp-unresolved")).toBe(true);
   });
 
   it("validates enum defaults against allowed values", () => {
@@ -781,9 +725,7 @@ jobs:
       - run: echo hi
 `);
 
-    expect(errors.some((diagnostic) => diagnostic.message.includes("[param-enum-default]"))).toBe(
-      true,
-    );
+    expect(errors.some((diagnostic) => diagnostic.code === "param-enum-default")).toBe(true);
   });
 
   it("errors when a param definition contains unknown keys", () => {
@@ -801,9 +743,9 @@ jobs:
       - run: echo hi
 `);
 
-    expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[param-definition-key-unknown]")),
-    ).toBe(true);
+    expect(errors.some((diagnostic) => diagnostic.code === "param-definition-key-unknown")).toBe(
+      true,
+    );
   });
 
   it("errors when non-enum param definitions include values", () => {
@@ -821,9 +763,9 @@ jobs:
       - run: echo hi
 `);
 
-    expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[param-definition-key-unknown]")),
-    ).toBe(true);
+    expect(errors.some((diagnostic) => diagnostic.code === "param-definition-key-unknown")).toBe(
+      true,
+    );
   });
 
   it("errors when a scalar param is used in a steps position", () => {
@@ -839,9 +781,7 @@ jobs:
     steps: params.script
 `);
 
-    expect(
-      errors.some((diagnostic) => diagnostic.message.includes("[param-structural-type]")),
-    ).toBe(true);
+    expect(errors.some((diagnostic) => diagnostic.code === "param-structural-type")).toBe(true);
   });
 });
 
@@ -1094,7 +1034,9 @@ jobs:
 
     const errors = result.diagnostics
       .filter((diagnostic) => diagnostic.severity === "error")
-      .map((diagnostic) => diagnostic.message);
+      .map((diagnostic) =>
+        diagnostic.code ? `[${diagnostic.code}] ${diagnostic.message}` : diagnostic.message,
+      );
     expect(errors.some((message) => message.includes("[interp-unresolved]"))).toBe(true);
   });
 });

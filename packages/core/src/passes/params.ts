@@ -1,7 +1,7 @@
 import type { ParamType, SymbolDef, SymbolKind } from "../ir.js";
 import type { ParseContext, Path } from "../parser.js";
 import { conservativeTaint } from "../symbols.js";
-import { isObject, pushDiagnostic } from "./helpers.js";
+import { expectMapping, isObject, pushDiagnostic, warnUnknownKeys } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
 interface ParsedExpr {
@@ -21,8 +21,6 @@ const PARAM_TYPES: ReadonlySet<ParamType> = new Set([
 
 const PARAM_DEFINITION_BASE_KEYS = new Set(["type", "default"]);
 const PARAM_DEFINITION_ENUM_KEYS = new Set([...PARAM_DEFINITION_BASE_KEYS, "values"]);
-
-const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
 
 const symbolKindForType = (type: ParamType): SymbolKind => {
   if (type === "stepList" || type === "steps") return "param-stepList";
@@ -80,13 +78,12 @@ const collectParamSymbol = (
   rawDefinition: unknown,
   path: Path,
 ): SymbolDef | undefined => {
-  if (!isObject(rawDefinition)) {
-    pushDiagnostic(
-      ctx,
-      "error",
-      diagnosticMessage("param-definition-invalid", `params.${name} must be an object definition`),
-      path,
-    );
+  if (
+    !expectMapping(ctx, rawDefinition, path, {
+      message: `params.${name} must be an object definition`,
+      code: "param-definition-invalid",
+    })
+  ) {
     return undefined;
   }
 
@@ -96,19 +93,12 @@ const collectParamSymbol = (
       ? PARAM_DEFINITION_ENUM_KEYS
       : PARAM_DEFINITION_BASE_KEYS;
 
-  const unknownKeys = Object.keys(rawDefinition).filter((key) => !allowedKeys.has(key));
+  const unknownKeys = warnUnknownKeys(ctx, rawDefinition, allowedKeys, path, {
+    severity: "error",
+    message: (key) => `params.${name}.${key} is not a supported parameter definition field`,
+    code: "param-definition-key-unknown",
+  });
   if (unknownKeys.length > 0) {
-    for (const key of unknownKeys) {
-      pushDiagnostic(
-        ctx,
-        "error",
-        diagnosticMessage(
-          "param-definition-key-unknown",
-          `params.${name}.${key} is not a supported parameter definition field`,
-        ),
-        [...path, key],
-      );
-    }
     return undefined;
   }
 
@@ -116,11 +106,9 @@ const collectParamSymbol = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage(
-        "param-type-invalid",
-        `params.${name}.type must be one of ${[...PARAM_TYPES].join(", ")}`,
-      ),
+      `params.${name}.type must be one of ${[...PARAM_TYPES].join(", ")}`,
       [...path, "type"],
+      { code: "param-type-invalid" },
     );
     return undefined;
   }
@@ -131,11 +119,9 @@ const collectParamSymbol = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage(
-        "param-enum-values",
-        `params.${name}.values must be a non-empty string array when type is enum`,
-      ),
+      `params.${name}.values must be a non-empty string array when type is enum`,
       [...path, "values"],
+      { code: "param-enum-values" },
     );
     return undefined;
   }
@@ -146,11 +132,9 @@ const collectParamSymbol = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage(
-        "param-default-type",
-        `params.${name}.default does not match declared type "${type}"`,
-      ),
+      `params.${name}.default does not match declared type "${type}"`,
       [...path, "default"],
+      { code: "param-default-type" },
     );
     return undefined;
   }
@@ -164,11 +148,9 @@ const collectParamSymbol = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage(
-        "param-enum-default",
-        `params.${name}.default must be one of [${values.join(", ")}]`,
-      ),
+      `params.${name}.default must be one of [${values.join(", ")}]`,
       [...path, "default"],
+      { code: "param-enum-default" },
     );
     return undefined;
   }
@@ -378,15 +360,9 @@ const interpolateCompileTokens = (
     const close = value.indexOf("}}", open + 2);
     if (close < 0) {
       if (options.reportInterpolationErrors !== false) {
-        pushDiagnostic(
-          ctx,
-          "error",
-          diagnosticMessage(
-            "interp-unresolved",
-            `Unclosed compile-time interpolation in "${value}"`,
-          ),
-          path,
-        );
+        pushDiagnostic(ctx, "error", `Unclosed compile-time interpolation in "${value}"`, path, {
+          code: "interp-unresolved",
+        });
       }
       output += value.slice(open);
       break;
@@ -396,12 +372,9 @@ const interpolateCompileTokens = (
     const parsed = parseCompileExpr(token);
     if (!parsed) {
       if (options.reportInterpolationErrors !== false) {
-        pushDiagnostic(
-          ctx,
-          "error",
-          diagnosticMessage("interp-unresolved", `Cannot parse compile-time expression "${token}"`),
-          path,
-        );
+        pushDiagnostic(ctx, "error", `Cannot parse compile-time expression "${token}"`, path, {
+          code: "interp-unresolved",
+        });
       }
       output += value.slice(open, close + 2);
       cursor = close + 2;
@@ -414,11 +387,9 @@ const interpolateCompileTokens = (
         pushDiagnostic(
           ctx,
           "error",
-          diagnosticMessage(
-            "interp-unresolved",
-            `Cannot resolve compile-time expression "${token}" from the symbol table`,
-          ),
+          `Cannot resolve compile-time expression "${token}" from the symbol table`,
           path,
+          { code: "interp-unresolved" },
         );
       }
       output += value.slice(open, close + 2);
@@ -434,11 +405,9 @@ const interpolateCompileTokens = (
           pushDiagnostic(
             ctx,
             "error",
-            diagnosticMessage(
-              "interp-unresolved",
-              `Cannot serialize compile-time expression "${token}" with toJSON(...)`,
-            ),
+            `Cannot serialize compile-time expression "${token}" with toJSON(...)`,
             path,
+            { code: "interp-unresolved" },
           );
         }
         output += value.slice(open, close + 2);
@@ -455,11 +424,9 @@ const interpolateCompileTokens = (
         pushDiagnostic(
           ctx,
           "error",
-          diagnosticMessage(
-            "interp-non-scalar",
-            `Expression "${token}" resolved to a non-scalar value; wrap it as {{ toJSON(...) }}`,
-          ),
+          `Expression "${token}" resolved to a non-scalar value; wrap it as {{ toJSON(...) }}`,
           path,
+          { code: "interp-non-scalar" },
         );
       }
       output += value.slice(open, close + 2);
@@ -486,11 +453,9 @@ export const resolveCompileTimeText = (
       pushDiagnostic(
         ctx,
         "error",
-        diagnosticMessage(
-          "params-runtime-sigil",
-          `Runtime expression "\${{ ${expr} }}" is invalid for params; use "{{ params.* }}"`,
-        ),
+        `Runtime expression "\${{ ${expr} }}" is invalid for params; use "{{ params.* }}"`,
         path,
+        { code: "params-runtime-sigil" },
       );
     }
   }
@@ -500,11 +465,9 @@ export const resolveCompileTimeText = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage(
-        "interp-unresolved",
-        `Compile-time interpolation was left unresolved in "${interpolated}"`,
-      ),
+      `Compile-time interpolation was left unresolved in "${interpolated}"`,
       path,
+      { code: "interp-unresolved" },
     );
   }
   return interpolated;
@@ -548,11 +511,9 @@ const resolveBareStructuralExpression = (ctx: ParseContext, value: string, path:
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage(
-        "param-structural-unresolved",
-        `Cannot resolve structural expression "${trimmed}" from the symbol table`,
-      ),
+      `Cannot resolve structural expression "${trimmed}" from the symbol table`,
       path,
+      { code: "param-structural-unresolved" },
     );
     return value;
   }
@@ -561,11 +522,9 @@ const resolveBareStructuralExpression = (ctx: ParseContext, value: string, path:
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage(
-        "param-structural-type",
-        `Expression "${trimmed}" must resolve to a step list in this position`,
-      ),
+      `Expression "${trimmed}" must resolve to a step list in this position`,
       path,
+      { code: "param-structural-type" },
     );
     return value;
   }
@@ -599,13 +558,12 @@ export const paramsPass = (ctx: ParseContext): void => {
   const rawParams = ctx.data.params;
   if (rawParams === undefined) return;
 
-  if (!isObject(rawParams)) {
-    pushDiagnostic(
-      ctx,
-      "error",
-      diagnosticMessage("params-shape-invalid", "Top-level params must be a mapping"),
-      ["params"],
-    );
+  if (
+    !expectMapping(ctx, rawParams, ["params"], {
+      message: "Top-level params must be a mapping",
+      code: "params-shape-invalid",
+    })
+  ) {
     delete ctx.data.params;
     return;
   }
