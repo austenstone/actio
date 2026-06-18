@@ -37,6 +37,8 @@
     "build:action": "npm run build -w actio-annotate-action",
     "build:workflows": "node packages/cli/dist/cli.js build --config .github/actio/actio.config.ts",
     "check:workflows": "node packages/cli/dist/cli.js check --config .github/actio/actio.config.ts",
+    "build:e2e-fixtures": "node scripts/build-e2e-fixtures.mjs",
+    "check:e2e-fixtures": "node scripts/build-e2e-fixtures.mjs --check",
     "test:lint:workflows": "docker run --rm -v \"$PWD\":/repo --workdir /repo rhysd/actionlint:1.7.12 -color -shellcheck= -pyflakes= .github/workflows/*.yml",
     "docs:install": "npm --prefix docs install",
     "docs:dev": "npm --prefix docs run dev",

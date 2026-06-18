@@ -36,6 +36,8 @@ export {
   workflow,
 } from "./ir.js";
 export {
+  type ForEachShareContract,
+  type ForEachShareContractEntry,
   type JobDefaultsInternalSnapshot,
   type ParseContext,
   type ParseContextInternal,
@@ -55,11 +57,14 @@ export {
   createRegistry,
   dynamicMatrix,
   EXECUTOR_KEYS,
+  type ExecutorKey,
   fallback,
   forEach,
   fragments,
+  JOB_DEFAULT_KEYS,
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,
+  type JobDefaultKey,
   type Pass,
   type PassFn,
   PassRegistry,

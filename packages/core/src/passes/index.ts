@@ -7,8 +7,11 @@ import {
   applyDefaults,
   applyExecutor,
   EXECUTOR_KEYS,
+  type ExecutorKey,
+  JOB_DEFAULT_KEYS,
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,
+  type JobDefaultKey,
 } from "./jobDefaults.js";
 import { params } from "./params.js";
 import { applyPasses, type Pass, PassRegistry } from "./registry.js";
@@ -61,11 +64,14 @@ export {
   applyExecutor,
   dynamicMatrix,
   EXECUTOR_KEYS,
+  type ExecutorKey,
   fallback,
   forEach,
   fragments,
+  JOB_DEFAULT_KEYS,
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,
+  type JobDefaultKey,
   params,
   retry,
   whenCompile,
