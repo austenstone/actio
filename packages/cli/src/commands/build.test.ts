@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type BuildOptions, ciAnnotationsEnabled, runBuild } from "./build.js";
+import { type BuildOptions, ciAnnotationsEnabled, discover, runBuild } from "./build.js";
 
 const INPUT = [
   "name: CI",
@@ -83,6 +83,46 @@ describe("runBuild source maps", () => {
     await mkdir(join(dir, "out"), { recursive: true });
     await writeFile(join(dir, "out", "ci.yml.map"), "{}\n", "utf8");
     expect(await runBuild([], options(dir, { check: true }))).toBe(1);
+  });
+});
+
+describe("discover default-glob exclusions", () => {
+  async function tree(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "actio-discover-"));
+    await writeFile(join(dir, "ci.actio.yml"), INPUT, "utf8");
+    // Collision-prone fixtures: many input.actio.yml all flatten to input.yml.
+    await mkdir(join(dir, "tests", "a"), { recursive: true });
+    await mkdir(join(dir, "tests", "b"), { recursive: true });
+    await writeFile(join(dir, "tests", "a", "input.actio.yml"), INPUT, "utf8");
+    await writeFile(join(dir, "tests", "b", "input.actio.yml"), INPUT, "utf8");
+    await mkdir(join(dir, "fixtures"), { recursive: true });
+    await writeFile(join(dir, "fixtures", "input.actio.yml"), INPUT, "utf8");
+    await mkdir(join(dir, "node_modules", "pkg"), { recursive: true });
+    await writeFile(join(dir, "node_modules", "pkg", "ci.actio.yml"), INPUT, "utf8");
+    return dir;
+  }
+
+  it("excludes tests/ and fixtures/ trees for a bare (no-pattern) run", async () => {
+    const dir = await tree();
+    const files = await discover([], dir);
+    expect(files).toEqual(["ci.actio.yml"]);
+  });
+
+  it("a bare build avoids the flatten-collision and succeeds", async () => {
+    const dir = await tree();
+    expect(await runBuild([], options(dir))).toBe(0);
+  });
+
+  it("honors an explicit pattern that opts back into tests/", async () => {
+    const dir = await tree();
+    const files = await discover(["tests/**/*.actio.yml"], dir);
+    expect(files).toEqual(["tests/a/input.actio.yml", "tests/b/input.actio.yml"]);
+  });
+
+  it("always excludes node_modules, even with an explicit pattern", async () => {
+    const dir = await tree();
+    const files = await discover(["**/*.actio.yml"], dir);
+    expect(files).not.toContain("node_modules/pkg/ci.actio.yml");
   });
 });
 

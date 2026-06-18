@@ -127,4 +127,17 @@ cli
 cli.help();
 cli.version(pkg.version);
 
-cli.parse();
+const parsed = cli.parse(process.argv, { run: false });
+if (!parsed.options.help && !parsed.options.version) {
+  if (!cli.matchedCommand) {
+    if (parsed.args.length === 0) {
+      // Bare `actio`: show help rather than silently exiting 0.
+      cli.outputHelp();
+      process.exit(0);
+    }
+    process.stderr.write(`${pc.red("error")}: unknown command "${parsed.args[0]}"\n`);
+    cli.outputHelp();
+    process.exit(1);
+  }
+  await cli.runMatchedCommand();
+}
