@@ -7,14 +7,39 @@ import { parse } from "yaml";
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 
+interface ParsedStep {
+  id?: string;
+  name?: string;
+  uses?: string;
+  run?: string;
+  if?: string;
+  "continue-on-error"?: boolean;
+}
+
+interface ParsedJob {
+  needs?: string[];
+  steps: ParsedStep[];
+  strategy?: {
+    matrix?: {
+      shard?: string;
+    };
+    "fail-fast"?: boolean;
+  };
+  fallback?: unknown;
+}
+
+interface ParsedWorkflow {
+  fragments?: unknown;
+  jobs: Record<string, ParsedJob>;
+}
+
 /** The `everything` fixture exercises every macro in a single workflow. These
  * assertions prove the passes compose — fragments feed retry/fallback, and
  * dynamic_matrix rewrites a job that also carries an inject + job-level fallback. */
 describe("all features together (everything fixture)", () => {
   const src = readFileSync(join(fixturesDir, "everything", "input.actio.yml"), "utf8");
   const result = transpile(src, { fileName: "input.actio.yml", sourceMap: true });
-  // biome-ignore lint/suspicious/noExplicitAny: parsed workflow is dynamic
-  const doc = parse(result.yaml) as any;
+  const doc = parse(result.yaml) as ParsedWorkflow;
 
   it("transpiles with no errors", () => {
     expect(result.diagnostics.filter((d) => d.severity === "error")).toEqual([]);

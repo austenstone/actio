@@ -1,6 +1,13 @@
 import { cloneNode, deriveNode, type Job, type Step, transformSteps, visitJobs } from "../ir.js";
 import type { ParseContext } from "../parser.js";
-import { collectUsedStepIds, combineIf, isObject, pushDiagnostic, slugify } from "./helpers.js";
+import {
+  asStepArray,
+  collectUsedStepIds,
+  combineIf,
+  isObject,
+  pushDiagnostic,
+  slugify,
+} from "./helpers.js";
 import type { Pass } from "./registry.js";
 
 const DEFAULT_ATTEMPTS = 3;
@@ -16,8 +23,9 @@ function parseDelaySeconds(value: unknown): number | undefined {
   if (typeof value === "number") return value > 0 ? value : undefined;
   if (typeof value === "string") {
     const m = value.trim().match(/^(\d+(?:\.\d+)?)\s*(s|m|h)?$/i);
-    if (!m) return undefined;
-    const n = Number.parseFloat(m[1]);
+    const amount = m?.[1];
+    if (!amount) return undefined;
+    const n = Number.parseFloat(amount);
     if (!(n > 0)) return undefined;
     const unit = (m[2] ?? "s").toLowerCase();
     const mult = unit === "h" ? 3600 : unit === "m" ? 60 : 1;
@@ -54,7 +62,7 @@ function stepLabel(step: Step): string {
   if (typeof step.name === "string" && step.name.trim()) return step.name.trim();
   if (typeof step.uses === "string" && step.uses.trim()) return step.uses.trim();
   if (typeof step.run === "string") {
-    const first = step.run.split("\n")[0].trim();
+    const first = step.run.split("\n")[0]?.trim();
     if (first) return first.length > 40 ? `${first.slice(0, 37)}...` : first;
   }
   return "step";
@@ -170,9 +178,9 @@ function expandRetryInFallback(
 ): void {
   const fb = container.fallback;
   if (Array.isArray(fb)) {
-    container.fallback = expandRetryInList(ctx, jobId, fb, used);
-  } else if (isObject(fb) && Array.isArray((fb as Step).steps)) {
-    (fb as Step).steps = expandRetryInList(ctx, jobId, (fb as Step).steps, used);
+    container.fallback = expandRetryInList(ctx, jobId, asStepArray(fb), used);
+  } else if (isObject(fb) && Array.isArray(fb.steps)) {
+    fb.steps = expandRetryInList(ctx, jobId, asStepArray(fb.steps), used);
   }
 }
 

@@ -1,7 +1,7 @@
 import { cloneNode, deriveNode, type Job, type Step, transformSteps, visitJobs } from "../ir.js";
 import type { ParseContext } from "../parser.js";
 import {
-  asArray,
+  asStepArray,
   collectUsedStepIds,
   combineIf,
   ensureStepId,
@@ -16,9 +16,9 @@ interface NormalizedFallback {
 }
 
 function normalizeFallback(fb: unknown): NormalizedFallback {
-  if (Array.isArray(fb)) return { steps: fb, recover: false };
+  if (Array.isArray(fb)) return { steps: asStepArray(fb), recover: false };
   if (isObject(fb)) {
-    return { steps: asArray((fb as Step).steps), recover: Boolean((fb as Step).recover) };
+    return { steps: asStepArray(fb.steps), recover: Boolean(fb.recover) };
   }
   return { steps: [], recover: false };
 }

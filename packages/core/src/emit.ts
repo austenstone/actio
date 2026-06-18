@@ -40,8 +40,7 @@ export function emitYaml(data: WorkflowData, options: EmitOptions = {}): string 
 function toOrdered(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(toOrdered);
   if (value && typeof value === "object") {
-    // biome-ignore lint/suspicious/noExplicitAny: dynamic workflow model
-    const obj = value as Record<string, any>;
+    const obj = value as Record<string, unknown>;
     const recorded: string[] | undefined = (obj as Record<symbol, unknown>)[KEY_ORDER] as
       | string[]
       | undefined;

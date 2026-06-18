@@ -186,7 +186,7 @@ export function resolveGeneratedLine(
   }
   if (!match) return undefined;
   return {
-    file: map.sources[match.source] ?? map.sources[0],
+    file: map.sources[match.source] ?? map.sources[0] ?? "",
     line: match.original.line,
     col: match.original.col,
   };

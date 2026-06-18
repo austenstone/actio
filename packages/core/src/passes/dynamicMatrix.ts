@@ -10,8 +10,7 @@ import {
 } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
-// biome-ignore lint/suspicious/noExplicitAny: dynamic config object
-type DM = Record<string, any>;
+type DM = Record<string, unknown>;
 
 function opt<T>(dm: DM, ...keys: string[]): T | undefined {
   for (const k of keys) {

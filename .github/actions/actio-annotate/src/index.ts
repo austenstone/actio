@@ -34,6 +34,7 @@ const SELF_JOB_NAME = "Actio annotate";
  */
 function workflowPathFromRef(ref: string, repo: string): string | undefined {
   const withoutGit = ref.split("@")[0];
+  if (!withoutGit) return undefined;
   const prefix = `${repo}/`;
   if (!withoutGit.startsWith(prefix)) return undefined;
   return withoutGit.slice(prefix.length);

@@ -11,6 +11,7 @@
     "rules": {
       "preset": "recommended",
       "suspicious": {
+        "noExplicitAny": "error",
         "noConsole": { "level": "off", "options": { "allow": ["log"] } },
         "noTemplateCurlyInString": "off"
       },
