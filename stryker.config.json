@@ -7,7 +7,8 @@
   "mutate": [
     "packages/core/src/passes/**/*.ts",
     "packages/core/src/emit.ts",
-    "packages/core/src/ir.ts"
+    "packages/core/src/ir.ts",
+    "packages/core/src/symbols.ts"
   ],
   "reporters": ["progress", "clear-text", "json"],
   "jsonReporter": {
