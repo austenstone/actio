@@ -1,5 +1,5 @@
 import { deriveNode, type Job, type Step } from "../ir.js";
-import type { ParseContext } from "../parser.js";
+import { KEY_ORDER, type ParseContext, setKeyOrder } from "../parser.js";
 import {
   asArray,
   combineIf,
@@ -220,10 +220,19 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
   const jobs = ctx.data.jobs;
   if (!isObject(jobs)) return;
 
+  const recorded = (jobs as Record<symbol, unknown>)[KEY_ORDER] as string[] | undefined;
+  const seen = new Set(recorded ?? []);
+  const order = recorded
+    ? [...recorded.filter((k) => k in jobs), ...Object.keys(jobs).filter((k) => !seen.has(k))]
+    : Object.keys(jobs);
+
   const rebuilt: Record<string, unknown> = {};
-  for (const [jobId, job] of Object.entries(jobs)) {
+  const rebuiltOrder: string[] = [];
+  for (const jobId of order) {
+    const job = (jobs as Record<string, unknown>)[jobId];
     if (!isObject(job) || (job as Job).dynamic_matrix == null) {
       rebuilt[jobId] = job;
+      rebuiltOrder.push(jobId);
       continue;
     }
     const setupId = opt<string>(job.dynamic_matrix as DM, "id") ?? `actio_setup_${jobId}`;
@@ -232,12 +241,16 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
       // Leave the job intact (minus the macro key) so other passes/validation proceed.
       delete (job as Job).dynamic_matrix;
       rebuilt[jobId] = job;
+      rebuiltOrder.push(jobId);
       continue;
     }
     transformTargetJob(ctx, jobId, job as Job, setupId);
     rebuilt[setupId] = setup;
+    rebuiltOrder.push(setupId);
     rebuilt[jobId] = job;
+    rebuiltOrder.push(jobId);
   }
+  setKeyOrder(rebuilt, rebuiltOrder);
   ctx.data.jobs = rebuilt;
 }
 

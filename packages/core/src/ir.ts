@@ -1,5 +1,12 @@
 import type { Range } from "./diagnostics.js";
-import { type Origin, type ParseContext, type Path, rangeOfPath } from "./parser.js";
+import {
+  KEY_ORDER,
+  type Origin,
+  type ParseContext,
+  type Path,
+  rangeOfPath,
+  setKeyOrder,
+} from "./parser.js";
 
 export type { Origin };
 
@@ -94,7 +101,26 @@ export function cloneNode<T extends object>(ctx: ParseContext, node: T): T {
   const copy = structuredClone(node);
   const origin = ctx.origins.get(node);
   if (origin) ctx.origins.set(copy, origin);
+  reapplyKeyOrder(node, copy);
   return copy;
+}
+
+/**
+ * `structuredClone` drops the non-enumerable KEY_ORDER symbol, so walk source
+ * and copy in lockstep (structuredClone preserves structure + enumerable key
+ * order) and re-stamp the recorded order wherever the source carried it. Keeps
+ * author mapping order faithful through retry/fallback/fragment fan-out.
+ */
+function reapplyKeyOrder(src: unknown, dst: unknown): void {
+  if (Array.isArray(src) && Array.isArray(dst)) {
+    for (let i = 0; i < src.length; i++) reapplyKeyOrder(src[i], dst[i]);
+    return;
+  }
+  if (isObject(src) && isObject(dst)) {
+    const order = (src as Record<symbol, unknown>)[KEY_ORDER];
+    if (Array.isArray(order)) setKeyOrder(dst, order as string[]);
+    for (const k of Object.keys(src)) reapplyKeyOrder(src[k], dst[k]);
+  }
 }
 
 /** Make a freshly built `node` map back to `from`'s source (synthetic nodes). */

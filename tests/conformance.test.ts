@@ -72,3 +72,74 @@ jobs:
     );
   });
 });
+
+/**
+ * Bug K — PARSER's KEY_ORDER fidelity must survive the passes that REBUILD the
+ * jobs map (dynamic_matrix) or CLONE step sub-maps (retry/fallback). The plain
+ * passthrough cases above only exercise a clean copy; once a pass reconstructs
+ * or structuredClone()s a node the recorded order is dropped and emit falls back
+ * to Object.keys, which hoists integer-like keys.
+ */
+describe("passthrough: key order through pass rebuild/clone (Bug K)", () => {
+  it("preserves job key order when a dynamic_matrix job rebuilds the jobs map", () => {
+    const source = `name: x
+on: push
+jobs:
+  '10':
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ten
+  build:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      shell: bash
+      script: echo hi
+    steps:
+      - run: echo build
+  '2':
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo two
+  zeta:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo zeta
+`;
+    const { errors, yaml } = build(source);
+    expect(errors).toEqual([]);
+    const authorOrder = keyOrder(source, ["jobs"]);
+    const emitted = keyOrder(yaml, ["jobs"]).filter((k) => authorOrder.includes(k));
+    expect(emitted).toEqual(authorOrder);
+  });
+
+  it("preserves step `with` input order after a retry clones the step", () => {
+    const source = `name: x
+on: push
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: foo/bar@v1
+        retry:
+          max_attempts: 2
+        with:
+          name: Bob
+          '1': first
+          other: val
+`;
+    const { errors, yaml } = build(source);
+    expect(errors).toEqual([]);
+    const doc = parseDocument(yaml);
+    const steps = (doc.getIn(["jobs", "a", "steps"], true) as { items: Node[] }).items;
+    const withOrders = steps
+      .map((s) => (s as { get(k: string, keep: boolean): Node }).get("with", true))
+      .filter((w): w is Node => isMap(w))
+      .map((w) =>
+        (w as unknown as { items: Array<{ key: { value?: unknown } }> }).items.map((it) =>
+          String(it.key.value ?? it.key),
+        ),
+      );
+    expect(withOrders.length).toBeGreaterThan(0);
+    for (const order of withOrders) expect(order).toEqual(["name", "1", "other"]);
+  });
+});
