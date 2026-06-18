@@ -13,6 +13,10 @@ const config = {
   trailingSlash: true,
   images: { unoptimized: true },
   turbopack: { root: import.meta.dirname },
+  // Inline PAGES_BASE_PATH into client bundles too. Without this, basePath in
+  // lib/shared.ts resolves to '' in the browser (Next only auto-inlines
+  // NEXT_PUBLIC_* vars), breaking the hand-built static search fetch URL.
+  env: { PAGES_BASE_PATH: basePath },
   ...(basePath ? { basePath } : {}),
 };
 
