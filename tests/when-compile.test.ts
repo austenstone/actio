@@ -1,6 +1,7 @@
 import { type Pass, type SymbolDef, transpile } from "actio-core";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
+import { RUNTIME_CONTEXT_ROOTS } from "../packages/core/src/symbols.js";
 
 function transpileErrors(source: string) {
   const result = transpile(source, { fileName: "t.actio.yml" });
@@ -30,6 +31,23 @@ jobs:
     expect(
       errors.some((diagnostic) => diagnostic.message.includes("[when-compile-runtime-context]")),
     ).toBe(true);
+  });
+
+  it("keeps when_compile runtime-root checks in parity with the shared runtime root list", () => {
+    for (const root of RUNTIME_CONTEXT_ROOTS) {
+      const errors = transpileErrors(`name: x
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        when_compile: ${root}.ref == 'x'
+`);
+      expect(
+        errors.some((diagnostic) => diagnostic.message.includes("[when-compile-runtime-context]")),
+      ).toBe(true);
+    }
   });
 
   it("errors when the expression result is not boolean (E2)", () => {
