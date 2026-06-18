@@ -327,6 +327,12 @@ export function jobDefaultsPass(ctx: ParseContext): void {
         ctx.internal.jobDefaults.inlineStrategyJobs = {};
       }
       ctx.internal.jobDefaults.inlineStrategyJobs[jobId] = true;
+      if (isObject(job.strategy) && Object.hasOwn(job.strategy, "fail-fast")) {
+        if (!ctx.internal.jobDefaults.inlineStrategyFailFastJobs) {
+          ctx.internal.jobDefaults.inlineStrategyFailFastJobs = {};
+        }
+        ctx.internal.jobDefaults.inlineStrategyFailFastJobs[jobId] = true;
+      }
     }
 
     const usesJob = isReusableCallJob(job);

@@ -181,6 +181,7 @@ function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId:
   const alias = opt<string>(dm, "alias", "as");
   const matrixExpr = `\${{ fromJSON(needs.${setupId}.outputs.matrix) }}`;
   const inlineStrategy = ctx.internal.jobDefaults?.inlineStrategyJobs?.[jobId] === true;
+  const inlineSetFailFast = ctx.internal.jobDefaults?.inlineStrategyFailFastJobs?.[jobId] === true;
 
   job.needs = mergeNeeds(job.needs, [setupId]);
 
@@ -207,7 +208,16 @@ function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId:
   }
 
   const failFast = opt<boolean>(dm, "fail-fast", "fail_fast");
-  if (failFast !== undefined) {
+  if (inlineSetFailFast) {
+    if (failFast !== undefined) {
+      pushDiagnostic(
+        ctx,
+        "warning",
+        `Job "${jobId}": inline strategy.fail-fast is preserved; dynamic_matrix fail-fast is ignored`,
+        ["jobs", jobId, "strategy", "fail-fast"],
+      );
+    }
+  } else if (failFast !== undefined) {
     strategy["fail-fast"] = failFast;
   } else if (strategy["fail-fast"] === undefined) {
     strategy["fail-fast"] = false;

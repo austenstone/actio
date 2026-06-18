@@ -147,6 +147,70 @@ jobs:
     });
   });
 
+  it("applies fail-fast precedence as inline > dynamic_matrix > job_defaults", () => {
+    const { result, errors, doc } = build(`name: x
+on: [push]
+job_defaults:
+  strategy:
+    matrix:
+      from_default: [a, b]
+    fail-fast: true
+jobs:
+  inline_full:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      script: echo '["x"]'
+      alias: shard
+      fail-fast: false
+    strategy:
+      matrix:
+        keep: [manual]
+      fail-fast: true
+    steps:
+      - run: echo \${{ matrix.keep }}
+  inline_missing_fail_fast:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      script: echo '["y"]'
+      alias: shard
+      fail-fast: false
+    strategy:
+      matrix:
+        keep: [manual]
+    steps:
+      - run: echo \${{ matrix.keep }}
+  defaults_only:
+    runs-on: ubuntu-latest
+    dynamic_matrix:
+      script: echo '["z"]'
+      alias: shard
+      fail-fast: false
+    steps:
+      - run: echo \${{ matrix.shard }}
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.inline_full.strategy).toEqual({
+      matrix: { keep: ["manual"] },
+      "fail-fast": true,
+    });
+    expect(doc.jobs.inline_missing_fail_fast.strategy).toEqual({
+      matrix: { keep: ["manual"] },
+      "fail-fast": false,
+    });
+    expect(doc.jobs.defaults_only.strategy).toEqual({
+      matrix: { shard: "${{ fromJSON(needs.actio_setup_defaults_only.outputs.matrix) }}" },
+      "fail-fast": false,
+    });
+    expect(
+      result.diagnostics.some(
+        (d) =>
+          d.severity === "warning" &&
+          d.message.includes("inline strategy.fail-fast is preserved") &&
+          d.message.includes("dynamic_matrix fail-fast is ignored"),
+      ),
+    ).toBe(true);
+  });
+
   it("auto-adds checkout when the script is a local path", () => {
     const { doc } = build(src);
     expect(doc.jobs.actio_setup_test.steps[0]).toEqual({ uses: "actions/checkout@v4" });

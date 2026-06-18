@@ -11,6 +11,7 @@ export interface JobDefaultsInternalSnapshot {
   jobDefaults?: Record<string, unknown>;
   executors?: Record<string, unknown>;
   inlineStrategyJobs?: Record<string, true>;
+  inlineStrategyFailFastJobs?: Record<string, true>;
 }
 
 export interface ParseContextInternal {
