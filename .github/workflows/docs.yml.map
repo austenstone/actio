@@ -1,0 +1,362 @@
+{
+  "version": 1,
+  "generator": "actio",
+  "file": ".github/actio/docs.yml",
+  "sources": [
+    ".github/actio/docs.actio.yml"
+  ],
+  "mappings": [
+    {
+      "generated": {
+        "line": 5
+      },
+      "source": 0,
+      "original": {
+        "line": 3,
+        "col": 7
+      },
+      "path": "name"
+    },
+    {
+      "generated": {
+        "line": 7
+      },
+      "source": 0,
+      "original": {
+        "line": 5,
+        "col": 3
+      },
+      "path": "on"
+    },
+    {
+      "generated": {
+        "line": 8
+      },
+      "source": 0,
+      "original": {
+        "line": 6,
+        "col": 5
+      },
+      "path": "on.push"
+    },
+    {
+      "generated": {
+        "line": 9
+      },
+      "source": 0,
+      "original": {
+        "line": 6,
+        "col": 16
+      },
+      "path": "on.push.branches.0"
+    },
+    {
+      "generated": {
+        "line": 11
+      },
+      "source": 0,
+      "original": {
+        "line": 7,
+        "col": 13
+      },
+      "path": "on.push.paths.0"
+    },
+    {
+      "generated": {
+        "line": 12
+      },
+      "source": 0,
+      "original": {
+        "line": 8,
+        "col": 21
+      },
+      "path": "on.workflow_dispatch"
+    },
+    {
+      "generated": {
+        "line": 14
+      },
+      "source": 0,
+      "original": {
+        "line": 11,
+        "col": 13
+      },
+      "path": "permissions.contents"
+    },
+    {
+      "generated": {
+        "line": 15
+      },
+      "source": 0,
+      "original": {
+        "line": 12,
+        "col": 10
+      },
+      "path": "permissions.pages"
+    },
+    {
+      "generated": {
+        "line": 16
+      },
+      "source": 0,
+      "original": {
+        "line": 13,
+        "col": 13
+      },
+      "path": "permissions.id-token"
+    },
+    {
+      "generated": {
+        "line": 18
+      },
+      "source": 0,
+      "original": {
+        "line": 16,
+        "col": 10
+      },
+      "path": "concurrency.group"
+    },
+    {
+      "generated": {
+        "line": 19
+      },
+      "source": 0,
+      "original": {
+        "line": 17,
+        "col": 23
+      },
+      "path": "concurrency.cancel-in-progress"
+    },
+    {
+      "generated": {
+        "line": 21
+      },
+      "source": 0,
+      "original": {
+        "line": 29,
+        "col": 3
+      },
+      "path": "jobs"
+    },
+    {
+      "generated": {
+        "line": 22
+      },
+      "source": 0,
+      "original": {
+        "line": 30,
+        "col": 14
+      },
+      "path": "jobs.build.runs-on"
+    },
+    {
+      "generated": {
+        "line": 24
+      },
+      "source": 0,
+      "original": {
+        "line": 32,
+        "col": 7
+      },
+      "path": "jobs.build.defaults"
+    },
+    {
+      "generated": {
+        "line": 25
+      },
+      "source": 0,
+      "original": {
+        "line": 33,
+        "col": 28
+      },
+      "path": "jobs.build.defaults.run.working-directory"
+    },
+    {
+      "generated": {
+        "line": 27
+      },
+      "source": 0,
+      "original": {
+        "line": 21,
+        "col": 13
+      },
+      "path": "jobs.build.steps.0.uses"
+    },
+    {
+      "generated": {
+        "line": 28
+      },
+      "source": 0,
+      "original": {
+        "line": 22,
+        "col": 13
+      },
+      "path": "jobs.build.steps.1.uses"
+    },
+    {
+      "generated": {
+        "line": 30
+      },
+      "source": 0,
+      "original": {
+        "line": 24,
+        "col": 23
+      },
+      "path": "jobs.build.steps.1.with.node-version"
+    },
+    {
+      "generated": {
+        "line": 31
+      },
+      "source": 0,
+      "original": {
+        "line": 25,
+        "col": 16
+      },
+      "path": "jobs.build.steps.1.with.cache"
+    },
+    {
+      "generated": {
+        "line": 32
+      },
+      "source": 0,
+      "original": {
+        "line": 26,
+        "col": 32
+      },
+      "path": "jobs.build.steps.1.with.cache-dependency-path"
+    },
+    {
+      "generated": {
+        "line": 33
+      },
+      "source": 0,
+      "original": {
+        "line": 36,
+        "col": 14
+      },
+      "path": "jobs.build.steps.2.run"
+    },
+    {
+      "generated": {
+        "line": 34
+      },
+      "source": 0,
+      "original": {
+        "line": 37,
+        "col": 15
+      },
+      "path": "jobs.build.steps.3.name"
+    },
+    {
+      "generated": {
+        "line": 35
+      },
+      "source": 0,
+      "original": {
+        "line": 38,
+        "col": 14
+      },
+      "path": "jobs.build.steps.3.run"
+    },
+    {
+      "generated": {
+        "line": 37
+      },
+      "source": 0,
+      "original": {
+        "line": 40,
+        "col": 28
+      },
+      "path": "jobs.build.steps.3.env.PAGES_BASE_PATH"
+    },
+    {
+      "generated": {
+        "line": 38
+      },
+      "source": 0,
+      "original": {
+        "line": 41,
+        "col": 15
+      },
+      "path": "jobs.build.steps.4.uses"
+    },
+    {
+      "generated": {
+        "line": 40
+      },
+      "source": 0,
+      "original": {
+        "line": 43,
+        "col": 17
+      },
+      "path": "jobs.build.steps.4.with.path"
+    },
+    {
+      "generated": {
+        "line": 42
+      },
+      "source": 0,
+      "original": {
+        "line": 46,
+        "col": 12
+      },
+      "path": "jobs.deploy.needs"
+    },
+    {
+      "generated": {
+        "line": 43
+      },
+      "source": 0,
+      "original": {
+        "line": 47,
+        "col": 14
+      },
+      "path": "jobs.deploy.runs-on"
+    },
+    {
+      "generated": {
+        "line": 45
+      },
+      "source": 0,
+      "original": {
+        "line": 49,
+        "col": 13
+      },
+      "path": "jobs.deploy.environment.name"
+    },
+    {
+      "generated": {
+        "line": 46
+      },
+      "source": 0,
+      "original": {
+        "line": 50,
+        "col": 12
+      },
+      "path": "jobs.deploy.environment.url"
+    },
+    {
+      "generated": {
+        "line": 48
+      },
+      "source": 0,
+      "original": {
+        "line": 52,
+        "col": 13
+      },
+      "path": "jobs.deploy.steps.0.id"
+    },
+    {
+      "generated": {
+        "line": 49
+      },
+      "source": 0,
+      "original": {
+        "line": 53,
+        "col": 15
+      },
+      "path": "jobs.deploy.steps.0.uses"
+    }
+  ]
+}
