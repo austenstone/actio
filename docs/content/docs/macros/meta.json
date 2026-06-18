@@ -2,6 +2,7 @@
   "title": "Macros",
   "pages": [
     "params",
+    "job-defaults",
     "fragments",
     "retry",
     "dynamic-matrix",
