@@ -7,6 +7,7 @@ const JOB_DEFAULT_KEYS = [
   "if",
   "permissions",
   "concurrency",
+  "strategy",
   "timeout-minutes",
   "runs-on",
   "env",
@@ -26,7 +27,7 @@ const EXECUTOR_KEYS = [
   "defaults",
 ] as const;
 
-const CALL_JOB_DEFAULT_KEYS = new Set<string>(["if", "permissions", "concurrency"]);
+const CALL_JOB_DEFAULT_KEYS = new Set<string>(["if", "permissions", "concurrency", "strategy"]);
 const REPLACE_ON_PRESENCE_KEYS = new Set(["permissions", "concurrency"]);
 const REPLACE_KEYS = new Set(["runs-on", "timeout-minutes"]);
 const REJECTED_TEMPLATE_KEYS = new Set([
@@ -35,7 +36,6 @@ const REJECTED_TEMPLATE_KEYS = new Set([
   "uses",
   "with",
   "secrets",
-  "strategy",
   "name",
   "outputs",
 ]);

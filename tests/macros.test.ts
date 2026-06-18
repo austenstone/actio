@@ -360,6 +360,10 @@ job_defaults:
     contents: read
   concurrency:
     group: ci
+  strategy:
+    fail-fast: false
+    matrix:
+      shard: [a, b]
   runs-on: ubuntu-latest
   timeout-minutes: 15
   env:
@@ -368,6 +372,10 @@ jobs:
   call:
     uses: org/repo/.github/workflows/reuse.yml@main
     if: \${{ success() }}
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo test
 `);
     expect(errors).toEqual([]);
     expect(result.ok).toBe(true);
@@ -378,6 +386,14 @@ jobs:
     expect(doc.jobs.call.if).toBe("github.ref == 'refs/heads/main' && success()");
     expect(doc.jobs.call.permissions).toEqual({ contents: "read" });
     expect(doc.jobs.call.concurrency).toEqual({ group: "ci" });
+    expect(doc.jobs.call.strategy).toEqual({
+      "fail-fast": false,
+      matrix: { shard: ["a", "b"] },
+    });
+    expect(doc.jobs.test.strategy).toEqual({
+      "fail-fast": false,
+      matrix: { shard: ["a", "b"] },
+    });
 
     const infos = result.diagnostics.filter((d) => d.severity === "info");
     expect(infos.some((d) => d.message.includes("job-defaults-uses-skipped"))).toBe(true);

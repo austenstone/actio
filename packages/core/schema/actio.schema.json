@@ -1350,7 +1350,39 @@
     },
     "jobDefaults": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "properties": {
+        "if": {
+          "$ref": "#/definitions/normalJob/properties/if"
+        },
+        "permissions": {
+          "$ref": "#/definitions/normalJob/properties/permissions"
+        },
+        "concurrency": {
+          "$ref": "#/definitions/normalJob/properties/concurrency"
+        },
+        "strategy": {
+          "$ref": "#/definitions/normalJob/properties/strategy"
+        },
+        "timeout-minutes": {
+          "$ref": "#/definitions/normalJob/properties/timeout-minutes"
+        },
+        "runs-on": {
+          "$ref": "#/definitions/normalJob/properties/runs-on"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "container": {
+          "$ref": "#/definitions/normalJob/properties/container"
+        },
+        "services": {
+          "$ref": "#/definitions/normalJob/properties/services"
+        },
+        "defaults": {
+          "$ref": "#/definitions/normalJob/properties/defaults"
+        }
+      }
     },
     "executorDefinition": {
       "type": "object",

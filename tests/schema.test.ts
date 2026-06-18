@@ -144,6 +144,32 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
+  it("accepts job_defaults strategy for reusable-workflow caller jobs", () => {
+    const doc = load(`on: [push]
+job_defaults:
+  strategy:
+    fail-fast: false
+    matrix:
+      shard: [a, b]
+jobs:
+  call:
+    uses: org/repo/.github/workflows/reuse.yml@main`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects non-allowlisted keys in job_defaults", () => {
+    const doc = load(`on: [push]
+job_defaults:
+  steps:
+    - run: echo nope
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(false);
+  });
+
   it("starter still transpiles cleanly with the modeline present", () => {
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);
