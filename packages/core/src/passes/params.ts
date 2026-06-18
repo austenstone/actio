@@ -19,46 +19,66 @@ const PARAM_TYPES: ReadonlySet<ParamType> = new Set([
   "steps",
 ]);
 
-function diagnosticMessage(code: string, message: string): string {
-  return `[${code}] ${message}`;
-}
+const PARAM_DEFINITION_KEYS = new Set(["type", "default", "values"]);
 
-function symbolKindForType(type: ParamType): SymbolKind {
+const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
+
+const symbolKindForType = (type: ParamType): SymbolKind => {
   if (type === "stepList" || type === "steps") return "param-stepList";
   if (type === "object") return "param-list";
   return "param-scalar";
-}
+};
 
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
 
-function isStepList(value: unknown): value is Record<string, unknown>[] {
-  return Array.isArray(value) && value.every((entry) => isObject(entry));
-}
+const isStepList = (value: unknown): value is Record<string, unknown>[] =>
+  Array.isArray(value) && value.every((entry) => isObject(entry));
 
-function typeAcceptsDefault(type: ParamType, value: unknown, enumValues?: string[]): boolean {
+const typeAcceptsDefault = (type: ParamType, value: unknown): boolean => {
   if (value === undefined) return true;
   if (type === "string") return typeof value === "string";
   if (type === "number") return isFiniteNumber(value);
   if (type === "boolean") return typeof value === "boolean";
-  if (type === "enum") return typeof value === "string" && Array.isArray(enumValues);
+  if (type === "enum") return typeof value === "string";
   if (type === "object") return (isObject(value) || Array.isArray(value)) && value !== null;
   return isStepList(value);
-}
+};
 
-function validateEnumValues(raw: unknown): string[] | undefined {
+const validateEnumValues = (raw: unknown): string[] | undefined => {
   if (!Array.isArray(raw) || raw.length === 0) return undefined;
   if (!raw.every((value) => typeof value === "string")) return undefined;
   return [...raw];
-}
+};
 
-function collectParamSymbol(
+const parseCompileExpr = (raw: string): ParsedExpr | undefined => {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return undefined;
+
+  let asJson = false;
+  let subject = trimmed;
+  if (trimmed.startsWith("toJSON(") && trimmed.endsWith(")")) {
+    asJson = true;
+    subject = trimmed.slice("toJSON(".length, -1).trim();
+    if (subject.length === 0) return undefined;
+  }
+
+  const segments = subject.split(".").map((segment) => segment.trim());
+  if (segments.length === 0 || segments.some((segment) => segment.length === 0)) return undefined;
+  if (
+    segments.some((segment) => !/^[A-Za-z_][A-Za-z0-9_-]*$/.test(segment) && !/^\d+$/.test(segment))
+  ) {
+    return undefined;
+  }
+  return { segments, asJson };
+};
+
+const collectParamSymbol = (
   ctx: ParseContext,
   name: string,
   rawDefinition: unknown,
   path: Path,
-): SymbolDef | undefined {
+): SymbolDef | undefined => {
   if (!isObject(rawDefinition)) {
     pushDiagnostic(
       ctx,
@@ -66,6 +86,22 @@ function collectParamSymbol(
       diagnosticMessage("param-definition-invalid", `params.${name} must be an object definition`),
       path,
     );
+    return undefined;
+  }
+
+  const unknownKeys = Object.keys(rawDefinition).filter((key) => !PARAM_DEFINITION_KEYS.has(key));
+  if (unknownKeys.length > 0) {
+    for (const key of unknownKeys) {
+      pushDiagnostic(
+        ctx,
+        "error",
+        diagnosticMessage(
+          "param-definition-key-unknown",
+          `params.${name}.${key} is not a supported parameter definition field`,
+        ),
+        [...path, key],
+      );
+    }
     return undefined;
   }
 
@@ -98,8 +134,9 @@ function collectParamSymbol(
     return undefined;
   }
 
+  const hasDefault = Object.hasOwn(rawDefinition, "default");
   const defaultValue = rawDefinition.default;
-  if (!typeAcceptsDefault(type, defaultValue, values)) {
+  if (!typeAcceptsDefault(type, defaultValue)) {
     pushDiagnostic(
       ctx,
       "error",
@@ -130,43 +167,26 @@ function collectParamSymbol(
     return undefined;
   }
 
+  const compileTimeKnown = hasDefault;
+  const valueKnown = hasDefault;
   const symbolName = `params.${name}`;
   return {
     name: symbolName,
     kind: symbolKindForType(type),
     type,
-    compileTimeKnown: true,
+    compileTimeKnown,
+    hasDefault,
+    valueKnown,
+    required: !hasDefault,
     taint: conservativeTaint(),
-    value: defaultValue,
+    value: hasDefault ? defaultValue : undefined,
   };
-}
+};
 
-function parseCompileExpr(raw: string): ParsedExpr | undefined {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return undefined;
-
-  let asJson = false;
-  let subject = trimmed;
-  if (trimmed.startsWith("toJSON(") && trimmed.endsWith(")")) {
-    asJson = true;
-    subject = trimmed.slice("toJSON(".length, -1).trim();
-    if (subject.length === 0) return undefined;
-  }
-
-  const segments = subject.split(".").map((segment) => segment.trim());
-  if (segments.length === 0 || segments.some((segment) => segment.length === 0)) return undefined;
-  if (
-    segments.some((segment) => !/^[A-Za-z_][A-Za-z0-9_-]*$/.test(segment) && !/^\d+$/.test(segment))
-  ) {
-    return undefined;
-  }
-  return { segments, asJson };
-}
-
-function lookupSymbolValue(
+const lookupSymbolValue = (
   ctx: ParseContext,
   segments: string[],
-): { symbol?: SymbolDef; value?: unknown; resolved: boolean } {
+): { symbol?: SymbolDef; value?: unknown; resolved: boolean } => {
   const root = segments[0];
   if (!root) return { resolved: false };
 
@@ -186,7 +206,9 @@ function lookupSymbolValue(
   if (!symbolKey) return { resolved: false };
 
   const symbol = ctx.symbols.get(symbolKey);
-  if (!symbol?.compileTimeKnown) return { symbol, resolved: false };
+  if (!symbol) return { resolved: false };
+  const valueKnown = symbol.valueKnown ?? symbol.compileTimeKnown;
+  if (!valueKnown) return { symbol, resolved: false };
 
   let current = symbol.value;
   for (const segment of segments.slice(offset)) {
@@ -204,9 +226,9 @@ function lookupSymbolValue(
     return { symbol, resolved: false };
   }
   return { symbol, value: current, resolved: current !== undefined };
-}
+};
 
-function findRuntimeExpressions(value: string): string[] {
+const findRuntimeExpressions = (value: string): string[] => {
   const expressions: string[] = [];
   let cursor = 0;
   while (cursor < value.length) {
@@ -218,17 +240,13 @@ function findRuntimeExpressions(value: string): string[] {
     cursor = close + 2;
   }
   return expressions;
-}
+};
 
-function isIdentifierStart(char: string): boolean {
-  return /[A-Za-z_]/.test(char);
-}
+const isIdentifierStart = (char: string): boolean => /[A-Za-z_]/.test(char);
 
-function isIdentifierPart(char: string): boolean {
-  return /[A-Za-z0-9_]/.test(char);
-}
+const isIdentifierPart = (char: string): boolean => /[A-Za-z0-9_]/.test(char);
 
-function containsParamsRootReference(expr: string): boolean {
+const containsParamsRootReference = (expr: string): boolean => {
   let quote: "'" | '"' | undefined;
   for (let index = 0; index < expr.length; index++) {
     const char = expr[index];
@@ -266,9 +284,9 @@ function containsParamsRootReference(expr: string): boolean {
     return true;
   }
   return false;
-}
+};
 
-function hasCompileToken(value: string): boolean {
+const hasCompileToken = (value: string): boolean => {
   let cursor = 0;
   while (cursor < value.length) {
     const open = value.indexOf("{{", cursor);
@@ -277,9 +295,20 @@ function hasCompileToken(value: string): boolean {
     cursor = open + 2;
   }
   return false;
+};
+
+export interface ResolveTextOptions {
+  validateRuntimeExpressions?: boolean;
+  enforceNoResidualTokens?: boolean;
+  reportInterpolationErrors?: boolean;
 }
 
-function interpolateCompileTokens(ctx: ParseContext, value: string, path: Path): string {
+const interpolateCompileTokens = (
+  ctx: ParseContext,
+  value: string,
+  path: Path,
+  options: ResolveTextOptions,
+): string => {
   let cursor = 0;
   let output = "";
 
@@ -299,12 +328,17 @@ function interpolateCompileTokens(ctx: ParseContext, value: string, path: Path):
     output += value.slice(cursor, open);
     const close = value.indexOf("}}", open + 2);
     if (close < 0) {
-      pushDiagnostic(
-        ctx,
-        "error",
-        diagnosticMessage("interp-unresolved", `Unclosed compile-time interpolation in "${value}"`),
-        path,
-      );
+      if (options.reportInterpolationErrors !== false) {
+        pushDiagnostic(
+          ctx,
+          "error",
+          diagnosticMessage(
+            "interp-unresolved",
+            `Unclosed compile-time interpolation in "${value}"`,
+          ),
+          path,
+        );
+      }
       output += value.slice(open);
       break;
     }
@@ -312,12 +346,14 @@ function interpolateCompileTokens(ctx: ParseContext, value: string, path: Path):
     const token = value.slice(open + 2, close).trim();
     const parsed = parseCompileExpr(token);
     if (!parsed) {
-      pushDiagnostic(
-        ctx,
-        "error",
-        diagnosticMessage("interp-unresolved", `Cannot parse compile-time expression "${token}"`),
-        path,
-      );
+      if (options.reportInterpolationErrors !== false) {
+        pushDiagnostic(
+          ctx,
+          "error",
+          diagnosticMessage("interp-unresolved", `Cannot parse compile-time expression "${token}"`),
+          path,
+        );
+      }
       output += value.slice(open, close + 2);
       cursor = close + 2;
       continue;
@@ -325,15 +361,17 @@ function interpolateCompileTokens(ctx: ParseContext, value: string, path: Path):
 
     const lookedUp = lookupSymbolValue(ctx, parsed.segments);
     if (!lookedUp.resolved) {
-      pushDiagnostic(
-        ctx,
-        "error",
-        diagnosticMessage(
-          "interp-unresolved",
-          `Cannot resolve compile-time expression "${token}" from the symbol table`,
-        ),
-        path,
-      );
+      if (options.reportInterpolationErrors !== false) {
+        pushDiagnostic(
+          ctx,
+          "error",
+          diagnosticMessage(
+            "interp-unresolved",
+            `Cannot resolve compile-time expression "${token}" from the symbol table`,
+          ),
+          path,
+        );
+      }
       output += value.slice(open, close + 2);
       cursor = close + 2;
       continue;
@@ -343,15 +381,17 @@ function interpolateCompileTokens(ctx: ParseContext, value: string, path: Path):
     if (parsed.asJson) {
       const json = JSON.stringify(resolvedValue);
       if (json === undefined) {
-        pushDiagnostic(
-          ctx,
-          "error",
-          diagnosticMessage(
-            "interp-unresolved",
-            `Cannot serialize compile-time expression "${token}" with toJSON(...)`,
-          ),
-          path,
-        );
+        if (options.reportInterpolationErrors !== false) {
+          pushDiagnostic(
+            ctx,
+            "error",
+            diagnosticMessage(
+              "interp-unresolved",
+              `Cannot serialize compile-time expression "${token}" with toJSON(...)`,
+            ),
+            path,
+          );
+        }
         output += value.slice(open, close + 2);
         cursor = close + 2;
         continue;
@@ -362,15 +402,17 @@ function interpolateCompileTokens(ctx: ParseContext, value: string, path: Path):
     }
 
     if ((isObject(resolvedValue) || Array.isArray(resolvedValue)) && resolvedValue !== null) {
-      pushDiagnostic(
-        ctx,
-        "error",
-        diagnosticMessage(
-          "interp-non-scalar",
-          `Expression "${token}" resolved to a non-scalar value; wrap it as {{ toJSON(...) }}`,
-        ),
-        path,
-      );
+      if (options.reportInterpolationErrors !== false) {
+        pushDiagnostic(
+          ctx,
+          "error",
+          diagnosticMessage(
+            "interp-non-scalar",
+            `Expression "${token}" resolved to a non-scalar value; wrap it as {{ toJSON(...) }}`,
+          ),
+          path,
+        );
+      }
       output += value.slice(open, close + 2);
       cursor = close + 2;
       continue;
@@ -381,10 +423,16 @@ function interpolateCompileTokens(ctx: ParseContext, value: string, path: Path):
   }
 
   return output;
-}
+};
 
-function resolveInterpolationsInTree(ctx: ParseContext, value: unknown, path: Path): unknown {
-  if (typeof value === "string") {
+/** Resolve compile-time interpolation in a text boundary and enforce runtime params sigil rules. */
+export const resolveCompileTimeText = (
+  ctx: ParseContext,
+  value: string,
+  path: Path,
+  options: ResolveTextOptions = {},
+): string => {
+  if (options.validateRuntimeExpressions !== false) {
     for (const expr of findRuntimeExpressions(value)) {
       if (containsParamsRootReference(expr)) {
         pushDiagnostic(
@@ -398,43 +446,108 @@ function resolveInterpolationsInTree(ctx: ParseContext, value: unknown, path: Pa
         );
       }
     }
-
-    const interpolated = interpolateCompileTokens(ctx, value, path);
-    if (hasCompileToken(interpolated)) {
-      pushDiagnostic(
-        ctx,
-        "error",
-        diagnosticMessage(
-          "interp-unresolved",
-          `Compile-time interpolation was left unresolved in "${interpolated}"`,
-        ),
-        path,
-      );
-    }
-    return interpolated;
   }
 
+  const interpolated = interpolateCompileTokens(ctx, value, path, options);
+  if (options.enforceNoResidualTokens !== false && hasCompileToken(interpolated)) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "interp-unresolved",
+        `Compile-time interpolation was left unresolved in "${interpolated}"`,
+      ),
+      path,
+    );
+  }
+  return interpolated;
+};
+
+/** Resolve compile-time text interpolation recursively in a value tree. */
+export const resolveCompileTimeTextBoundaries = (
+  ctx: ParseContext,
+  value: unknown,
+  path: Path,
+  options: ResolveTextOptions = {},
+): unknown => {
+  if (typeof value === "string") return resolveCompileTimeText(ctx, value, path, options);
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index++) {
-      value[index] = resolveInterpolationsInTree(ctx, value[index], [...path, index]);
+      value[index] = resolveCompileTimeTextBoundaries(ctx, value[index], [...path, index], options);
     }
     return value;
   }
-
   if (isObject(value)) {
     for (const [key, child] of Object.entries(value)) {
-      value[key] = resolveInterpolationsInTree(ctx, child, [...path, key]);
+      value[key] = resolveCompileTimeTextBoundaries(ctx, child, [...path, key], options);
     }
   }
   return value;
-}
+};
 
-export function resolveCompileTimeInterpolations(ctx: ParseContext): void {
-  resolveInterpolationsInTree(ctx, ctx.data, []);
-}
+const isStepListPosition = (path: Path): boolean => path[path.length - 1] === "steps";
 
-/** Collect top-level typed params into the unified symbol table and strip them from output. */
-export function paramsPass(ctx: ParseContext): void {
+const resolveBareStructuralExpression = (ctx: ParseContext, value: string, path: Path): unknown => {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return value;
+  if (trimmed.includes("{{") || trimmed.includes("}}")) return value;
+
+  const parsed = parseCompileExpr(trimmed);
+  if (!parsed || parsed.asJson) return value;
+
+  const lookedUp = lookupSymbolValue(ctx, parsed.segments);
+  if (!lookedUp.symbol) return value;
+  if (!lookedUp.resolved) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "param-structural-unresolved",
+        `Cannot resolve structural expression "${trimmed}" from the symbol table`,
+      ),
+      path,
+    );
+    return value;
+  }
+
+  if (isStepListPosition(path) && !isStepList(lookedUp.value)) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "param-structural-type",
+        `Expression "${trimmed}" must resolve to a step list in this position`,
+      ),
+      path,
+    );
+    return value;
+  }
+
+  return structuredClone(lookedUp.value);
+};
+
+const resolveStructuralExpressionsInTree = (
+  ctx: ParseContext,
+  value: unknown,
+  path: Path,
+): unknown => {
+  if (typeof value === "string") return resolveBareStructuralExpression(ctx, value, path);
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++) {
+      value[index] = resolveStructuralExpressionsInTree(ctx, value[index], [...path, index]);
+    }
+    return value;
+  }
+  if (isObject(value)) {
+    for (const [key, child] of Object.entries(value)) {
+      value[key] = resolveStructuralExpressionsInTree(ctx, child, [...path, key]);
+    }
+  }
+  return value;
+};
+
+/** Collect top-level typed params into the symbol table and resolve bare structural expressions. */
+export const paramsPass = (ctx: ParseContext): void => {
   const rawParams = ctx.data.params;
   if (rawParams === undefined) return;
 
@@ -456,7 +569,8 @@ export function paramsPass(ctx: ParseContext): void {
   }
 
   delete ctx.data.params;
-}
+  resolveStructuralExpressionsInTree(ctx, ctx.data, []);
+};
 
 /** Tier-0 pass: seed typed params before any other transform executes. */
 export const params: Pass = { name: "params", apply: paramsPass };

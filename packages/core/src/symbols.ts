@@ -12,6 +12,9 @@ export interface SymbolDef {
   kind: SymbolKind;
   type: ParamType;
   compileTimeKnown: boolean;
+  hasDefault?: boolean;
+  valueKnown?: boolean;
+  required?: boolean;
   taint: TaintFacet;
   value?: unknown;
 }

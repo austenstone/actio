@@ -96,6 +96,21 @@ jobs:
     expect(validate(doc)).toBe(false);
   });
 
+  it("rejects unknown keys on param definitions", () => {
+    const doc = load(`on: [push]
+params:
+  env:
+    type: string
+    default: prod
+    description: Production environment
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(false);
+  });
+
   it("starter still transpiles cleanly with the modeline present", () => {
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);

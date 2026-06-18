@@ -1,6 +1,7 @@
 import { cloneNode, type Job, type Step, visitJobs } from "../ir.js";
 import type { ParseContext } from "../parser.js";
 import { asStepArray, isObject, pushDiagnostic } from "./helpers.js";
+import { resolveCompileTimeTextBoundaries } from "./params.js";
 import type { Pass } from "./registry.js";
 
 type FragmentMap = Record<string, Step[]>;
@@ -85,16 +86,21 @@ function expandFallbackInPlace(
  */
 export function fragmentsPass(ctx: ParseContext): void {
   const fragments = getFragments(ctx);
-  visitJobs(ctx, ({ job }) => {
+  visitJobs(ctx, ({ id, job }) => {
     if (Array.isArray(job.steps)) {
       job.steps = expandList(job.steps, ctx, fragments, []);
     }
     if (job.fallback != null) {
       expandFallbackInPlace(job, ctx, fragments, []);
     }
+    resolveCompileTimeTextBoundaries(ctx, job, ["jobs", id], {
+      validateRuntimeExpressions: false,
+      enforceNoResidualTokens: false,
+      reportInterpolationErrors: false,
+    });
   });
   delete ctx.data.fragments;
 }
 
 /** Splice reusable `inject:` steps in first, so later passes see real steps. */
-export const fragments: Pass = { name: "fragments", apply: fragmentsPass };
+export const fragments: Pass = { name: "fragments", runsAfter: ["params"], apply: fragmentsPass };

@@ -40,14 +40,27 @@ describe("sortPasses", () => {
     expect(() => sortPasses(passes)).toThrow(/cycle/i);
   });
 
-  it("resolves the built-in pipeline to the documented order", () => {
-    expect(sortPasses(builtinPasses).map((p) => p.name)).toEqual([
-      "params",
-      "fragments",
-      "retry",
-      "fallback",
-      "dynamic_matrix",
-    ]);
+  it("declares params as an explicit dependency for fragments", () => {
+    const fragmentsPass = builtinPasses.find((pass) => pass.name === "fragments");
+    expect(fragmentsPass?.runsAfter ?? []).toContain("params");
+  });
+
+  it("keeps params before fragments because of dependency metadata", () => {
+    const ordered = sortPasses(builtinPasses).map((pass) => pass.name);
+    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("fragments"));
+    expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("retry"));
+    expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
+    expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("dynamic_matrix"));
+  });
+
+  it("ignores forward dependency references to not-yet-registered passes", () => {
+    const log: string[] = [];
+    const passes = [
+      recorder("when_compile", ["params", "for_each"], log),
+      recorder("params", [], log),
+    ];
+    expect(() => sortPasses(passes)).not.toThrow();
+    expect(sortPasses(passes).map((pass) => pass.name)).toEqual(["params", "when_compile"]);
   });
 });
 

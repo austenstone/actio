@@ -2,12 +2,8 @@ import type { Diagnostic } from "./diagnostics.js";
 import { emitYaml, generatedHeader } from "./emit.js";
 import { parseActio } from "./parser.js";
 import { annotate } from "./passes/annotate.js";
-import {
-  createRegistry,
-  type Pass,
-  resolveCompileTimeInterpolations,
-  runPasses,
-} from "./passes/index.js";
+import { createRegistry, type Pass, runPasses } from "./passes/index.js";
+import { resolveCompileTimeTextBoundaries } from "./passes/params.js";
 import { buildSourceMap, resolveGeneratedLine, type SourceMap } from "./sourcemap.js";
 import { validateWorkflowYaml } from "./validate.js";
 
@@ -80,7 +76,7 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
     passes = registry.list();
   }
   runPasses(ctx, passes);
-  resolveCompileTimeInterpolations(ctx);
+  resolveCompileTimeTextBoundaries(ctx, ctx.data, []);
 
   const body = emitYaml(ctx.data, { header: false });
   const header = options.header === false ? "" : generatedHeader(fileName);

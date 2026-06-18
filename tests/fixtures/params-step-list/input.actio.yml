@@ -11,5 +11,4 @@ params:
 jobs:
   show:
     runs-on: ubuntu-latest
-    steps:
-      - run: echo '{{ toJSON(params.bootstrap) }}'
+    steps: params.bootstrap

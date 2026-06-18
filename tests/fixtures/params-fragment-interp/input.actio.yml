@@ -1,0 +1,15 @@
+name: Params Fragment Interp
+on: [push]
+params:
+  greeting:
+    type: string
+    default: hello
+fragments:
+  setup:
+    - run: echo "{{ params.greeting }}"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: setup
+      - run: echo done

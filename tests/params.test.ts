@@ -1,10 +1,4 @@
-import {
-  applyPasses,
-  builtinPasses,
-  parseActio,
-  resolveCompileTimeInterpolations,
-  transpile,
-} from "actio-core";
+import { applyPasses, builtinPasses, type Pass, parseActio, transpile } from "actio-core";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
@@ -30,6 +24,8 @@ params:
   retries:
     type: number
     default: 3
+  required_input:
+    type: string
   bootstrap:
     type: stepList
     default:
@@ -50,18 +46,36 @@ jobs:
       kind: "param-scalar",
       type: "enum",
       compileTimeKnown: true,
+      hasDefault: true,
+      valueKnown: true,
+      required: false,
       taint: { tainted: false, derivedFrom: [] },
     });
     expect(ctx.symbols.get("params.retries")).toMatchObject({
       kind: "param-scalar",
       type: "number",
       compileTimeKnown: true,
+      hasDefault: true,
+      valueKnown: true,
+      required: false,
+      taint: { tainted: false, derivedFrom: [] },
+    });
+    expect(ctx.symbols.get("params.required_input")).toMatchObject({
+      kind: "param-scalar",
+      type: "string",
+      compileTimeKnown: false,
+      hasDefault: false,
+      valueKnown: false,
+      required: true,
       taint: { tainted: false, derivedFrom: [] },
     });
     expect(ctx.symbols.get("params.bootstrap")).toMatchObject({
       kind: "param-stepList",
       type: "stepList",
       compileTimeKnown: true,
+      hasDefault: true,
+      valueKnown: true,
+      required: false,
       taint: { tainted: false, derivedFrom: [] },
     });
   });
@@ -175,6 +189,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "\${{ params.env }}"
+`);
+
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
+      true,
+    );
+  });
+
+  it("errors when runtime expressions nest params usage under fromJSON", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+params:
+  config:
+    type: object
+    default:
+      image: app
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ fromJSON(params.config).image }}"
 `);
 
     expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
@@ -345,9 +379,123 @@ jobs:
       true,
     );
   });
+
+  it("errors when a param definition contains unknown keys", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+    description: Production environment
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+`);
+
+    expect(
+      errors.some((diagnostic) => diagnostic.message.includes("[param-definition-key-unknown]")),
+    ).toBe(true);
+  });
+
+  it("errors when a scalar param is used in a steps position", () => {
+    const errors = errorsFor(`name: x
+on: [push]
+params:
+  script:
+    type: string
+    default: echo hi
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps: params.script
+`);
+
+    expect(
+      errors.some((diagnostic) => diagnostic.message.includes("[param-structural-type]")),
+    ).toBe(true);
+  });
 });
 
 describe("params interpolation", () => {
+  it("resolves bare stepList references structurally in steps positions", () => {
+    const result = transpile(
+      `name: x
+on: [push]
+params:
+  bootstrap:
+    type: stepList
+    default:
+      - uses: actions/checkout@v4
+      - run: npm test
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps: params.bootstrap
+`,
+      { fileName: "t.actio.yml" },
+    );
+
+    expect(result.ok).toBe(true);
+    const doc = parse(result.yaml) as {
+      jobs: { deploy: { steps: Array<{ uses?: string; run?: string }> } };
+    };
+    expect(doc.jobs.deploy.steps).toEqual([{ uses: "actions/checkout@v4" }, { run: "npm test" }]);
+  });
+
+  it("resolves bare scalar references structurally in directive value positions", () => {
+    const result = transpile(
+      `name: x
+on: [push]
+params:
+  script:
+    type: string
+    default: echo hello
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: params.script
+`,
+      { fileName: "t.actio.yml" },
+    );
+
+    expect(result.ok).toBe(true);
+    const doc = parse(result.yaml) as {
+      jobs: { deploy: { steps: Array<{ run?: string }> } };
+    };
+    expect(doc.jobs.deploy.steps[0]?.run).toBe("echo hello");
+  });
+
+  it("resolves compile-time interpolation that enters via fragments during pass execution", () => {
+    const ctx = parseActio(
+      `name: x
+on: [push]
+params:
+  greeting:
+    type: string
+    default: hello
+fragments:
+  setup:
+    - run: echo "{{ params.greeting }}"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: setup
+`,
+      "t.actio.yml",
+    );
+
+    applyPasses(ctx, builtinPasses);
+
+    expect(
+      (ctx.data.jobs as { deploy: { steps: Array<{ run?: string }> } }).deploy.steps[0]?.run,
+    ).toBe('echo "hello"');
+  });
+
   it("resolves {{ params.* }} and toJSON(params.*) into final literals", () => {
     const result = transpile(
       `name: x
@@ -450,57 +598,75 @@ jobs:
   });
 
   it("resolves symbols registered at root key paths", () => {
-    const ctx = parseActio(
-      `name: x
+    const source = `name: x
 on: [push]
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - run: echo "{{ share.value }}"
-`,
-      "t.actio.yml",
-    );
-    ctx.symbols.set("share.value", {
-      name: "share.value",
-      kind: "shared-output",
-      type: "string",
-      compileTimeKnown: true,
-      taint: { tainted: false, derivedFrom: [] },
-      value: "ok",
+`;
+    const seedShareSymbol: Pass = {
+      name: "seed_share_symbol",
+      runsAfter: ["params"],
+      apply: (ctx) => {
+        ctx.symbols.set("share.value", {
+          name: "share.value",
+          kind: "shared-output",
+          type: "string",
+          compileTimeKnown: true,
+          valueKnown: true,
+          hasDefault: false,
+          required: false,
+          taint: { tainted: false, derivedFrom: [] },
+          value: "ok",
+        });
+      },
+    };
+    const result = transpile(source, {
+      fileName: "t.actio.yml",
+      passes: [seedShareSymbol],
     });
 
-    resolveCompileTimeInterpolations(ctx);
-
-    expect(
-      (ctx.data.jobs as { deploy: { steps: Array<{ run?: string }> } }).deploy.steps[0]?.run,
-    ).toBe('echo "ok"');
+    expect(result.ok).toBe(true);
+    const doc = parse(result.yaml) as {
+      jobs: { deploy: { steps: Array<{ run?: string }> } };
+    };
+    expect(doc.jobs.deploy.steps[0]?.run).toBe('echo "ok"');
   });
 
   it("errors when toJSON(...) cannot serialize a resolved value", () => {
-    const ctx = parseActio(
-      `name: x
+    const source = `name: x
 on: [push]
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - run: echo "{{ toJSON(share.fn) }}"
-`,
-      "t.actio.yml",
-    );
-    ctx.symbols.set("share.fn", {
-      name: "share.fn",
-      kind: "shared-output",
-      type: "object",
-      compileTimeKnown: true,
-      taint: { tainted: false, derivedFrom: [] },
-      value: () => "nope",
+`;
+    const seedFunctionSymbol: Pass = {
+      name: "seed_share_fn_symbol",
+      runsAfter: ["params"],
+      apply: (ctx) => {
+        ctx.symbols.set("share.fn", {
+          name: "share.fn",
+          kind: "shared-output",
+          type: "object",
+          compileTimeKnown: true,
+          valueKnown: true,
+          hasDefault: false,
+          required: false,
+          taint: { tainted: false, derivedFrom: [] },
+          value: () => "nope",
+        });
+      },
+    };
+    const result = transpile(source, {
+      fileName: "t.actio.yml",
+      passes: [seedFunctionSymbol],
     });
 
-    resolveCompileTimeInterpolations(ctx);
-
-    const errors = ctx.diagnostics
+    const errors = result.diagnostics
       .filter((diagnostic) => diagnostic.severity === "error")
       .map((diagnostic) => diagnostic.message);
     expect(errors.some((message) => message.includes("[interp-unresolved]"))).toBe(true);

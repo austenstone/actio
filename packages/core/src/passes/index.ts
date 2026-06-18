@@ -2,7 +2,7 @@ import type { ParseContext } from "../parser.js";
 import { dynamicMatrix } from "./dynamicMatrix.js";
 import { fallback } from "./fallback.js";
 import { fragments } from "./fragments.js";
-import { params, resolveCompileTimeInterpolations } from "./params.js";
+import { params } from "./params.js";
 import { applyPasses, type Pass, PassRegistry } from "./registry.js";
 import { retry } from "./retry.js";
 
@@ -31,4 +31,4 @@ export {
   PassRegistry,
   sortPasses,
 } from "./registry.js";
-export { dynamicMatrix, fallback, fragments, params, resolveCompileTimeInterpolations, retry };
+export { dynamicMatrix, fallback, fragments, params, retry };

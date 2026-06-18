@@ -56,7 +56,6 @@ export {
   type PassFn,
   PassRegistry,
   params,
-  resolveCompileTimeInterpolations,
   retry,
   runPasses,
   sortPasses,
