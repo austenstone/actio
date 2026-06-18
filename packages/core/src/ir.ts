@@ -21,7 +21,7 @@ export interface Step {
   name?: string;
   uses?: string;
   run?: string;
-  if?: string;
+  if?: string | boolean | number;
   shell?: string;
   "continue-on-error"?: boolean;
   inject?: string;
@@ -34,7 +34,7 @@ export interface Step {
 export interface Job {
   "runs-on"?: unknown;
   needs?: string | string[];
-  if?: string;
+  if?: string | boolean | number;
   steps?: Step[];
   strategy?: Record<string, unknown>;
   permissions?: unknown;
