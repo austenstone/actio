@@ -1,3 +1,4 @@
+import type { ActioTarget } from "./config.js";
 import type { Diagnostic } from "./diagnostics.js";
 import { emitYaml, generatedHeader } from "./emit.js";
 import { parseActio } from "./parser.js";
@@ -5,6 +6,14 @@ import { annotate } from "./passes/annotate.js";
 import { createRegistry, type Pass, runPasses } from "./passes/index.js";
 import { buildSourceMap, resolveGeneratedLine, type SourceMap } from "./sourcemap.js";
 import { validateWorkflowYaml } from "./validate.js";
+
+export interface NativeDependencyEntry {
+  ref: string;
+  sha: string;
+  integrity: string;
+}
+
+export type NativeDependencies = Record<string, NativeDependencyEntry>;
 
 export interface TranspileOptions {
   /** File name used in diagnostics and the generated banner. Default "<input>". */
@@ -22,6 +31,13 @@ export interface TranspileOptions {
    * Requires `sourceMap`; ignored (with a warning) without it. Default false.
    */
   annotate?: boolean;
+  /** Output target capability profile. Defaults to `legacy` behavior. */
+  target?: ActioTarget;
+  /**
+   * Native workflow lock data emitted as top-level `dependencies:` for preview
+   * targets. The resolver that computes this data lives in the CLI/build layer.
+   */
+  nativeDependencies?: NativeDependencies;
 }
 
 export interface TranspileResult {
@@ -75,6 +91,15 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
     passes = registry.list();
   }
   runPasses(ctx, passes);
+
+  if (
+    options.target === "github-actions-native-dependencies-preview" &&
+    options.nativeDependencies !== undefined &&
+    Object.keys(options.nativeDependencies).length > 0
+  ) {
+    // TODO(native-deps-schema): tighten this shape to the final GitHub-native schema.
+    (ctx.data as Record<string, unknown>).dependencies = options.nativeDependencies;
+  }
 
   const body = emitYaml(ctx.data, { header: false });
   const header = options.header === false ? "" : generatedHeader(fileName);

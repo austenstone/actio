@@ -1,4 +1,4 @@
-export { type ActioConfig, defineConfig } from "./config.js";
+export { type ActioConfig, type ActioTarget, defineConfig } from "./config.js";
 export {
   ActioError,
   type Diagnostic,
@@ -67,5 +67,11 @@ export {
   type SourceMap,
   type SourceMapping,
 } from "./sourcemap.js";
-export { type TranspileOptions, type TranspileResult, transpile } from "./transpile.js";
+export {
+  type NativeDependencies,
+  type NativeDependencyEntry,
+  type TranspileOptions,
+  type TranspileResult,
+  transpile,
+} from "./transpile.js";
 export { validateWorkflowYaml } from "./validate.js";

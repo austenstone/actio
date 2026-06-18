@@ -1,10 +1,13 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  type ActioTarget,
   type Diagnostic,
   formatDiagnostic,
   formatGithubAnnotation,
+  type NativeDependencies,
   type Pass,
   transpile,
 } from "actio-core";
@@ -23,10 +26,134 @@ export interface BuildOptions {
   cwd?: string;
   /** Extra transform passes (from the config file) merged into the built-in pipeline. */
   passes?: Pass[];
+  /** Output target capability profile. */
+  target: ActioTarget;
+  /**
+   * Optional override for native dependency resolution (tests inject this to
+   * avoid network calls).
+   */
+  nativeDependencyResolver?: NativeDependencyResolver;
 }
 
 const DEFAULT_GLOBS = ["**/*.actio.yml"];
 const IGNORE = ["**/node_modules/**", "**/dist/**", "**/.git/**"];
+const PINNED_SHA_RE = /^[0-9a-f]{40}$/i;
+
+interface NativeDependencyResolverRequest {
+  action: string;
+  ref: string;
+}
+
+interface NativeDependencyResolver {
+  resolveToImmutable(request: NativeDependencyResolverRequest): Promise<string>;
+  fetchByImmutable(
+    request: NativeDependencyResolverRequest,
+    immutableRef: string,
+  ): Promise<Uint8Array>;
+}
+
+const parseActionRepo = (action: string): { owner: string; repo: string } => {
+  const parts = action.split("/");
+  if (parts.length < 2) {
+    throw new Error(`Invalid action "${action}"`);
+  }
+  const owner = parts[0];
+  const repo = parts[1];
+  if (owner === undefined || repo === undefined || owner.length === 0 || repo.length === 0) {
+    throw new Error(`Invalid action "${action}"`);
+  }
+  return { owner, repo };
+};
+
+const githubHeaders = (): Record<string, string> => {
+  const token = process.env.ACTIO_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN;
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "actio-cli/build",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+};
+
+const sha256Hex = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
+
+const createGitHubNativeDependencyResolver = (): NativeDependencyResolver => ({
+  async resolveToImmutable(request) {
+    if (PINNED_SHA_RE.test(request.ref)) return request.ref;
+    const { owner, repo } = parseActionRepo(request.action);
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(request.ref)}`,
+      { headers: githubHeaders() },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `cannot resolve action: ${request.action}@${request.ref} (${response.status} ${response.statusText})`,
+      );
+    }
+    const payload = (await response.json()) as { sha?: string };
+    if (!payload.sha || !PINNED_SHA_RE.test(payload.sha)) {
+      throw new Error(`GitHub did not return a commit SHA for ${request.action}@${request.ref}`);
+    }
+    return payload.sha;
+  },
+  async fetchByImmutable(request, immutableRef) {
+    const { owner, repo } = parseActionRepo(request.action);
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/zipball/${immutableRef}`,
+      {
+        headers: githubHeaders(),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `cannot fetch action bytes for ${request.action}@${immutableRef} (${response.status} ${response.statusText})`,
+      );
+    }
+    return new Uint8Array(await response.arrayBuffer());
+  },
+});
+
+const parseRemoteActionUses = (yaml: string): NativeDependencyResolverRequest[] =>
+  yaml.split("\n").flatMap((line) => {
+    const match = line.match(
+      /^\s*-\s*uses:\s*(?<action>[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[^\s@#]+)?)@(?<ref>[^\s#]+)(?:\s*#.*)?\s*$/,
+    );
+    if (!match?.groups) return [];
+    const { action, ref } = match.groups;
+    if (!action || !ref) return [];
+    return [{ action, ref }];
+  });
+
+const resolveNativeDependencies = async (
+  yaml: string,
+  resolver: NativeDependencyResolver,
+): Promise<NativeDependencies> => {
+  const uses = parseRemoteActionUses(yaml);
+  const requestedRefs = new Map<string, string>();
+  const dependencies: NativeDependencies = {};
+
+  for (const use of uses) {
+    const previousRef = requestedRefs.get(use.action);
+    if (previousRef !== undefined && previousRef !== use.ref) {
+      throw new Error(
+        `native dependencies emission requires a single ref per action; found ${use.action}@${previousRef} and ${use.action}@${use.ref}`,
+      );
+    }
+    requestedRefs.set(use.action, use.ref);
+  }
+
+  for (const [action, ref] of [...requestedRefs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const resolvedSha = await resolver.resolveToImmutable({ action, ref });
+    const bytes = await resolver.fetchByImmutable({ action, ref }, resolvedSha);
+    dependencies[action] = {
+      ref,
+      sha: resolvedSha,
+      integrity: `sha256:${sha256Hex(bytes)}`,
+    };
+  }
+
+  return dependencies;
+};
 
 export function outputPathFor(inputFile: string, outDir: string): string {
   const base = path.basename(inputFile).replace(/\.actio\.yml$/, ".yml");
@@ -80,14 +207,34 @@ export interface FileResult {
 export async function buildOne(file: string, cwd: string, opts: BuildOptions): Promise<FileResult> {
   const abs = path.resolve(cwd, file);
   const source = await readFile(abs, "utf8");
-  const result = transpile(source, {
+  let result = transpile(source, {
     fileName: file,
     header: opts.header,
     validate: opts.validate,
     passes: opts.passes,
     sourceMap: opts.sourceMap,
     annotate: opts.annotate,
+    target: opts.target,
   });
+
+  if (result.ok && opts.target === "github-actions-native-dependencies-preview") {
+    const resolver = opts.nativeDependencyResolver ?? createGitHubNativeDependencyResolver();
+    const nativeDependencies = await resolveNativeDependencies(result.yaml, resolver);
+    if (Object.keys(nativeDependencies).length > 0) {
+      result = transpile(source, {
+        fileName: file,
+        header: opts.header,
+        // TODO(native-deps-schema): re-enable validation once upstream schema includes workflow dependencies.
+        validate: false,
+        passes: opts.passes,
+        sourceMap: opts.sourceMap,
+        annotate: opts.annotate,
+        target: opts.target,
+        // TODO(native-deps-schema): update this payload shape once GitHub finalizes preview docs.
+        nativeDependencies,
+      });
+    }
+  }
 
   if (result.diagnostics.length > 0) {
     printDiagnostics(result.diagnostics, source);

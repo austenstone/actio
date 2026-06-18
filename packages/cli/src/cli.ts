@@ -16,6 +16,7 @@ const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url),
 interface CliBuildFlags {
   config?: string;
   outDir?: string;
+  target?: string;
   check?: boolean;
   stdout?: boolean;
   validate: boolean;
@@ -51,13 +52,18 @@ async function resolveOptions(
     process.stderr.write(`${pc.red("error")}: ${(err as Error).message}\n`);
     process.exit(1);
   }
-  return resolveBuildOptions({
-    files,
-    flags,
-    forceCheck,
-    argv: process.argv.slice(2),
-    config: loaded?.config ?? {},
-  });
+  try {
+    return resolveBuildOptions({
+      files,
+      flags,
+      forceCheck,
+      argv: process.argv.slice(2),
+      config: loaded?.config ?? {},
+    });
+  } catch (err) {
+    process.stderr.write(`${pc.red("error")}: ${(err as Error).message}\n`);
+    process.exit(1);
+  }
 }
 
 async function startWatch(files: string[], flags: CliBuildFlags) {
@@ -75,6 +81,10 @@ cli
   .command("build [...files]", "Compile .actio.yml files into GitHub Actions workflows")
   .option("--config <file>", "Path to an actio config file (overrides auto-discovery)")
   .option("--out-dir <dir>", "Output directory for generated workflows")
+  .option(
+    "--target <profile>",
+    "Output target profile (legacy | github-actions-native-dependencies-preview)",
+  )
   .option("--check", "Verify generated output is up to date without writing (CI drift check)")
   .option("--stdout", "Write generated YAML to stdout instead of files")
   .option("-w, --watch", "Rebuild on change and keep running (like tsc --watch)")
@@ -97,6 +107,10 @@ cli
   .option("--out-dir <dir>", "Output directory for generated workflows", {
     default: ".github/workflows",
   })
+  .option(
+    "--target <profile>",
+    "Output target profile (legacy | github-actions-native-dependencies-preview)",
+  )
   .option("--no-validate", "Skip schema validation of generated workflows")
   .option("--no-header", "Omit the generated-by-Actio banner")
   .action(async (files: string[], flags: CliBuildFlags) => {
@@ -110,6 +124,10 @@ cli
   )
   .option("--config <file>", "Path to an actio config file (overrides auto-discovery)")
   .option("--out-dir <dir>", "Output directory for generated workflows")
+  .option(
+    "--target <profile>",
+    "Output target profile (legacy | github-actions-native-dependencies-preview)",
+  )
   .option("--no-validate", "Skip schema validation of generated workflows")
   .option("--no-header", "Omit the generated-by-Actio banner")
   .option("--no-source-map", "Ignore the .yml.map source map in the drift check")
