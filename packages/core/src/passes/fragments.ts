@@ -5,7 +5,7 @@ import { resolveCompileTimeTextBoundaries } from "./params.js";
 import type { Pass } from "./registry.js";
 
 type FragmentMap = Record<string, Step[]>;
-const FORM_B_KEY_RE = /^when_compile\([\s\S]+\)$/;
+const FORM_B_KEY_RE = /^when_compile\([\s\S]*\)$/;
 const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
 
 function getFragments(ctx: ParseContext): FragmentMap {

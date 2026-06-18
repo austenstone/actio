@@ -44,7 +44,7 @@ interface Token {
   pos: number;
 }
 
-const FORM_B_KEY_RE = /^when_compile\((.+)\)$/;
+const FORM_B_KEY_RE = /^when_compile\((.*)\)$/;
 
 const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
 
@@ -615,7 +615,7 @@ const evaluateWhenCompile = (
         "error",
         diagnosticMessage(
           "params-runtime-sigil",
-          `Runtime expression "\${{ ${wrapped} }}" is invalid for params; use "{{ params.* }}"`,
+          `Runtime expression "\${{ ${wrapped} }}" is invalid for params; use bare compile-time form such as "params.deploy"`,
         ),
         path,
       );
@@ -781,7 +781,7 @@ const transformNode = (ctx: ParseContext, value: unknown, path: Path): Transform
   for (const key of keys) {
     if (key === "when_compile") continue;
     const expression = key.match(FORM_B_KEY_RE)?.[1];
-    if (expression) {
+    if (expression !== undefined) {
       formBKeys.push(key);
       continue;
     }

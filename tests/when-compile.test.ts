@@ -202,8 +202,42 @@ jobs:
       true,
     );
     expect(
+      errors.some(
+        (diagnostic) =>
+          diagnostic.message.includes("[params-runtime-sigil]") &&
+          diagnostic.message.includes('bare compile-time form such as "params.deploy"'),
+      ),
+    ).toBe(true);
+    expect(
       errors.some((diagnostic) => diagnostic.message.includes("[when-compile-runtime-context]")),
     ).toBe(true);
+  });
+
+  it("treats empty form B predicates as when_compile-empty and strips them from output", () => {
+    const result = transpileResult(`name: x
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        env:
+          when_compile():
+            FLAG: "1"
+          KEEP: yes
+`);
+    expect(
+      result.diagnostics.some((diagnostic) => diagnostic.message.includes("[when-compile-empty]")),
+    ).toBe(true);
+    const doc = parse(result.yaml) as {
+      jobs: {
+        build: {
+          steps: Array<{ env?: { KEEP?: string; "when_compile()"?: { FLAG?: string } } }>;
+        };
+      };
+    };
+    expect(doc.jobs.build.steps[0]?.env?.["when_compile()"]).toBeUndefined();
+    expect(doc.jobs.build.steps[0]?.env?.KEEP).toBe("yes");
   });
 
   it("rejects wrapper syntax even when no runtime root is referenced", () => {
@@ -446,6 +480,26 @@ fragments:
   gated:
     - run: echo hidden
       when_compile: params.deploy
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: gated
+`);
+    expect(
+      errors.some((diagnostic) => diagnostic.message.includes("[when-compile-residual]")),
+    ).toBe(true);
+  });
+
+  it("errors when a fragment injects an empty-paren residual when_compile() directive", () => {
+    const errors = transpileErrors(`name: x
+on: [push]
+fragments:
+  gated:
+    - run: echo hidden
+      env:
+        when_compile():
+          FLAG: "1"
 jobs:
   build:
     runs-on: ubuntu-latest
