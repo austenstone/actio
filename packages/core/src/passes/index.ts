@@ -2,13 +2,13 @@ import type { ParseContext } from "../parser.js";
 import { dynamicMatrix } from "./dynamicMatrix.js";
 import { fallback } from "./fallback.js";
 import { fragments } from "./fragments.js";
-import { params } from "./params.js";
 import {
   applyDefaults,
   applyExecutor,
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,
 } from "./jobDefaults.js";
+import { params } from "./params.js";
 import { applyPasses, type Pass, PassRegistry } from "./registry.js";
 import { retry } from "./retry.js";
 

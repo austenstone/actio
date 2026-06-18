@@ -124,7 +124,7 @@ jobs:
     steps:
       - run: echo hi`);
     expect(validate(doc)).toBe(false);
-});
+  });
 
   it("accepts executor arrays and executor definitions with timeout/permissions", () => {
     const doc = load(`on: [push]
