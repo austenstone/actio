@@ -60,6 +60,17 @@ function processJobFallback(ctx: ParseContext, job: Job, jobId: string): void {
   if (job.fallback == null) return;
   const { steps: fbSteps, recover } = normalizeFallback(job.fallback);
   delete job.fallback;
+  // A reusable-workflow job (`uses:`) cannot also declare `steps:`; appending
+  // fallback steps would emit schema-invalid output. Skip and warn instead.
+  if (typeof job.uses === "string") {
+    pushDiagnostic(
+      ctx,
+      "warning",
+      `Job "${jobId}": job-level fallback is not supported on a reusable-workflow (uses) job; ignoring`,
+      ["jobs", jobId, "fallback"],
+    );
+    return;
+  }
   if (recover) {
     pushDiagnostic(
       ctx,
