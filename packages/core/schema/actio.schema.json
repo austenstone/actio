@@ -630,7 +630,9 @@
         },
         "inject": {
           "type": "string",
-          "description": "Actio macro. Splice in the steps of the named fragment (defined under top-level `fragments:`) at this position. Replaced inline by `actio build`."
+          "title": "inject (Actio macro)",
+          "description": "Actio macro. Splice in the steps of the named fragment (defined under top-level `fragments:`) at this position. Replaced inline by `actio build`.",
+          "markdownDescription": "**Actio macro**: splice a fragment here.\n\nReplaced inline by `actio build` with the steps of the named fragment from top-level `fragments:`.\n\n```yaml\nsteps:\n  - inject: setup\n  - run: npm test\n```"
         },
         "when_compile": {
           "type": "string",
@@ -1449,6 +1451,7 @@
     "retry": {
       "title": "retry (Actio macro)",
       "description": "Actio macro. Retry a flaky step with optional backoff; expands into a chain of conditional attempts where attempt N runs only if attempt N-1 failed. Shorthand `retry: 3` is the same as `retry: { attempts: 3 }`.",
+      "markdownDescription": "**Actio macro**: retry a flaky step.\n\nExpands into a chain of conditional attempts: attempt _N_ runs only if attempt _N-1_ failed. Shorthand `retry: 3` is the same as `retry: { attempts: 3 }`.\n\n```yaml\nsteps:\n  - run: flaky-command\n    retry:\n      attempts: 3\n      delay: 10s\n```",
       "oneOf": [
         {
           "type": "integer",
@@ -1492,6 +1495,7 @@
     "fallback": {
       "title": "fallback (Actio macro)",
       "description": "Actio macro. A native try/catch. Default (notify): the fallback runs on failure via `if: failure()` but the job still fails. With `recover: true` the guarded step gets `continue-on-error: true` and the fallback keys off `outcome`, so the job can pass.",
+      "markdownDescription": "**Actio macro**: a native try/catch.\n\n- **notify** (default): the fallback runs on failure via `if: failure()`, but the job still fails.\n- **recover** (`recover: true`): the guarded step gets `continue-on-error: true` and the fallback keys off `outcome`, so the job can pass.\n\n```yaml\nsteps:\n  - run: deploy\n    fallback:\n      recover: true\n      steps:\n        - run: ./rollback.sh\n```",
       "oneOf": [
         {
           "type": "array",
@@ -1526,6 +1530,7 @@
       "title": "dynamic_matrix (Actio macro)",
       "type": "object",
       "description": "Actio macro. Build a matrix at runtime: `script` prints a JSON array (or `{include:[...]}`) to stdout. Actio generates a setup job that publishes the JSON and wires this job to consume it via `fromJSON()` with a fail-fast:false default and an empty-matrix guard.",
+      "markdownDescription": "**Actio macro**: build a matrix at runtime.\n\n`script` prints a JSON array (or `{ include: [...] }`) to stdout. Actio generates a setup job that publishes the JSON and wires this job to consume it via `fromJSON()`, with `fail-fast: false` and an empty-matrix guard by default.\n\n```yaml\njobs:\n  test:\n    dynamic_matrix:\n      script: ./list-targets.sh\n      alias: target\n    steps:\n      - run: ./test ${{ matrix.target }}\n```",
       "required": [
         "script"
       ],
@@ -2789,7 +2794,9 @@
     },
     "fragments": {
       "type": "object",
+      "title": "fragments (Actio macro)",
       "description": "Actio macro. Reusable, named lists of steps. Splice a fragment into a job with `- inject: <name>`. The `fragments` key is stripped from the generated workflow.",
+      "markdownDescription": "**Actio macro**: reusable, named step lists.\n\nDefine ordered step lists once, then splice them into any job with `- inject: <name>`. The `fragments` key is stripped from the generated workflow.\n\n```yaml\nfragments:\n  setup:\n    - uses: actions/checkout@v4\n    - uses: actions/setup-node@v4\njobs:\n  build:\n    steps:\n      - inject: setup\n      - run: npm ci\n```",
       "additionalProperties": {
         "type": "array",
         "description": "An ordered list of steps to inject wherever this fragment is referenced.",
