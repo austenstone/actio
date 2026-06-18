@@ -80,10 +80,25 @@ function buildRetryAttempts(
   const label = stepLabel(step);
   const slug = slugify(label);
   const base = slug ? `step_${slug}` : `actio_${jobId}_step_${idx + 1}`;
-  // Preserve a user-supplied `id`: the final attempt reclaims it so downstream
-  // `steps.<id>` references (outputs, outcome) still resolve to the real result.
+  // A user-supplied `id` is reclaimed onto the FINAL attempt only. That attempt
+  // is gated on the prior attempt FAILING, so on the common first-attempt-success
+  // path it (and the reclaimed id) is skipped — downstream `steps.<id>.outputs`
+  // and `.outcome` then read empty. Native GHA can't express "id of whichever
+  // attempt ran", so warn about the hazard rather than corrupt silently.
   const userId = typeof step.id === "string" && step.id.trim() ? step.id.trim() : undefined;
-  if (userId) used.delete(userId);
+  if (userId) {
+    pushDiagnostic(
+      ctx,
+      "warning",
+      `Step "${userId}" in job "${jobId}": retry reclaims this id onto the final attempt, ` +
+        `which only runs after an earlier attempt fails; downstream ` +
+        `steps.${userId}.outputs/.outcome are empty on first-attempt success`,
+      ["jobs", jobId, "steps", idx, "id"],
+    );
+  }
+  // Keep `userId` reserved in `used` so a synthesized `${base}_attempt_${n}` can
+  // never claim that exact value (the `while (used.has(id))` guard below skips
+  // it); the final attempt then reclaims it as a unique id.
   // Preserve a falsy boolean/number `if` (e.g. `if: false` / `if: 0`) — both
   // are valid "never run" gates that must survive onto the first attempt.
   const originalIf =

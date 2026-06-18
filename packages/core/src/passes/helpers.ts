@@ -46,13 +46,29 @@ function stripExprWrapper(cond: string): string {
 function needsParens(expr: string): boolean {
   // Wrap only when a `||` sits at the top level (depth 0). GitHub allows the
   // spaceless `a||b` form, so a whitespace check misses it; tracking paren depth
-  // also avoids double-wrapping an already-grouped `(a||b)`.
+  // also avoids double-wrapping an already-grouped `(a||b)`. Parens and `|`
+  // inside a string literal don't count: a stray `)` in a literal would corrupt
+  // `depth` and hide a real top-level `||`. GitHub literals use single quotes
+  // with `''` escaping; handle `"` defensively too.
   let depth = 0;
+  let quote = "";
   for (let i = 0; i < expr.length; i++) {
     const ch = expr[i];
-    if (ch === "(") depth++;
-    else if (ch === ")") depth--;
-    else if (depth === 0 && ch === "|" && expr[i + 1] === "|") return true;
+    if (quote) {
+      if (ch === quote) {
+        // A doubled quote is an escaped quote, not the closing delimiter.
+        if (expr[i + 1] === quote) i++;
+        else quote = "";
+      }
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+    } else if (ch === "(") {
+      depth++;
+    } else if (ch === ")") {
+      depth--;
+    } else if (depth === 0 && ch === "|" && expr[i + 1] === "|") {
+      return true;
+    }
   }
   return false;
 }

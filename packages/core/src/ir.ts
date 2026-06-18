@@ -21,7 +21,7 @@ export interface Step {
   name?: string;
   uses?: string;
   run?: string;
-  if?: string;
+  if?: string | boolean | number;
   shell?: string;
   "continue-on-error"?: boolean;
   inject?: string;
@@ -33,7 +33,7 @@ export interface Step {
 export interface Job {
   "runs-on"?: unknown;
   needs?: string | string[];
-  if?: string;
+  if?: string | boolean | number;
   steps?: Step[];
   strategy?: Record<string, unknown>;
   permissions?: unknown;
@@ -115,7 +115,7 @@ function reapplyKeyOrder(src: unknown, dst: unknown): void {
   }
   if (isObject(src) && isObject(dst)) {
     const order = (src as Record<symbol, unknown>)[KEY_ORDER];
-    if (Array.isArray(order)) setKeyOrder(dst, order as string[]);
+    if (Array.isArray(order)) setKeyOrder(dst, [...(order as string[])]);
     for (const k of Object.keys(src)) reapplyKeyOrder(src[k], dst[k]);
   }
 }
