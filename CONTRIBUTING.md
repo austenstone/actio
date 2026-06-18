@@ -11,6 +11,8 @@ Actio is a transpiler. The dangerous failure mode is not a crash, it is silently
 
 Coverage proves code ran. Mutation testing proves the assertions bite. For a YAML transpiler, mutation testing is the load-bearing TDD gate because it catches tests that snapshot happy paths without detecting wrong conditions, missing branches, or subtly incorrect emitted YAML.
 
+The canonical mutation threshold lives in `stryker.config.json`; the current `break` threshold is 62%. A PR can fail mutation testing even with 100% line coverage if it deletes or weakens a load-bearing assertion. Treat that as the gate working, not as a flaky coverage check.
+
 ## Fully typed expectations
 
 - No explicit `any`. Use `unknown`, type guards, discriminated unions, or typed helpers.
