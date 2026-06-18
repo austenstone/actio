@@ -1,6 +1,7 @@
 import type { ParseContext } from "../parser.js";
 import { dynamicMatrix } from "./dynamicMatrix.js";
 import { fallback } from "./fallback.js";
+import { forEach } from "./forEach.js";
 import { fragments } from "./fragments.js";
 import {
   applyDefaults,
@@ -17,11 +18,12 @@ import { whenCompile } from "./whenCompile.js";
 /**
  * The transforms Actio ships with. Order is derived from each pass's `runsAfter`
  * (see registry.ts), not this array, so the effective pipeline is:
- *   params → job_defaults → when_compile → fragments → retry → fallback → dynamic_matrix
+ *   params → job_defaults → for_each → when_compile → fragments → retry → fallback → dynamic_matrix
  */
 export const builtinPasses: Pass[] = [
   params,
   jobDefaults,
+  forEach,
   whenCompile,
   fragments,
   retry,
@@ -53,6 +55,7 @@ export {
   dynamicMatrix,
   EXECUTOR_KEYS,
   fallback,
+  forEach,
   fragments,
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,

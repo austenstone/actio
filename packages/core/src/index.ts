@@ -56,6 +56,7 @@ export {
   dynamicMatrix,
   EXECUTOR_KEYS,
   fallback,
+  forEach,
   fragments,
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,

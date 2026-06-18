@@ -54,10 +54,15 @@ describe("sortPasses", () => {
       byName.get("fallback"),
       byName.get("retry"),
       byName.get("when_compile"),
+      byName.get("for_each"),
       byName.get("params"),
+      byName.get("job_defaults"),
     ].filter((pass): pass is Pass => pass !== undefined);
     const ordered = sortPasses(shuffled).map((pass) => pass.name);
+    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("job_defaults"));
+    expect(ordered.indexOf("job_defaults")).toBeLessThan(ordered.indexOf("for_each"));
     expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("when_compile"));
+    expect(ordered.indexOf("for_each")).toBeLessThan(ordered.indexOf("when_compile"));
     expect(ordered.indexOf("when_compile")).toBeLessThan(ordered.indexOf("fragments"));
     expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("retry"));
     expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
@@ -78,6 +83,7 @@ describe("sortPasses", () => {
     expect(sortPasses(builtinPasses).map((p) => p.name)).toEqual([
       "params",
       "job_defaults",
+      "for_each",
       "when_compile",
       "fragments",
       "retry",
@@ -103,6 +109,7 @@ describe("PassRegistry", () => {
     expect(registry.list().map((p) => p.name)).toEqual([
       "params",
       "job_defaults",
+      "for_each",
       "when_compile",
       "fragments",
       "retry",
