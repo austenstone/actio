@@ -34,7 +34,7 @@ serialization. Actio's differentiator is the **macro/transform compiler**.
 ```bash
 npm install -D actio-cli
 # or run without installing:
-npx actio-cli build
+npx -p actio-cli actio build
 ```
 
 Requires Node ≥ 20.
@@ -43,13 +43,13 @@ Requires Node ≥ 20.
 
 ```bash
 # scaffold a starter source file
-npx actio-cli init ci.actio.yml
+npx -p actio-cli actio init ci.actio.yml
 
 # compile *.actio.yml → .github/workflows/*.yml
-npx actio-cli build
+npx -p actio-cli actio build
 
 # CI drift check (fails if generated output is stale)
-npx actio-cli check
+npx -p actio-cli actio check
 ```
 
 **Recommended layout:** keep sources in `.github/actio/` and compile them into
@@ -62,6 +62,58 @@ outside `.github/workflows/` won't be mistaken for real workflows. Think of
   actio/        # source: *.actio.yml (+ actio.config.ts)
   workflows/    # generated: *.yml (committed, GitHub runs these)
 ```
+
+## Supply-chain pinning (`pins`)
+
+Actio ships a dedicated pin-management surface for freezing mutable refs to immutable digests without introducing a foreign runtime. For action dependencies, this now serves as a **legacy bridge** while GitHub's native workflow `dependencies:` lock model rolls out.
+
+```bash
+# verify pin state
+npx -p actio-cli actio pins check .github/actio/ci.actio.yml
+
+# mechanical pin rewrite only (no build/config/custom-pass execution)
+npx -p actio-cli actio pins update .github/actio/ci.actio.yml --no-exec --delta-out .actio/pins-delta.json
+
+# privileged apply of a precomputed delta with strict allowlist checks
+npx -p actio-cli actio pins apply --constrained .actio/pins-delta.json
+```
+
+Exit codes are security-significant:
+
+1. `0` = clean.
+2. `1` = resolvable drift (for example, a tag moved).
+3. `2` = hard failure (including integrity mismatch); never auto-heal.
+
+`pins apply --constrained` only accepts a single-action, three-artifact delta shape:
+
+1. source `.actio.yml` `uses: owner/repo@ref` bump,
+2. matching `actio.lock` digest update,
+3. matching generated `uses: owner/repo@<digest> # <ref>` substitution.
+
+Anything outside that shape is rejected with exit `2`.
+
+### Dependabot reconcile (safe two-phase pattern)
+
+Use a two-phase workflow split:
+
+1. **Phase 1 (`pull_request`, read-only token):** run `pins update --no-exec` on the PR head and upload the delta artifact.
+2. **Phase 2 (`workflow_run`, write token):** download the trusted artifact and run `pins apply --constrained`; never run `build` or `pins update` in this privileged phase.
+
+This avoids executing PR-controlled config/passes in a write-privileged context while still keeping source, lockfile, and generated pins aligned.
+
+### Relationship to GitHub native `dependencies:`
+
+Actio now has two action-locking modes selected by target capability:
+
+1. **Native preview target (`github-actions-native-dependencies-preview`)**: Actio resolves `uses:` actions to immutable SHAs + integrity and emits a top-level `dependencies:` block in generated workflows.
+2. **Legacy target (`legacy`, default)**: Actio keeps using `actio.lock` + `pins` (`check` / `update --no-exec` / `apply --constrained`) as a transitional bridge.
+
+Why both exist:
+
+- Native `dependencies:` is the long-term destination because runner-side pre-execution verification is stronger than compile-time-only pinning.
+- `actio.lock` remains for environments that don't yet support native workflow dependencies.
+
+Set the target in config (or via `--target`) to choose behavior per repository.
 
 
 ## Macros
@@ -332,6 +384,7 @@ actio schema             Print the Actio JSON Schema (--out <file> to save local
 | --- | --- |
 | `--config <file>` | Path to an actio config file (overrides auto-discovery) |
 | `--out-dir <dir>` | Output directory (default `.github/workflows`) |
+| `--target <profile>` | Output target profile (`legacy` or `github-actions-native-dependencies-preview`) |
 | `--check` | Verify output is up to date without writing (CI drift check) |
 | `--stdout` | Write generated YAML to stdout instead of files |
 | `-w, --watch` | Rebuild on change and keep running (like `tsc --watch`) |
@@ -481,6 +534,7 @@ export default defineConfig({
   outDir: ".github/workflows",
   validate: true,
   header: true,
+  target: "legacy",
   files: ["**/*.actio.yml"], // `include` is accepted as an alias
   passes: [],                // custom transform passes (see below)
 });
@@ -494,6 +548,7 @@ authoring and autocompletion.
 | `outDir` | `string` | Output directory for generated workflows |
 | `validate` | `boolean` | Validate generated YAML against GitHub's schema |
 | `header` | `boolean` | Prepend the generated-by-Actio banner |
+| `target` | `"legacy" \| "github-actions-native-dependencies-preview"` | Capability profile for supply-chain output (`legacy` bridge mode vs native workflow `dependencies:` emission) |
 | `files` / `include` | `string[]` | Default glob patterns when no files are passed on the CLI |
 | `sourceMap` | `boolean` | Write a `.yml.map` source map beside each workflow (default `true`) |
 | `annotate` | `boolean` | Inject the `actio-annotate` runtime failure-mapping job (default `true`; needs `sourceMap`) |

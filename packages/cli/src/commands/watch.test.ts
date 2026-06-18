@@ -31,6 +31,7 @@ const baseOpts = (cwd: string): BuildOptions => ({
   header: false,
   sourceMap: false,
   annotate: false,
+  target: "legacy",
   cwd,
 });
 
