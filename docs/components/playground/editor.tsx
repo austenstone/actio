@@ -5,7 +5,7 @@ import MonacoEditor, { loader } from '@monaco-editor/react';
 import actioSchema from 'actio-core/schema/actio.schema.json';
 import * as monaco from 'monaco-editor';
 import { configureMonacoYaml } from 'monaco-yaml';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { basePath } from '@/lib/shared';
 
 // Model paths. monaco-yaml scopes schemas via `fileMatch` against the model URI,
@@ -39,6 +39,20 @@ if (typeof window !== 'undefined') {
   });
 }
 
+/** Track the site's dark/light mode via the `dark` class fumadocs toggles on <html>. */
+function useIsDark(): boolean {
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const root = document.documentElement;
+    const update = () => setIsDark(root.classList.contains('dark'));
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+  return isDark;
+}
+
 interface EditorProps {
   value: string;
   onChange?: (value: string) => void;
@@ -47,6 +61,7 @@ interface EditorProps {
 }
 
 export function Editor({ value, onChange, readOnly, ariaLabel }: EditorProps) {
+  const isDark = useIsDark();
   const options = useMemo<monaco.editor.IStandaloneEditorConstructionOptions>(
     () => ({
       readOnly,
@@ -76,7 +91,7 @@ export function Editor({ value, onChange, readOnly, ariaLabel }: EditorProps) {
       path={readOnly ? OUTPUT_PATH : SOURCE_PATH}
       value={value}
       onChange={(next) => onChange?.(next ?? '')}
-      theme="vs-dark"
+      theme={isDark ? 'vs-dark' : 'vs'}
       options={options}
       loading={
         <div className="px-4 py-3 text-sm text-fd-muted-foreground">Loading editor…</div>
