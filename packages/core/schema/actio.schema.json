@@ -875,6 +875,9 @@
               "$ref": "#/definitions/concurrency"
             }
           ]
+        },
+        "extends": {
+          "$ref": "#/definitions/extendsRef"
         }
       },
       "required": [
@@ -1312,6 +1315,89 @@
           "$ref": "#/definitions/globs"
         }
       ]
+    },
+    "callTemplateDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Actio macro. A named reusable-workflow call-job template referenced by `jobs.<id>.extends`. May carry only call-job plumbing keys.",
+      "properties": {
+        "uses": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/uses"
+        },
+        "with": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/with"
+        },
+        "needs": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/needs"
+        },
+        "secrets": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/secrets"
+        },
+        "if": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/if"
+        },
+        "permissions": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/permissions"
+        },
+        "concurrency": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/concurrency"
+        },
+        "strategy": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/strategy"
+        }
+      }
+    },
+    "extendsRef": {
+      "description": "Actio macro. The name (or ordered list of names) of one or more `call_templates:` entries a call job inherits via `extends:`. Later templates win; the job's own inline keys win over all.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      ]
+    },
+    "extendsCallJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Actio macro. A reusable-workflow call job whose `uses` is supplied by a `call_templates:` entry via `extends:`. Inline keys override the template.",
+      "required": [
+        "extends"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/name"
+        },
+        "needs": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/needs"
+        },
+        "permissions": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/permissions"
+        },
+        "if": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/if"
+        },
+        "with": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/with"
+        },
+        "secrets": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/secrets"
+        },
+        "strategy": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/strategy"
+        },
+        "concurrency": {
+          "$ref": "#/definitions/reusableWorkflowCallJob/properties/concurrency"
+        },
+        "extends": {
+          "$ref": "#/definitions/extendsRef"
+        }
+      }
     },
     "share": {
       "title": "share (Actio macro)",
@@ -3085,6 +3171,9 @@
             },
             {
               "$ref": "#/definitions/reusableWorkflowCallJob"
+            },
+            {
+              "$ref": "#/definitions/extendsCallJob"
             }
           ]
         }
@@ -3129,6 +3218,13 @@
       "description": "Actio macro. Named runner/container/service presets referenced by `jobs.<id>.executor`. Stripped from generated workflow YAML.",
       "additionalProperties": {
         "$ref": "#/definitions/executorDefinition"
+      }
+    },
+    "call_templates": {
+      "type": "object",
+      "description": "Actio macro (compile-time). Named reusable-workflow call-job templates referenced by `jobs.<id>.extends`. Stripped from generated workflow YAML.",
+      "additionalProperties": {
+        "$ref": "#/definitions/callTemplateDefinition"
       }
     },
     "injectionHoist": {

@@ -31,6 +31,11 @@
       "description": "Actio macro. Named runner/container/service presets referenced by `jobs.<id>.executor`. Stripped from generated workflow YAML.",
       "additionalProperties": { "$ref": "#/definitions/executorDefinition" }
     },
+    "call_templates": {
+      "type": "object",
+      "description": "Actio macro (compile-time). Named reusable-workflow call-job templates referenced by `jobs.<id>.extends`. Stripped from generated workflow YAML.",
+      "additionalProperties": { "$ref": "#/definitions/callTemplateDefinition" }
+    },
     "injectionHoist": {
       "$ref": "#/definitions/injectionHoistMode",
       "description": "Actio macro. Global default injection-hoist mode for every `run:` in the workflow. Overridden by job- and step-level `injectionHoist`. Stripped from generated workflow YAML."
@@ -42,7 +47,13 @@
       "markdownDescription": "**Actio macro**: workflow-scoped teardown (sibling to `jobs:`).\n\nEach named entry compiles to an aggregator job that `needs:` every real job and runs on the normal path (`if: !cancelled()`), plus an auto cancel-companion (`if: cancelled()`, `timeout-minutes: 5`). Nest `on_success`/`on_failure`/`on_abort` for outcome-branch jobs; `on_abort: []` opts out of the cancel job.\n\n```yaml\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./deploy.sh\nfinally:\n  teardown:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./cleanup.sh\n```\n\nFor job/step teardown use `ensure:` instead."
     }
   },
+  "jobOneOf": [{ "$ref": "#/definitions/extendsCallJob" }],
   "patchDefinitions": {
+    "reusableWorkflowCallJob": {
+      "properties": {
+        "extends": { "$ref": "#/definitions/extendsRef" }
+      }
+    },
     "step": {
       "properties": {
         "inject": {
@@ -170,6 +181,45 @@
       "description": "Actio macro. Gate this step or job on file changes. Runs only when files changed in the pull request or push match one of these glob patterns. Compiles to a single shared `dorny/paths-filter` setup job plus a `needs.<setup>.outputs.<flag> == 'true'` guard folded into the existing `if:`. Stripped from generated workflow YAML.",
       "markdownDescription": "**Actio macro**: file-change gating.\n\nRuns this step or job only when files changed in the pull request or push match one of the glob patterns. Actio synthesizes one shared setup job that runs [`dorny/paths-filter`](https://github.com/dorny/paths-filter) once, publishes a flag output per unique glob group, and folds `if: needs.<setup>.outputs.<flag> == 'true'` (AND-combined with any existing `if:`) plus `needs:` into each guarded node.\n\n```yaml\nsteps:\n  - name: Build docs\n    run: ./build-docs.sh\n    if_changed:\n      - 'docs/**'\n      - '*.md'\n```",
       "oneOf": [{ "type": "string", "minLength": 1 }, { "$ref": "#/definitions/globs" }]
+    },
+    "callTemplateDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Actio macro. A named reusable-workflow call-job template referenced by `jobs.<id>.extends`. May carry only call-job plumbing keys.",
+      "properties": {
+        "uses": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/uses" },
+        "with": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/with" },
+        "needs": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/needs" },
+        "secrets": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/secrets" },
+        "if": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/if" },
+        "permissions": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/permissions" },
+        "concurrency": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/concurrency" },
+        "strategy": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/strategy" }
+      }
+    },
+    "extendsRef": {
+      "description": "Actio macro. The name (or ordered list of names) of one or more `call_templates:` entries a call job inherits via `extends:`. Later templates win; the job's own inline keys win over all.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      ]
+    },
+    "extendsCallJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Actio macro. A reusable-workflow call job whose `uses` is supplied by a `call_templates:` entry via `extends:`. Inline keys override the template.",
+      "required": ["extends"],
+      "properties": {
+        "name": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/name" },
+        "needs": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/needs" },
+        "permissions": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/permissions" },
+        "if": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/if" },
+        "with": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/with" },
+        "secrets": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/secrets" },
+        "strategy": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/strategy" },
+        "concurrency": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/concurrency" },
+        "extends": { "$ref": "#/definitions/extendsRef" }
+      }
     },
     "share": {
       "title": "share (Actio macro)",

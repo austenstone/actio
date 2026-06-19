@@ -1,5 +1,5 @@
 import type { ParseContext } from "../parser.js";
-import { callTemplates } from "./callTemplates.js";
+import { CALL_TEMPLATE_KEYS, type CallTemplateKey, callTemplates } from "./callTemplates.js";
 import { dynamicMatrix } from "./dynamicMatrix.js";
 import { fallback } from "./fallback.js";
 import { forEach } from "./forEach.js";
@@ -75,6 +75,8 @@ export {
 export {
   applyDefaults,
   applyExecutor,
+  CALL_TEMPLATE_KEYS,
+  type CallTemplateKey,
   callTemplates,
   dynamicMatrix,
   EXECUTOR_KEYS,

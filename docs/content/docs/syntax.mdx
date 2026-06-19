@@ -245,6 +245,83 @@ jobs:
 
 See [`executor`](#executor) for the call site. Full guide: [executors](/docs/macros/job-defaults#executors).
 
+{/* macro:call_templates */}
+### `call_templates` [#call_templates]
+
+Named reusable-workflow **call-job** templates referenced by `jobs.<id>.extends`. Lets N
+near-identical call jobs collapse to one base template plus per-job deltas (usually a single
+`with.*` value). Stripped from the generated workflow YAML.
+
+- **Valid in:** top level
+- **Type:** map of name → call-template definition
+- **Compiles to:** nothing; the referenced template is merged **under** each job that
+  `extends:` it, then the job is emitted as an ordinary call job
+
+<TypeTable
+  type={{
+    uses: { type: 'string', description: 'Reusable workflow reference. Inline job value wins when set.' },
+    with: { type: 'map', description: 'Call inputs, shallow per-key: each inline with.<key> overrides the template; unspecified keys inherit.' },
+    needs: { type: 'string | string[]', description: 'Order-preserving union of template and inline needs.' },
+    secrets: { type: "map | 'inherit'", description: "A string on either side (e.g. inherit) replaces; two maps shallow-merge per key." },
+    if: { type: 'string', description: 'AND-combined with the inline if condition.' },
+    permissions: { type: 'map', description: 'Replaces on presence; inline wins.' },
+    concurrency: { type: 'map', description: 'Replaces on presence; inline wins.' },
+    strategy: { type: 'map', description: 'Replaces on presence; inline wins.' },
+  }}
+/>
+
+Precedence is **inline > extends > job_defaults**: the template runs before `job_defaults`, so
+a job written as just `{ extends, with }` already carries a real `uses` before `job_defaults`
+partitions jobs — and any key the template (or inline job) supplied is already present, so
+`job_defaults` won't overwrite it.
+
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
+
+  ```yaml
+  call_templates:
+    reusable-test:
+      uses: ./.github/workflows/test.yml
+      with:
+        testTimingsArtifact: test-timings
+  jobs:
+    test-unit:
+      extends: reusable-test
+      with:
+        afterBuild: pnpm test-unit
+    test-integration:
+      extends: reusable-test
+      with:
+        afterBuild: pnpm test-integration
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    test-unit:
+      uses: ./.github/workflows/test.yml
+      with:
+        testTimingsArtifact: test-timings
+        afterBuild: pnpm test-unit
+    test-integration:
+      uses: ./.github/workflows/test.yml
+      with:
+        testTimingsArtifact: test-timings
+        afterBuild: pnpm test-integration
+  ```
+
+  </Tab>
+</Tabs>
+
+<Callout title="Call jobs only">
+  `extends:` is valid only on reusable-workflow call jobs. A job with inline `steps:`, or one
+  where no template in the chain provides `uses:`, is rejected at compile time.
+</Callout>
+
+See [`extends`](#extends) for the call site.
+
 {/* macro:injectionHoist */}
 ### `injectionHoist` [#injectionhoist]
 
@@ -340,6 +417,28 @@ jobs:
 ```
 
 Full guide: [executors](/docs/macros/job-defaults#executors).
+
+{/* macro:extends */}
+### `jobs.<job_id>.extends` [#extends]
+
+Name (or ordered list of names) from top-level [`call_templates:`](#call_templates). Materializes
+the call-job plumbing (`uses`/`with`/`needs`/`secrets`/…) during compile and is stripped from
+output.
+
+- **Valid in:** `jobs.<job_id>` (reusable-workflow call jobs only)
+- **Type:** string, or list of strings (composed left-to-right; later templates win; inline job
+  keys always win)
+- **Compiles to:** nothing; the template is merged into the job
+
+```yaml title=".actio.yml"
+jobs:
+  test-unit:
+    extends: [base-test, gpu-test]
+    with:
+      afterBuild: pnpm test-unit
+```
+
+See [`call_templates`](#call_templates) for the merge rules.
 
 {/* macro:dynamic_matrix */}
 ### `jobs.<job_id>.dynamic_matrix` [#dynamic_matrix]

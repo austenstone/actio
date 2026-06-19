@@ -19,6 +19,8 @@ export const CALL_TEMPLATE_KEYS = [
   "strategy",
 ] as const;
 
+export type CallTemplateKey = (typeof CALL_TEMPLATE_KEYS)[number];
+
 const CALL_TEMPLATE_KEY_SET = new Set<string>(CALL_TEMPLATE_KEYS);
 
 type CallTemplate = Record<string, unknown>;
