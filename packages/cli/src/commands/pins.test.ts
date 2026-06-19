@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -283,6 +283,50 @@ describe("pins update --no-exec", () => {
       actions: Record<string, { resolvedAt: string }>;
     };
     expect(lock.actions[ACTION]?.resolvedAt).toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it("does not rewrite actio.lock when computed lock content is unchanged", async () => {
+    const resolver = makeResolver({
+      resolutions: { [`${ACTION}@v1`]: D1 },
+      bytes: { [`${ACTION}@${D1}`]: "bytes-v1" },
+    });
+    const dir = await setupWorkspace({
+      sourceRef: "v1",
+      generatedDigest: D1,
+      generatedRef: "v1",
+      lockDigest: D1,
+      lockIntegrity: toIntegrity("bytes-v1"),
+    });
+    const lockPath = path.join(dir, "actio.lock");
+    const lockText = `${JSON.stringify({
+      version: 1,
+      unknownTopLevel: { keep: true },
+      actions: {
+        [ACTION]: {
+          action: ACTION,
+          sourceRef: "v1",
+          digest: D1,
+          integrity: toIntegrity("bytes-v1"),
+          resolvedAt: "2026-01-01T00:00:00.000Z",
+          unknownEntryField: "keep",
+        },
+      },
+      imports: {},
+    })}\n`;
+    await writeFile(lockPath, lockText, "utf8");
+    const fixedTime = new Date("2026-01-01T00:00:00.000Z");
+    await utimes(lockPath, fixedTime, fixedTime);
+    const before = await stat(lockPath);
+
+    const code = await runPinsUpdate([path.join(".github", "actio", "ci.actio.yml")], {
+      cwd: dir,
+      noExec: true,
+      resolver,
+    });
+
+    expect(code).toBe(0);
+    expect(await readFile(lockPath, "utf8")).toBe(lockText);
+    expect((await stat(lockPath)).mtimeMs).toBe(before.mtimeMs);
   });
 
   it("warns and exits 0 without creating actio.lock when no files match", async () => {
