@@ -8,6 +8,10 @@
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
+    "domains": {
+      "project": "all",
+      "test": "all"
+    },
     "rules": {
       "preset": "recommended",
       "suspicious": {
@@ -20,6 +24,11 @@
       },
       "style": {
         "noNonNullAssertion": "off"
+      },
+      "correctness": {
+        "useImportExtensions": "off",
+        "noUndeclaredDependencies": "off",
+        "noUnresolvedImports": "off"
       }
     }
   },

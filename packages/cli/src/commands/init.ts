@@ -5,13 +5,14 @@ import { STARTER_ACTIO } from "../starter.js";
 
 const ACTIO_SUFFIX = ".actio.yml";
 const DEFAULT_NAME = "ci";
+const YAML_SUFFIX_RE = /(\.actio)?\.ya?ml$/i;
 
 // Accept whatever the user hands us (`ci`, `ci.yml`, `ci.yaml`, `ci.actio.yaml`,
 // `path/to/ci.actio.yml`) and normalize it to the `.actio.yml` source suffix
 // that `build` discovers via `**/*.actio.yml`.
 export function normalizeInitTarget(file?: string): string {
   const raw = (file ?? DEFAULT_NAME).trim() || DEFAULT_NAME;
-  const stem = raw.replace(/(\.actio)?\.ya?ml$/i, "");
+  const stem = raw.replace(YAML_SUFFIX_RE, "");
   return `${stem}${ACTIO_SUFFIX}`;
 }
 
