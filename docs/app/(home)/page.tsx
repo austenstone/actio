@@ -16,6 +16,12 @@ export default function HomePage() {
           Get started
         </Link>
         <Link
+          href="/play"
+          className="rounded-full border px-5 py-2.5 font-medium transition-colors hover:bg-fd-muted"
+        >
+          Try the playground
+        </Link>
+        <Link
           href="/docs/macros/fragments"
           className="rounded-full border px-5 py-2.5 font-medium transition-colors hover:bg-fd-muted"
         >
