@@ -545,6 +545,41 @@
           "required": [
             "inject"
           ]
+        },
+        {
+          "required": [
+            "for-each",
+            "steps"
+          ]
+        },
+        {
+          "required": [
+            "share"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "uses"
+                ]
+              },
+              {
+                "required": [
+                  "run"
+                ]
+              },
+              {
+                "required": [
+                  "inject"
+                ]
+              },
+              {
+                "required": [
+                  "for-each"
+                ]
+              }
+            ]
+          }
         }
       ],
       "properties": {
@@ -648,6 +683,12 @@
         },
         "share": {
           "$ref": "#/definitions/share"
+        },
+        "for-each": {
+          "$ref": "#/definitions/forEach"
+        },
+        "steps": {
+          "$ref": "#/definitions/normalJob/properties/steps"
         },
         "if-changed": {
           "$ref": "#/definitions/ifChanged"
@@ -1105,6 +1146,9 @@
         "dynamic-matrix": {
           "$ref": "#/definitions/dynamicMatrix"
         },
+        "for-each": {
+          "$ref": "#/definitions/forEach"
+        },
         "fallback": {
           "$ref": "#/definitions/fallback"
         },
@@ -1149,16 +1193,25 @@
           ]
         }
       },
-      "required": [
-        "runs-on"
-      ],
       "additionalProperties": false,
       "patternProperties": {
         "^static-if\\(.+\\)$": {
           "type": "object",
           "description": "Actio macro. Conditional merge map. When expression is true, merge this mapping into the parent map."
         }
-      }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "runs-on"
+          ]
+        },
+        {
+          "required": [
+            "executor"
+          ]
+        }
+      ]
     },
     "workflowDispatchInput": {
       "$comment": "https://help.github.com/en/github/automating-your-workflow-with-github-actions/metadata-syntax-for-github-actions#inputsinput_id",
@@ -1315,6 +1368,58 @@
           "$ref": "#/definitions/globs"
         }
       ]
+    },
+    "forEach": {
+      "title": "for-each (Actio macro)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "var",
+        "in"
+      ],
+      "description": "Actio macro. Repeat a step body or fan out a job over compile-time values, runtime expressions, or generated JSON. Stripped from generated workflow YAML.",
+      "properties": {
+        "var": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Compile-time loop variable name available as `{{ <var> }}` in the loop body."
+        },
+        "in": {
+          "description": "Loop source: a literal list, object generator (`run`/`script`), compile-time expression, or runtime `${{ ... }}` expression.",
+          "anyOf": [
+            {
+              "type": "array"
+            },
+            {
+              "type": "object"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "parallel": {
+          "type": "boolean",
+          "description": "At job scope, fan out with a matrix by default; set false for serial job expansion. Step-scope loops must be serial."
+        },
+        "as": {
+          "type": "string",
+          "description": "Matrix axis or output alias for the loop value."
+        },
+        "key": {
+          "type": "string",
+          "description": "Object field to use when deriving stable serial job IDs."
+        },
+        "max-parallel": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum parallel matrix jobs."
+        },
+        "fail-fast": {
+          "type": "boolean",
+          "description": "Matrix fail-fast setting for job-scope loops."
+        }
+      }
     },
     "callTemplateDefinition": {
       "type": "object",

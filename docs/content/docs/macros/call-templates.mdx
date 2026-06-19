@@ -81,7 +81,7 @@ jobs:
 A v1 template may declare only the call quad: `uses`, `with`, `needs`,
 `secrets`, and `if`. Runner keys (`runs-on`, `env`, `container`, …), `steps`,
 and the broader job knobs (`permissions`, `concurrency`, `strategy`) are
-rejected — keep `strategy` on the job so [`for-each`](/docs/macros/for-each)
+rejected — keep `strategy` on the job so [`for-each`](/docs/syntax#for-each)
 stays its sole owner, and set `permissions`/`concurrency` per job or via
 [`job-defaults`](/docs/macros/job-defaults).
 
