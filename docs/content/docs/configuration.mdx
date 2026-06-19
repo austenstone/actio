@@ -68,6 +68,13 @@ Now `actio build` runs `stampEnv` as part of the pipeline — no fork of core
 required. Pass names must be unique (Actio throws on a collision with a built-in or
 another custom pass).
 
+After the last built-in or custom pass runs, Actio resolves final compile-time text
+boundaries. That means custom passes can still emit scalar strings containing
+`{{ params.* }}` or `{{ toJSON(params.*) }}` and let the public pipeline turn them
+into literals. If you call lower-level helpers directly, use `transpile()`,
+`runPasses()`, or `PassRegistry.run()` for complete compilation; `applyPasses()` is
+only the raw pass-only stage and may leave compile-time interpolation unresolved.
+
 <Callout title="Traversing jobs and steps?">
   Prefer the typed-IR **visitor helpers** — `workflow`, `visitJobs`, `visitSteps`,
   `transformSteps`, all exported from `actio-core` — over poking `ctx.data` by

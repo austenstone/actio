@@ -5,6 +5,8 @@ import {
   createRegistry,
   type Pass,
   PassRegistry,
+  parseActio,
+  runPasses,
   sortPasses,
 } from "actio-core";
 import { describe, expect, it } from "vitest";
@@ -21,6 +23,21 @@ function recorder(name: string, runsAfter: string[], log: string[]): Pass {
 }
 
 const fakeCtx = {} as ParseContext;
+
+const sourceWithParamsInterpolation = `name: x
+on: [push]
+params:
+  env:
+    type: string
+    default: prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+env:
+  TARGET: "{{ params.env }}"
+`;
 
 describe("sortPasses", () => {
   it("orders passes after their declared dependencies", () => {
@@ -113,6 +130,23 @@ describe("applyPasses", () => {
     applyPasses(fakeCtx, [recorder("second", ["first"], log), recorder("first", [], log)]);
     expect(log).toEqual(["first", "second"]);
   });
+
+  it("leaves final compile-time text interpolation to the complete public pipeline", () => {
+    const ctx = parseActio(sourceWithParamsInterpolation, "t.actio.yml");
+    applyPasses(ctx, builtinPasses);
+
+    expect((ctx.data.env as { TARGET?: string }).TARGET).toBe("{{ params.env }}");
+  });
+});
+
+describe("runPasses", () => {
+  it("runs passes and resolves final compile-time text interpolation", () => {
+    const ctx = parseActio(sourceWithParamsInterpolation, "t.actio.yml");
+    runPasses(ctx);
+
+    expect((ctx.data.env as { TARGET?: string }).TARGET).toBe("prod");
+    expect(ctx.data.params).toBeUndefined();
+  });
 });
 
 describe("PassRegistry", () => {
@@ -150,6 +184,14 @@ describe("PassRegistry", () => {
     expect(registry.has("temp")).toBe(true);
     expect(registry.unregister("temp")).toBe(true);
     expect(registry.has("temp")).toBe(false);
+  });
+
+  it("runs the complete public pass pipeline", () => {
+    const ctx = parseActio(sourceWithParamsInterpolation, "t.actio.yml");
+    new PassRegistry(builtinPasses).run(ctx);
+
+    expect((ctx.data.env as { TARGET?: string }).TARGET).toBe("prod");
+    expect(ctx.data.params).toBeUndefined();
   });
 });
 
