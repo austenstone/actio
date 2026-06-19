@@ -564,15 +564,15 @@ steps:
 See [`fragments`](#fragments). Full guide: [fragments + inject](/docs/macros/fragments).
 
 {/* macro:for-each */}
-### `jobs.<job_id>.steps[*].for-each` [#for-each]
+### `jobs.<job_id>.for-each` / `jobs.<job_id>.steps[*].for-each` [#for-each]
 
 Expand one step into many by looping over a list at compile time. Reference the loop
 variable with the compile-time token `{{ <var> }}` (or `{{ <var>.<field> }}` for object
 elements). A `parallel` loop must be job-level and becomes a matrix.
 
-- **Valid in:** `jobs.<job_id>.steps[*]`
+- **Valid in:** `jobs.<job_id>`, `jobs.<job_id>.steps[*]`
 - **Type:** map
-- **Compiles to:** repeated steps (serial) or matrix wiring (`parallel: true`)
+- **Compiles to:** repeated steps, matrix wiring, or serial job fan-out
 
 | Option | Type | Description |
 |---|---|---|
@@ -585,7 +585,8 @@ steps:
   - for-each:
       var: svc
       in: [api, web, worker]
-    run: ./deploy.sh {{ svc }}
+    steps:
+      - run: ./deploy.sh {{ svc }}
 ```
 
 <Callout type="info" title="Coexists with strategy.matrix">
@@ -596,12 +597,6 @@ steps:
   status checks. If the loop `var` (or its `as` alias) collides with a matrix key, the
   build fails with `for-each-matrix-key-collision`; the matrix's own `fail-fast` /
   `max-parallel` stay authoritative and any loop-level copies are ignored with a warning.
-</Callout>
-
-<Callout type="warn" title="Not in the JSON Schema">
-  `for-each` is a shipping macro but is **not** described in `actio.schema.json` yet, so
-  the editor extension will not autocomplete or validate it. Mistyped options fail at
-  `actio build`, not in your editor.
 </Callout>
 
 {/* macro:retry */}

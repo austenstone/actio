@@ -4,6 +4,7 @@ import { actioSchema, CALL_TEMPLATE_KEYS, EXECUTOR_KEYS, transpile } from "actio
 import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
+import { sampleSource } from "../docs/components/playground/sample";
 import { STARTER_ACTIO } from "../packages/cli/src/starter.js";
 
 const ajv = new Ajv({ strict: false, allErrors: true });
@@ -99,6 +100,20 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
+  it("accepts a share-only capture step that synthesizes run", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Plan metadata
+        share:
+          deploy:
+            run: jq -nc '{env:"preview"}'
+            json: true`);
+    expect(validate(doc)).toBe(true);
+  });
+
   it("rejects an empty share mapping", () => {
     const doc = load(`on: [push]
 jobs:
@@ -175,6 +190,20 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
+  it("accepts step-scoped for-each loops", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - for-each:
+          var: service
+          in: [api, web]
+        steps:
+          - run: npm run build --workspace {{ service }}`);
+    expect(validate(doc)).toBe(true);
+  });
+
   it("rejects enum params without values", () => {
     const doc = load(`on: [push]
 params:
@@ -241,6 +270,28 @@ jobs:
     steps:
       - run: echo release`);
     expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts normal jobs whose runs-on is supplied by an executor", () => {
+    const doc = load(`on: [push]
+executors:
+  linux:
+    runs-on: ubuntu-latest
+jobs:
+  test:
+    executor: linux
+    steps:
+      - run: echo test`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects plain normal jobs without runs-on or executor", () => {
+    const doc = load(`on: [push]
+jobs:
+  test:
+    steps:
+      - run: echo test`);
+    expect(validate(doc)).toBe(false);
   });
 
   it("rejects strategy in executor definitions", () => {
@@ -331,6 +382,14 @@ jobs:
     extends: test
     with:
       afterBuild: pnpm test`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts reusable-workflow call jobs without runs-on", () => {
+    const doc = load(`on: [push]
+jobs:
+  call:
+    uses: org/repo/.github/workflows/reuse.yml@main`);
     expect(validate(doc)).toBe(true);
   });
 
@@ -428,6 +487,10 @@ jobs:
   it("starter still transpiles cleanly with the modeline present", () => {
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);
+  });
+
+  it("validates the playground sample source", () => {
+    expect(validate(load(sampleSource))).toBe(true);
   });
 
   it("accepts injection-hoist macro keys on root, job, and step", () => {

@@ -37,6 +37,11 @@ export function buildSchema() {
     if (patch.patternProperties) {
       target.patternProperties = { ...target.patternProperties, ...patch.patternProperties };
     }
+    if (patch.required !== undefined) {
+      if (patch.required.length > 0) target.required = patch.required;
+      else delete target.required;
+    }
+    if (patch.anyOf) target.anyOf = [...(target.anyOf ?? []), ...patch.anyOf];
     if (patch.appendOneOf) target.oneOf = [...(target.oneOf ?? []), ...patch.appendOneOf];
   }
 

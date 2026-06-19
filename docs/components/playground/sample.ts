@@ -20,21 +20,20 @@ params:
     default: [api, web, worker]
 
 job-defaults:
-  runs-on: ubuntu-latest
-  timeout-minutes: 20
   permissions:
     contents: read
-  env:
-    CI: "true"
-    CHANNEL: "{{ params.channel }}"
-  defaults:
-    run:
-      shell: bash
 
 executors:
   node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
+      CI: "true"
+      CHANNEL: "{{ params.channel }}"
       NODE_ENV: test
+    defaults:
+      run:
+        shell: bash
   cache:
     services:
       redis:
@@ -101,6 +100,7 @@ jobs:
       - run: docker compose down --remove-orphans || true
 
   test:
+    executor: node
     needs: build
     dynamic-matrix:
       alias: shard
@@ -114,6 +114,7 @@ jobs:
             - run: echo "collecting diagnostics"
 
   docs:
+    executor: node
     static-if: params.preview
     if-changed: [docs/**, README.md]
     steps:
@@ -121,6 +122,7 @@ jobs:
       - run: npm run docs:build
 
   preview:
+    executor: node
     needs: test
     static-if: params.preview
     if: github.event_name == 'pull_request'
@@ -145,6 +147,7 @@ jobs:
       command: npm test -- --suite integration
 
   release:
+    executor: node
     needs: [test, reusable-unit, reusable-integration]
     if: github.ref == 'refs/heads/main'
     permissions:
