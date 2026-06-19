@@ -1,7 +1,7 @@
 name: Compose
 on: [push]
 
-call_templates:
+call-templates:
   base:
     uses: ./.github/workflows/reuse.yml
     needs: build

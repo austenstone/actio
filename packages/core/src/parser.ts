@@ -27,7 +27,7 @@ export interface ForEachShareContract {
 }
 
 export interface ParseContextInternal {
-  /** Preserved macro templates stripped from `ctx.data` after the job_defaults pass. */
+  /** Preserved macro templates stripped from `ctx.data` after the job-defaults pass. */
   jobDefaults?: JobDefaultsInternalSnapshot;
   /** v1 handoff contract for #18 share integration. */
   forEachShareContracts?: ForEachShareContract[];
@@ -62,7 +62,7 @@ function mapTreeToData(value: unknown): unknown {
 /**
  * Stamp the author's mapping key order onto a plain object via a non-enumerable
  * symbol, invisible to passes but read by emit to restore order. Passes that
- * REBUILD a map (dynamic_matrix) or CLONE a node (cloneNode) must re-apply this,
+ * REBUILD a map (dynamic-matrix) or CLONE a node (cloneNode) must re-apply this,
  * otherwise emit falls back to Object.keys and hoists integer-like keys.
  */
 export function setKeyOrder(obj: object, order: string[]): void {

@@ -83,13 +83,13 @@ jobs:
     }
   });
 
-  it("dynamic_matrix setup job maps back to its target job", () => {
+  it("dynamic-matrix setup job maps back to its target job", () => {
     const ctx = ctxOf(`name: x
 on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '{"include":[]}'
     steps:
       - run: echo build

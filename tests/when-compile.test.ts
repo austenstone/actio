@@ -17,7 +17,7 @@ function transpileResult(source: string) {
   return transpile(source, { fileName: "t.actio.yml" });
 }
 
-describe("static_if diagnostics", () => {
+describe("static-if diagnostics", () => {
   it("pins the canonical runtime root allow-list", () => {
     expect([...RUNTIME_CONTEXT_ROOTS]).toEqual([
       "github",
@@ -42,14 +42,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: github.ref == 'refs/heads/main'
+        static-if: github.ref == 'refs/heads/main'
 `);
     expect(
       errors.some((diagnostic) => diagnostic.message.includes("[static-if-runtime-context]")),
     ).toBe(true);
   });
 
-  it("keeps static_if runtime-root checks in parity with the shared runtime root list", () => {
+  it("keeps static-if runtime-root checks in parity with the shared runtime root list", () => {
     for (const root of RUNTIME_CONTEXT_ROOTS) {
       const errors = transpileErrors(`name: x
 on: [push]
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: ${root}.ref == 'x'
+        static-if: ${root}.ref == 'x'
 `);
       expect(
         errors.some((diagnostic) => diagnostic.message.includes("[static-if-runtime-context]")),
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: params.mode
+        static-if: params.mode
 `);
     expect(
       errors.some((diagnostic) => diagnostic.message.includes("[static-if-non-boolean]")),
@@ -97,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: false && params.typoed
+        static-if: false && params.typoed
 `);
     expect(
       errors.some((diagnostic) => diagnostic.message.includes("[static-if-undefined-ref]")),
@@ -113,7 +113,7 @@ params:
     default: false
 jobs:
   build:
-    static_if: params.deploy
+    static-if: params.deploy
     runs-on: ubuntu-latest
     steps:
       - run: echo build
@@ -136,7 +136,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: ""
+        static-if: ""
 `);
     expect(errors.some((diagnostic) => diagnostic.message.includes("[static-if-empty]"))).toBe(
       true,
@@ -155,7 +155,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: params.keep
+        static-if: params.keep
 `);
     expect(errors.some((diagnostic) => diagnostic.message.includes("[static-if-empty-job]"))).toBe(
       true,
@@ -175,14 +175,14 @@ jobs:
     steps:
       - run: echo hi
         env:
-          static_if(params.keep): nope
+          static-if(params.keep): nope
 `);
     expect(
       errors.some((diagnostic) => diagnostic.message.includes("[static-if-merge-non-map]")),
     ).toBe(true);
   });
 
-  it("rejects runtime wrapper syntax in static_if values", () => {
+  it("rejects runtime wrapper syntax in static-if values", () => {
     const errors = transpileErrors(`name: x
 on: [push]
 params:
@@ -194,9 +194,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: \${{ params.deploy }}
+        static-if: \${{ params.deploy }}
       - run: echo ok
-        static_if: \${{ github.ref == 'refs/heads/main' }}
+        static-if: \${{ github.ref == 'refs/heads/main' }}
 `);
     expect(errors.some((diagnostic) => diagnostic.message.includes("[params-runtime-sigil]"))).toBe(
       true,
@@ -222,7 +222,7 @@ jobs:
     steps:
       - run: echo hi
         env:
-          static_if():
+          static-if():
             FLAG: "1"
           KEEP: yes
 `);
@@ -232,11 +232,11 @@ jobs:
     const doc = parse(result.yaml) as {
       jobs: {
         build: {
-          steps: Array<{ env?: { KEEP?: string; "static_if()"?: { FLAG?: string } } }>;
+          steps: Array<{ env?: { KEEP?: string; "static-if()"?: { FLAG?: string } } }>;
         };
       };
     };
-    expect(doc.jobs.build.steps[0]?.env?.["static_if()"]).toBeUndefined();
+    expect(doc.jobs.build.steps[0]?.env?.["static-if()"]).toBeUndefined();
     expect(doc.jobs.build.steps[0]?.env?.KEEP).toBe("yes");
   });
 
@@ -248,7 +248,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: \${{ true }}
+        static-if: \${{ true }}
 `);
     expect(
       errors.some(
@@ -267,7 +267,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: \${{ contains('a}}b', '}}') }}
+        static-if: \${{ contains('a}}b', '}}') }}
 `);
     expect(
       errors.some(
@@ -290,7 +290,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: params.deploy &&
+        static-if: params.deploy &&
 `);
     expect(errors.some((diagnostic) => diagnostic.message.includes("[static-if-empty]"))).toBe(
       true,
@@ -305,7 +305,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: true false
+        static-if: true false
 `);
     const badBracket = transpileErrors(`name: x
 on: [push]
@@ -318,7 +318,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: params.deploy[foo]
+        static-if: params.deploy[foo]
 `);
     expect(leftovers.some((diagnostic) => diagnostic.message.includes("[static-if-empty]"))).toBe(
       true,
@@ -336,7 +336,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: nope()
+        static-if: nope()
 `);
     expect(
       errors.some(
@@ -359,7 +359,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: "!params.mode"
+        static-if: "!params.mode"
 `);
     expect(
       errors.some((diagnostic) =>
@@ -380,7 +380,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: params.mode && true
+        static-if: params.mode && true
 `);
     expect(
       errors.some((diagnostic) => diagnostic.message.includes("&& requires boolean operands")),
@@ -399,7 +399,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: params.deploy < true
+        static-if: params.deploy < true
 `);
     expect(
       errors.some((diagnostic) => diagnostic.message.includes("< requires comparable operands")),
@@ -415,7 +415,7 @@ jobs:
     steps:
       - run: echo hi
         env:
-          static_if(github.ref == 'refs/heads/main'):
+          static-if(github.ref == 'refs/heads/main'):
             FLAG: "1"
 `);
     expect(
@@ -423,7 +423,7 @@ jobs:
     ).toBe(true);
   });
 
-  it("errors when static_if value is neither string nor boolean", () => {
+  it("errors when static-if value is neither string nor boolean", () => {
     const errors = transpileErrors(`name: x
 on: [push]
 jobs:
@@ -431,7 +431,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: 1
+        static-if: 1
 `);
     expect(
       errors.some((diagnostic) =>
@@ -440,7 +440,7 @@ jobs:
     ).toBe(true);
   });
 
-  it("errors on residual non-structural static_if keys", () => {
+  it("errors on residual non-structural static-if keys", () => {
     const result = transpileResult(`name: x
 on: [push]
 params:
@@ -453,7 +453,7 @@ jobs:
     steps:
       - run: echo hi
         env:
-          static_if: params.deploy
+          static-if: params.deploy
           KEEP: yes
 `);
     expect(result.ok).toBe(false);
@@ -461,13 +461,13 @@ jobs:
       result.diagnostics.some((diagnostic) => diagnostic.message.includes("[static-if-residual]")),
     ).toBe(true);
     const output = parse(result.yaml) as {
-      jobs: { build: { steps: Array<{ env?: { static_if?: string; KEEP?: string } }> } };
+      jobs: { build: { steps: Array<{ env?: { "static-if"?: string; KEEP?: string } }> } };
     };
-    expect(output.jobs.build.steps[0]?.env?.static_if).toBeUndefined();
+    expect(output.jobs.build.steps[0]?.env?.["static-if"]).toBeUndefined();
     expect(output.jobs.build.steps[0]?.env?.KEEP).toBe("yes");
   });
 
-  it("fails loud on residual static_if form B keys under top-level env", () => {
+  it("fails loud on residual static-if form B keys under top-level env", () => {
     const source = `name: t
 on: push
 params:
@@ -475,7 +475,7 @@ params:
     type: boolean
     default: true
 env:
-  static_if(params.deploy):
+  static-if(params.deploy):
     DEPLOY_TOKEN: abc
 jobs:
   build:
@@ -488,10 +488,10 @@ jobs:
     expect(
       result.diagnostics.some((diagnostic) => diagnostic.message.includes("[static-if-residual]")),
     ).toBe(true);
-    expect(result.yaml.includes("static_if")).toBe(false);
+    expect(result.yaml.includes("static-if")).toBe(false);
   });
 
-  it("fails loud on residual static_if form B keys under top-level env with validate disabled", () => {
+  it("fails loud on residual static-if form B keys under top-level env with validate disabled", () => {
     const source = `name: t
 on: push
 params:
@@ -499,7 +499,7 @@ params:
     type: boolean
     default: true
 env:
-  static_if(params.deploy):
+  static-if(params.deploy):
     DEPLOY_TOKEN: abc
 jobs:
   build:
@@ -512,10 +512,10 @@ jobs:
     expect(
       result.diagnostics.some((diagnostic) => diagnostic.message.includes("[static-if-residual]")),
     ).toBe(true);
-    expect(result.yaml.includes("static_if")).toBe(false);
+    expect(result.yaml.includes("static-if")).toBe(false);
   });
 
-  it("allows top-level env without static_if directives", () => {
+  it("allows top-level env without static-if directives", () => {
     const result = transpileResult(`name: t
 on: push
 env:
@@ -530,7 +530,7 @@ jobs:
     expect(result.diagnostics.some((diagnostic) => diagnostic.severity === "error")).toBe(false);
   });
 
-  it("errors when a fragment injects a residual static_if directive", () => {
+  it("errors when a fragment injects a residual static-if directive", () => {
     const errors = transpileErrors(`name: x
 on: [push]
 params:
@@ -540,7 +540,7 @@ params:
 fragments:
   gated:
     - run: echo hidden
-      static_if: params.deploy
+      static-if: params.deploy
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -552,14 +552,14 @@ jobs:
     );
   });
 
-  it("errors when a fragment injects an empty-paren residual static_if() directive", () => {
+  it("errors when a fragment injects an empty-paren residual static-if() directive", () => {
     const errors = transpileErrors(`name: x
 on: [push]
 fragments:
   gated:
     - run: echo hidden
       env:
-        static_if():
+        static-if():
           FLAG: "1"
 jobs:
   build:
@@ -573,7 +573,7 @@ jobs:
   });
 });
 
-describe("static_if behavior seams", () => {
+describe("static-if behavior seams", () => {
   it("warns on form B collisions and uses last writer", () => {
     const result = transpile(
       `name: x
@@ -591,9 +591,9 @@ jobs:
     steps:
       - run: echo hi
         env:
-          static_if(params.first):
+          static-if(params.first):
             SHARED: first
-          static_if(params.second):
+          static-if(params.second):
             SHARED: second
 `,
       { fileName: "t.actio.yml" },
@@ -614,9 +614,9 @@ jobs:
     steps:
       - run: echo hi
         env:
-          static_if(params.first):
+          static-if(params.first):
             SHARED: first
-          static_if(params.second):
+          static-if(params.second):
             SHARED: second
 `);
     expect(
@@ -628,27 +628,27 @@ jobs:
     expect(doc.jobs.build.steps[0]?.env?.SHARED).toBe("second");
   });
 
-  // Issue #50 re-points the old for_each×static_if seam to the RUNTIME side.
-  // When a whole-job runtime for_each auto-rewrites (Case A), its loop var binds
+  // Issue #50 re-points the old for-each×static-if seam to the RUNTIME side.
+  // When a whole-job runtime for-each auto-rewrites (Case A), its loop var binds
   // to `${{ matrix.<as> }}` — a runtime value not knowable at compile time. A
-  // static_if reading that binding therefore fails loud with
+  // static-if reading that binding therefore fails loud with
   // [static-if-undefined-ref], never a silent miscompile. The POSITIVE static
-  // composition (static_if evaluating a compile-time loop binding) is its own
+  // composition (static-if evaluating a compile-time loop binding) is its own
   // seam, tracked as a separate follow-up issue.
-  it("fails loud when static_if reads a runtime for_each loop binding (#50)", () => {
+  it("fails loud when static-if reads a runtime for-each loop binding (#50)", () => {
     const errors = transpileErrors(`name: x
 on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: item
           in: "\${{ fromJSON(needs.s.outputs.a) }}"
         steps:
           - run: echo hi
             env:
-              static_if(item == 'a'):
+              static-if(item == 'a'):
                 K: v
 `);
     expect(
@@ -656,24 +656,24 @@ jobs:
     ).toBe(true);
   });
 
-  // Issue #72: the POSITIVE static composition of for_each x static_if. When a
-  // for_each iterates a compile-time-known list, each iteration's loop binding
-  // (item, for_each.item, index, key) is knowable at transpile time, so a
-  // static_if referencing the loop var is frozen per iteration inside for_each's
-  // static expansion while the binding symbol is in scope. when_compile then
+  // Issue #72: the POSITIVE static composition of for-each x static-if. When a
+  // for-each iterates a compile-time-known list, each iteration's loop binding
+  // (item, for-each.item, index, key) is knowable at transpile time, so a
+  // static-if referencing the loop var is frozen per iteration inside for-each's
+  // static expansion while the binding symbol is in scope. when-compile then
   // owns the structural keep/omit/merge, so its diagnostics stay intact.
-  it("evaluates static_if against a compile-time loop binding per iteration (#72)", () => {
+  it("evaluates static-if against a compile-time loop binding per iteration (#72)", () => {
     const result = transpileResult(`name: x
 on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each: { var: item, in: [a, b] }
+      - for-each: { var: item, in: [a, b] }
         steps:
           - run: echo {{ item }}-always
           - run: echo {{ item }}-only-a
-            static_if: item == 'a'
+            static-if: item == 'a'
 `);
     expect(result.ok).toBe(true);
     expect(
@@ -691,18 +691,18 @@ jobs:
     ]);
   });
 
-  it("merges a loop-binding static_if(...) block per iteration (#72)", () => {
+  it("merges a loop-binding static-if(...) block per iteration (#72)", () => {
     const result = transpileResult(`name: x
 on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each: { var: item, in: [a, b] }
+      - for-each: { var: item, in: [a, b] }
         steps:
           - run: echo {{ item }}
             env:
-              static_if(item == 'a'):
+              static-if(item == 'a'):
                 ONLY_A: "yes"
 `);
     expect(result.ok).toBe(true);
@@ -713,17 +713,17 @@ jobs:
     expect(doc.jobs.build.steps[1]?.env?.ONLY_A).toBeUndefined();
   });
 
-  it("resolves the index binding in static_if per iteration (#72)", () => {
+  it("resolves the index binding in static-if per iteration (#72)", () => {
     const result = transpileResult(`name: x
 on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each: { var: item, in: [a, b, c] }
+      - for-each: { var: item, in: [a, b, c] }
         steps:
           - run: echo {{ item }}
-            static_if: index == 0
+            static-if: index == 0
 `);
     expect(result.ok).toBe(true);
     const doc = parse(result.yaml) as {
@@ -732,17 +732,17 @@ jobs:
     expect(doc.jobs.build.steps.map((step) => step.run)).toEqual(["echo a"]);
   });
 
-  it("evaluates static_if per sibling job in a serial static fan-out (#72)", () => {
+  it("evaluates static-if per sibling job in a serial static fan-out (#72)", () => {
     const result = transpileResult(`name: x
 on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    for_each: { var: item, in: [a, b], parallel: false }
+    for-each: { var: item, in: [a, b], parallel: false }
     steps:
       - run: echo {{ item }}-always
       - run: echo {{ item }}-only-a
-        static_if: item == 'a'
+        static-if: item == 'a'
 `);
     expect(result.ok).toBe(true);
     const doc = parse(result.yaml) as {
@@ -757,37 +757,37 @@ jobs:
 
   // The runtime/dynamic case must keep failing loud (the #50 invariant): a
   // parallel matrix renders ONE shared body whose loop var lowers to
-  // `${{ matrix.<as> }}`, so the binding is genuinely runtime and static_if on
+  // `${{ matrix.<as> }}`, so the binding is genuinely runtime and static-if on
   // it stays unresolved.
-  it("still fails loud for static_if on a parallel-matrix loop binding (#72)", () => {
+  it("still fails loud for static-if on a parallel-matrix loop binding (#72)", () => {
     const errors = transpileErrors(`name: x
 on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    for_each: { var: item, in: [a, b], parallel: true }
+    for-each: { var: item, in: [a, b], parallel: true }
     steps:
       - run: echo hi
-        static_if: item == 'a'
+        static-if: item == 'a'
 `);
     expect(
       errors.some((diagnostic) => diagnostic.message.includes("[static-if-undefined-ref]")),
     ).toBe(true);
   });
 
-  // for_each only freezes the condition; when_compile still owns structure, so a
-  // sibling job whose every step is dropped by a per-iteration static_if still
+  // for-each only freezes the condition; when-compile still owns structure, so a
+  // sibling job whose every step is dropped by a per-iteration static-if still
   // raises the empty-job diagnostic.
-  it("preserves the empty-job check when a loop static_if drops every step (#72)", () => {
+  it("preserves the empty-job check when a loop static-if drops every step (#72)", () => {
     const errors = transpileErrors(`name: x
 on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    for_each: { var: item, in: [a, b], parallel: false }
+    for-each: { var: item, in: [a, b], parallel: false }
     steps:
       - run: echo {{ item }}
-        static_if: item == 'a'
+        static-if: item == 'a'
 `);
     expect(errors.some((diagnostic) => diagnostic.message.includes("[static-if-empty-job]"))).toBe(
       true,
@@ -820,19 +820,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo keep-a
-        static_if: (params.count >= 3 && params.mode == 'prod') || false
+        static-if: (params.count >= 3 && params.mode == 'prod') || false
       - run: echo keep-b
-        static_if: contains(params.labels, 'beta')
+        static-if: contains(params.labels, 'beta')
       - run: echo keep-c
-        static_if: startsWith(params.mode, 'pr') && endsWith(params.mode, 'od')
+        static-if: startsWith(params.mode, 'pr') && endsWith(params.mode, 'od')
       - run: echo keep-d
-        static_if: format('{0}-{1}', params.mode, params.count) == 'prod-3'
+        static-if: format('{0}-{1}', params.mode, params.count) == 'prod-3'
       - run: echo keep-e
-        static_if: defined(params.profile.flags.ship)
+        static-if: defined(params.profile.flags.ship)
       - run: echo drop-f
-        static_if: params.profile.score < 0
+        static-if: params.profile.score < 0
       - run: echo keep-g
-        static_if: params.profile['flags']['ship'] == true
+        static-if: params.profile['flags']['ship'] == true
 `);
     expect(result.ok).toBe(true);
     const doc = parse(result.yaml) as {
@@ -866,11 +866,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo keep-decimal
-        static_if: params.pi >= 3.14
+        static-if: params.pi >= 3.14
       - run: echo keep-double-quote
-        static_if: params.quote == 'say "hi"'
+        static-if: params.quote == 'say "hi"'
       - run: echo keep-single-quote
-        static_if: params.apostrophe == 'pro''d'
+        static-if: params.apostrophe == 'pro''d'
 `);
     expect(result.ok).toBe(true);
     const doc = parse(result.yaml) as {
@@ -897,11 +897,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo keep-null-key
-        static_if: params.dict[null] == 'enabled'
+        static-if: params.dict[null] == 'enabled'
       - run: echo keep-true-key
-        static_if: params.dict[true] == 'yes'
+        static-if: params.dict[true] == 'yes'
       - run: echo drop-defined-null
-        static_if: defined(null)
+        static-if: defined(null)
 `);
     expect(result.ok).toBe(true);
     const doc = parse(result.yaml) as {
@@ -926,7 +926,7 @@ jobs:
     steps:
       - run: echo always
       - run: echo probe
-        static_if: defined(params.profile.flags.ship)
+        static-if: defined(params.profile.flags.ship)
 `);
     expect(result.ok).toBe(true);
     expect(
@@ -953,7 +953,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: params.values[2] == 'one'
+        static-if: params.values[2] == 'one'
 `);
     expect(
       errors.some(
@@ -966,7 +966,7 @@ jobs:
 
   it("resolves direct-root symbols and preserves merged object origins", () => {
     const seed: Pass = {
-      name: "for_each",
+      name: "for-each",
       runsAfter: ["params"],
       apply: (ctx) => {
         const rootFlag: SymbolDef = {
@@ -988,9 +988,9 @@ jobs:
 on: [push]
 jobs:
   build:
-    static_if: flag
+    static-if: flag
     runs-on: ubuntu-latest
-    static_if(flag):
+    static-if(flag):
       concurrency:
         group: ci
     steps:
@@ -1018,13 +1018,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo lt
-        static_if: params.score < 3
+        static-if: params.score < 3
       - run: echo lte
-        static_if: params.score <= 2
+        static-if: params.score <= 2
       - run: echo gt
-        static_if: params.score > 1
+        static-if: params.score > 1
       - run: echo gte
-        static_if: params.score >= 2
+        static-if: params.score >= 2
 `);
     expect(result.ok).toBe(true);
     const doc = parse(result.yaml) as {
@@ -1046,7 +1046,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo drop
-        static_if: contains(42, 'x')
+        static-if: contains(42, 'x')
       - run: echo keep
 `);
     expect(result.ok).toBe(true);
@@ -1056,9 +1056,9 @@ jobs:
     expect(doc.jobs.build.steps.map((step) => step.run)).toEqual(["echo keep"]);
   });
 
-  it("accepts already-resolved boolean static_if values from earlier passes", () => {
+  it("accepts already-resolved boolean static-if values from earlier passes", () => {
     const seedBoolean: Pass = {
-      name: "for_each",
+      name: "for-each",
       runsAfter: ["params"],
       apply: (ctx) => {
         const jobs = ctx.data.jobs;
@@ -1069,7 +1069,7 @@ jobs:
         if (!Array.isArray(steps)) return;
         const first = steps[0];
         if (typeof first !== "object" || first === null) return;
-        (first as Record<string, unknown>).static_if = true;
+        (first as Record<string, unknown>)["static-if"] = true;
       },
     };
     const result = transpileResult(`name: x
@@ -1094,9 +1094,9 @@ jobs:
     );
     expect(patched.ok).toBe(true);
     const doc = parse(patched.yaml) as {
-      jobs: { build: { steps: Array<{ run?: string; static_if?: unknown }> } };
+      jobs: { build: { steps: Array<{ run?: string; "static-if"?: unknown }> } };
     };
     expect(doc.jobs.build.steps[0]?.run).toBe("echo hi");
-    expect(doc.jobs.build.steps[0]).not.toHaveProperty("static_if");
+    expect(doc.jobs.build.steps[0]).not.toHaveProperty("static-if");
   });
 });

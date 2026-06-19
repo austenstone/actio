@@ -4,7 +4,7 @@ import { asArray, clone, combineIf, isObject, mergeNeeds, pushDiagnostic } from 
 import type { Pass } from "./registry.js";
 
 /**
- * The keys a `call_templates:` entry may carry, i.e. the plumbing of a
+ * The keys a `call-templates:` entry may carry, i.e. the plumbing of a
  * reusable-workflow call job. Order here is the canonical fallback emit order;
  * a template's own authored order still wins (see `composeCallTemplate`).
  */
@@ -78,12 +78,12 @@ function composeCallTemplate(
   return { composed, order };
 }
 
-/** Validate and normalize the top-level `call_templates:` map. */
+/** Validate and normalize the top-level `call-templates:` map. */
 function getCallTemplates(ctx: ParseContext): Record<string, CallTemplate> {
-  const raw = (workflow(ctx) as Workflow).call_templates;
+  const raw = (workflow(ctx) as Workflow)["call-templates"];
   if (raw === undefined) return {};
   if (!isObject(raw)) {
-    pushDiagnostic(ctx, "error", '"call_templates" must be a mapping', ["call_templates"], {
+    pushDiagnostic(ctx, "error", '"call-templates" must be a mapping', ["call-templates"], {
       code: "call-templates-must-be-mapping",
     });
     return {};
@@ -95,7 +95,7 @@ function getCallTemplates(ctx: ParseContext): Record<string, CallTemplate> {
         ctx,
         "error",
         `Call template "${name}" must be a mapping`,
-        ["call_templates", name],
+        ["call-templates", name],
         { code: "call-template-must-be-mapping" },
       );
       continue;
@@ -107,7 +107,7 @@ function getCallTemplates(ctx: ParseContext): Record<string, CallTemplate> {
           ctx,
           "error",
           `[call-template-rejected-key] Key "${key}" is not allowed in a call template`,
-          ["call_templates", name, key],
+          ["call-templates", name, key],
           { hint: `Allowed keys: ${CALL_TEMPLATE_KEYS.join(", ")}` },
         );
         continue;
@@ -174,7 +174,7 @@ function parseExtendsRefs(
 /**
  * Resolve `extends:` on reusable-workflow call jobs into materialized plumbing.
  *
- * Runs before `job_defaults` so a job written as just `{ extends, with }` carries
+ * Runs before `job-defaults` so a job written as just `{ extends, with }` carries
  * a real `uses` before partitioning. Inline keys win over the template; a job
  * with inline `steps` or no resolved `uses` is rejected (call-job-only in v1).
  */
@@ -215,7 +215,7 @@ export function callTemplatesPass(ctx: ParseContext): void {
             hint:
               available.length > 0
                 ? `Available templates: ${available.join(", ")}`
-                : "No call_templates are defined",
+                : "No call-templates are defined",
           },
         );
       }
@@ -253,11 +253,11 @@ export function callTemplatesPass(ctx: ParseContext): void {
     setKeyOrder(job, [...inlineOnly, ...order]);
   });
 
-  delete (workflow(ctx) as Workflow).call_templates;
+  delete (workflow(ctx) as Workflow)["call-templates"];
 }
 
 export const callTemplates: Pass = {
-  name: "call_templates",
+  name: "call-templates",
   runsAfter: ["params"],
   apply: callTemplatesPass,
 };

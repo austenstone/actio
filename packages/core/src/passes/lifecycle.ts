@@ -25,11 +25,11 @@ import type { Pass } from "./registry.js";
 // --- vocabulary (single source of truth) ----------------------------------
 
 /** Branch-group keys valid both as step/job modifiers and as `finally:` groups. */
-const BRANCH_KEYS = new Set(["on_success", "on_failure", "on_abort"]);
+const BRANCH_KEYS = new Set(["on-success", "on-failure", "on-abort"]);
 /** Every same-unit hook key (`ensure:` plus the branch keys). */
 const STEP_HOOK_KEYS = new Set(["ensure", ...BRANCH_KEYS]);
 /** Hook keys plus `finally`, used to detect illegal hook-on-hook nesting (#10). */
-const LIFECYCLE_KEYS = ["ensure", "on_success", "on_failure", "on_abort", "finally"];
+const LIFECYCLE_KEYS = ["ensure", "on-success", "on-failure", "on-abort", "finally"];
 /** `when:` outcome sugar → `needs.<job>.result` value. */
 const WHEN_STATES: Record<string, string> = {
   failed: "failure",
@@ -47,7 +47,7 @@ const CANCEL_TIMEOUT_MINUTES = 5;
 const MSG_NOT_MAPPING = "finally must be a mapping of teardown jobs";
 const MSG_WRONG_SCOPE = "finally: is workflow-scoped; use ensure: for job/step teardown";
 const MSG_STEP_ON_ABORT =
-  "step-level on_abort only sees step cancellation; run-level cancel belongs in a workflow finally:";
+  "step-level on-abort only sees step cancellation; run-level cancel belongs in a workflow finally:";
 const MSG_HOOK_NESTING = "lifecycle hooks cannot nest";
 
 // --- shared helpers -------------------------------------------------------
@@ -69,16 +69,16 @@ function stripLifecycleKeys(step: Step): void {
 /** Guard for a same-unit hook attached to a step (keys on `outcome`). */
 function stepHookGuard(key: string, stepId: string): string {
   if (key === "ensure") return "always()";
-  if (key === "on_abort") return "cancelled()";
-  if (key === "on_failure") return `!cancelled() && steps.${stepId}.outcome == 'failure'`;
+  if (key === "on-abort") return "cancelled()";
+  if (key === "on-failure") return `!cancelled() && steps.${stepId}.outcome == 'failure'`;
   return `success() && steps.${stepId}.outcome == 'success'`;
 }
 
 /** Guard for a same-unit hook attached to a job (appended teardown steps). */
 function jobHookGuard(key: string): string {
   if (key === "ensure") return "always()";
-  if (key === "on_success") return "success()";
-  if (key === "on_failure") return "failure()";
+  if (key === "on-success") return "success()";
+  if (key === "on-failure") return "failure()";
   return "cancelled()";
 }
 
@@ -135,10 +135,10 @@ function expandStepHooks(
       }
       continue;
     }
-    if (key === "on_abort") {
+    if (key === "on-abort") {
       pushDiagnostic(ctx, "warning", MSG_STEP_ON_ABORT, keyPath, { code: "step-on-abort" });
     }
-    if ((key === "on_failure" || key === "on_success") && stepId === undefined) {
+    if ((key === "on-failure" || key === "on-success") && stepId === undefined) {
       stepId = ensureStepId(step, used, `actio_${jobId}_step_${idx + 1}`);
     }
     const guard = stepHookGuard(key, stepId ?? "");
@@ -343,7 +343,7 @@ function processUnconditional(
   }
 }
 
-/** Process an `on_success:`/`on_failure:`/`on_abort:` branch group of finally jobs. */
+/** Process an `on-success:`/`on-failure:`/`on-abort:` branch group of finally jobs. */
 function processBranchGroup(
   ctx: ParseContext,
   branchKey: string,
@@ -353,7 +353,7 @@ function processBranchGroup(
   realJobSet: Set<string>,
   finallyNames: Set<string>,
 ): void {
-  // `on_abort: []` (or empty map) is the explicit opt-out: no cancel job.
+  // `on-abort: []` (or empty map) is the explicit opt-out: no cancel job.
   if (Array.isArray(value)) {
     if (value.length === 0) return;
     pushDiagnostic(ctx, "error", MSG_NOT_MAPPING, ["finally", branchKey], {
@@ -369,12 +369,12 @@ function processBranchGroup(
   }
 
   const branchGuard =
-    branchKey === "on_success"
+    branchKey === "on-success"
       ? "success()"
-      : branchKey === "on_failure"
+      : branchKey === "on-failure"
         ? "failure()"
         : "cancelled()";
-  const isCancelPath = branchKey === "on_abort";
+  const isCancelPath = branchKey === "on-abort";
 
   for (const [name, body] of Object.entries(value)) {
     const path: Path = ["finally", branchKey, name];
@@ -449,7 +449,7 @@ function processFinally(ctx: ParseContext): void {
   const realJobs = Object.keys(jobs).filter((k) => k !== ANNOTATE_JOB_ID);
   const realJobSet = new Set(realJobs);
   const finallyNames = collectFinallyJobNames(block);
-  const hasOnAbort = Object.hasOwn(block, "on_abort");
+  const hasOnAbort = Object.hasOwn(block, "on-abort");
 
   for (const [key, value] of Object.entries(block)) {
     if (BRANCH_KEYS.has(key)) {
@@ -482,6 +482,6 @@ export function lifecyclePass(ctx: ParseContext): void {
 
 export const lifecycle: Pass = {
   name: "lifecycle",
-  runsAfter: ["fragments", "retry", "fallback", "dynamic_matrix", "for_each", "job_defaults"],
+  runsAfter: ["fragments", "retry", "fallback", "dynamic-matrix", "for-each", "job-defaults"],
   apply: lifecyclePass,
 };

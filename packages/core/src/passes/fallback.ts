@@ -61,7 +61,7 @@ function normalizeRetry(ctx: ParseContext, raw: unknown, path?: Path): RetrySpec
     return null;
   }
   let whenExitCodes: number[] | undefined;
-  const wec = raw.when_exit_code;
+  const wec = raw["when-exit-code"];
   if (wec !== undefined) {
     const codes = Array.isArray(wec) ? wec : [wec];
     const valid = codes.filter((c): c is number => typeof c === "number" && Number.isInteger(c));
@@ -69,8 +69,8 @@ function normalizeRetry(ctx: ParseContext, raw: unknown, path?: Path): RetrySpec
       pushDiagnostic(
         ctx,
         "warning",
-        `fallback.retry.when_exit_code must be an integer or list of integers; ignoring invalid entries`,
-        path ? [...path, "when_exit_code"] : path,
+        `fallback.retry.when-exit-code must be an integer or list of integers; ignoring invalid entries`,
+        path ? [...path, "when-exit-code"] : path,
       );
     }
     if (valid.length > 0) whenExitCodes = valid;
@@ -161,7 +161,7 @@ function expandStepFallback(
 /**
  * Lift a guarded step into a sibling recovery job spec. The original step stays
  * in its job; the clone is what re-runs on the fallback runner. When
- * `when_exit_code` is set on a POSIX `run` step we also rewrite the original
+ * `when-exit-code` is set on a POSIX `run` step we also rewrite the original
  * step to publish its exit code so the retry job can gate on it.
  */
 function liftRetryStep(
@@ -184,21 +184,21 @@ function liftRetryStep(
   let gateExpr: string | undefined;
   const codes = retry.whenExitCodes;
   if (codes && codes.length > 0) {
-    const path: Path = ["jobs", jobId, "steps", idx, "fallback", "retry", "when_exit_code"];
+    const path: Path = ["jobs", jobId, "steps", idx, "fallback", "retry", "when-exit-code"];
     const shell = step.shell;
     const posix = shell === undefined || shell === "bash" || shell === "sh";
     if (typeof step.run !== "string") {
       pushDiagnostic(
         ctx,
         "warning",
-        `Job "${jobId}": fallback.retry.when_exit_code only applies to "run" steps; retrying on any failure`,
+        `Job "${jobId}": fallback.retry.when-exit-code only applies to "run" steps; retrying on any failure`,
         path,
       );
     } else if (!posix) {
       pushDiagnostic(
         ctx,
         "warning",
-        `Job "${jobId}": fallback.retry.when_exit_code requires a POSIX shell (bash/sh); retrying on any failure`,
+        `Job "${jobId}": fallback.retry.when-exit-code requires a POSIX shell (bash/sh); retrying on any failure`,
         path,
       );
     } else {
@@ -321,7 +321,7 @@ function uniqueJobId(jobId: string, index: number, taken: Set<string>): string {
 /**
  * Insert collected retry jobs into `ctx.data.jobs`, each placed right after its
  * origin job, and publish the origin step exit-code outputs. Rebuilds the jobs
- * map (mirroring dynamic_matrix) so KEY_ORDER stays faithful for emit.
+ * map (mirroring dynamic-matrix) so KEY_ORDER stays faithful for emit.
  */
 function applyRetryJobs(ctx: ParseContext, collector: RetryCollector): void {
   const jobs = ctx.data.jobs;
@@ -387,7 +387,7 @@ export function fallbackPass(ctx: ParseContext): void {
   if (collector.specs.length > 0) applyRetryJobs(ctx, collector);
 }
 
-/** Wrap steps with try/catch before dynamic_matrix moves them between jobs. */
+/** Wrap steps with try/catch before dynamic-matrix moves them between jobs. */
 export const fallback: Pass = {
   name: "fallback",
   runsAfter: ["fragments", "retry"],

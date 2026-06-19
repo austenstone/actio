@@ -47,7 +47,7 @@ reusable steps, `inject` splices them in, and ordinary steps pass straight throu
 
 | Pain in raw YAML | Macro |
 | --- | --- |
-| Dynamic matrix needs a hand-built setup job that prints JSON to `$GITHUB_OUTPUT`, consumed downstream via `fromJSON()`, with escaping and empty-guard gotchas | [`dynamic_matrix`](/docs/macros/dynamic-matrix) |
+| Dynamic matrix needs a hand-built setup job that prints JSON to `$GITHUB_OUTPUT`, consumed downstream via `fromJSON()`, with escaping and empty-guard gotchas | [`dynamic-matrix`](/docs/macros/dynamic-matrix) |
 | Reusing steps forces a separate [composite action](https://docs.github.com/en/actions/sharing-automations/creating-actions/creating-a-composite-action) or [reusable workflow](https://docs.github.com/en/actions/sharing-automations/reusing-workflows) file | [`fragments`](/docs/macros/fragments) |
 | Retrying flaky steps requires bash loops or third-party actions | [`retry`](/docs/macros/retry) |
 | try/catch means smearing `if: failure()` / `continue-on-error` across steps | [`fallback`](/docs/macros/fallback) |

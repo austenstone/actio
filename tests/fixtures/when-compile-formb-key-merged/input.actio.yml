@@ -11,5 +11,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: dist
-          static_if(params.debug):
+          static-if(params.debug):
             retention-days: "1"

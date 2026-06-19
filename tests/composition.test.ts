@@ -15,7 +15,7 @@ function needsOf(job: { needs?: string | string[] }): string[] {
   return Array.isArray(job.needs) ? job.needs : [job.needs];
 }
 
-describe("composition: dynamic_matrix setup job context", () => {
+describe("composition: dynamic-matrix setup job context", () => {
   it("the setup job inherits the target job's needs so the matrix script can read upstream outputs", () => {
     // The matrix-generating script references needs.build.outputs.shards. That
     // script runs in the generated actio_setup_test job, so that job must list
@@ -34,7 +34,7 @@ jobs:
   test:
     needs: build
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo "[$(seq -s, 1 \${{ needs.build.outputs.shards }})]"
     steps:
       - run: echo \${{ matrix.value }}
@@ -47,7 +47,7 @@ jobs:
   });
 
   it("the setup job inherits the target job's env so the matrix script can read job-level vars", () => {
-    // The script uses $SHARDS, defined as job-level env. After dynamic_matrix
+    // The script uses $SHARDS, defined as job-level env. After dynamic-matrix
     // splits the job, the script lives in actio_setup_test, so that job must
     // carry the env or $SHARDS expands to nothing.
     const { doc, errors } = build(`name: x
@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SHARDS: "3"
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo "[$(seq -s, 1 $SHARDS)]"
     steps:
       - run: echo hi

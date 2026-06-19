@@ -10,6 +10,6 @@ jobs:
     steps:
       - run: echo start
       - name: Publish preview
-        static_if: params.deploy
+        static-if: params.deploy
         run: echo publish
       - run: echo end

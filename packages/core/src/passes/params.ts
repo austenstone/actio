@@ -566,7 +566,7 @@ const resolveStructuralExpressionsInTree = (
   }
   if (isObject(value)) {
     for (const [key, child] of Object.entries(value)) {
-      if (key === "static_if") continue;
+      if (key === "static-if") continue;
       value[key] = resolveStructuralExpressionsInTree(ctx, child, [...path, key]);
     }
   }

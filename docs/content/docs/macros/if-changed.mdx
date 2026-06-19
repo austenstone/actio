@@ -1,5 +1,5 @@
 ---
-title: if_changed
+title: if-changed
 description: Gate a step or job on file changes with one shared paths-filter setup job.
 ---
 
@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build docs
         run: ./build-docs.sh
-        if_changed:
+        if-changed:
           - "docs/**"
           - "*.md"
       - name: Always run
@@ -56,11 +56,11 @@ jobs:
 
 ## Value
 
-`if_changed` takes a single glob string or an array of globs:
+`if-changed` takes a single glob string or an array of globs:
 
 ```yaml title=".actio.yml"
-if_changed: "services/api/**"        # one pattern
-if_changed: ["docs/**", "*.md"]      # multiple (matches if ANY hit)
+if-changed: "services/api/**"        # one pattern
+if-changed: ["docs/**", "*.md"]      # multiple (matches if ANY hit)
 ```
 
 Globs use the standard [paths-filter pattern
@@ -69,14 +69,14 @@ with `!`).
 
 ## Job-level gating
 
-Put `if_changed` directly on a job to skip the whole job when nothing relevant
+Put `if-changed` directly on a job to skip the whole job when nothing relevant
 changed:
 
 ```yaml title=".actio.yml"
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if_changed: "services/api/**"
+    if-changed: "services/api/**"
     steps:
       - uses: actions/checkout@v4
       - run: ./deploy.sh
@@ -84,7 +84,7 @@ jobs:
 
 ## Shared setup, deduped flags
 
-Every `if_changed` in the workflow feeds the **same** `actio_changes` setup job.
+Every `if-changed` in the workflow feeds the **same** `actio_changes` setup job.
 Identical glob groups collapse to a single filter flag, so two nodes watching
 `services/api/**` share one output instead of running paths-filter twice:
 
@@ -92,12 +92,12 @@ Identical glob groups collapse to a single filter flag, so two nodes watching
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if_changed: "services/api/**"
+    if-changed: "services/api/**"
     steps:
       - run: ./deploy.sh
   smoke:
     runs-on: ubuntu-latest
-    if_changed: "services/api/**"
+    if-changed: "services/api/**"
     steps:
       - run: ./smoke.sh
 ```
@@ -115,7 +115,7 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    if_changed: "services/api/**"
+    if-changed: "services/api/**"
     steps:
       - run: ./smoke.sh
 ```
@@ -141,6 +141,6 @@ source works for both triggers with no extra config:
 - The setup job is named `actio_changes` and the filter step `actio_filter`. If a
   job named `actio_changes` already exists, Actio emits an error and leaves the
   workflow unchanged.
-- The `if_changed` key is stripped from the generated workflow.
+- The `if-changed` key is stripped from the generated workflow.
 - A raw `git diff` mode (no marketplace action) is a possible future option; today
   the macro standardizes on `dorny/paths-filter` for robust base detection.

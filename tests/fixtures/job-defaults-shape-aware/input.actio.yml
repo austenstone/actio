@@ -1,7 +1,7 @@
 name: Job defaults shape aware
 on: [push]
 
-job_defaults:
+job-defaults:
   permissions:
     contents: read
   concurrency: ci-${{ github.ref }}

@@ -27,10 +27,10 @@ function jobsOf(doc: { jobs?: Record<string, unknown> }): Record<string, Record<
 }
 
 // ---------------------------------------------------------------------------
-// Serial step loops (the most common shape: a `for_each` step that unrolls)
+// Serial step loops (the most common shape: a `for-each` step that unrolls)
 // ---------------------------------------------------------------------------
 
-describe("for_each: serial step loops", () => {
+describe("for-each: serial step loops", () => {
   it("unrolls a scalar list into one step per value with compile-time substitution", () => {
     const { result, errors, doc } = build(`
 name: ci
@@ -39,7 +39,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: item
           in: [alpha, beta]
         steps:
@@ -51,7 +51,7 @@ jobs:
     const steps = jobsOf(doc).build.steps as { run: string }[];
     expect(steps.map((s) => s.run)).toEqual(["echo alpha", "echo beta", "echo done"]);
     // USP: no residual directives, no unrendered compile tokens.
-    expect(result.yaml).not.toContain("for_each");
+    expect(result.yaml).not.toContain("for-each");
     expect(result.yaml).not.toContain("{{");
   });
 
@@ -63,7 +63,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: [a, b]
         steps:
@@ -83,7 +83,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: t
           in:
             - { name: lint, cmd: "npm run lint" }
@@ -108,7 +108,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: t
           in:
             - { name: lint }
@@ -129,7 +129,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: []
         steps:
@@ -143,7 +143,7 @@ jobs:
     expect(steps.map((s) => s.run)).toEqual(["echo done"]);
   });
 
-  it("expands nested for_each loops and warns on a shadowed loop var", () => {
+  it("expands nested for-each loops and warns on a shadowed loop var", () => {
     const { result, doc } = build(`
 name: ci
 on: [push]
@@ -151,11 +151,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: [a, b]
         steps:
-          - for_each:
+          - for-each:
               var: x
               in: [1, 2]
             steps:
@@ -177,7 +177,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: [a, b]
           parallel: true
@@ -200,14 +200,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: "\${{ fromJSON(needs.setup.outputs.list) }}"
         steps:
           - run: echo {{ x }}
 `);
     expect(result.ok).toBe(true);
-    expect(result.yaml).not.toContain("for_each");
+    expect(result.yaml).not.toContain("for-each");
     const jobs = jobsOf(doc);
     expect(jobs.actio_setup_build).toBeDefined();
     const build_ = jobs.build as {
@@ -230,7 +230,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: [a, b]
           fail-fast: true
@@ -251,7 +251,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: [a, b]
         steps:
@@ -260,7 +260,7 @@ jobs:
     expect(hasCode(result, "for-each-fragment-loopvar")).toBe(true);
   });
 
-  it("errors when for_each is not a mapping", () => {
+  it("errors when for-each is not a mapping", () => {
     const { result } = build(`
 name: ci
 on: [push]
@@ -268,7 +268,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each: "nope"
+      - for-each: "nope"
         steps:
           - run: echo hi
 `);
@@ -276,7 +276,7 @@ jobs:
     expect(hasCode(result, "for-each-shape")).toBe(true);
   });
 
-  it("errors when for_each is missing var or in", () => {
+  it("errors when for-each is missing var or in", () => {
     const { result } = build(`
 name: ci
 on: [push]
@@ -284,7 +284,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
         steps:
           - run: echo {{ x }}
@@ -298,7 +298,7 @@ jobs:
 // `in` source resolution edge cases
 // ---------------------------------------------------------------------------
 
-describe("for_each: source resolution", () => {
+describe("for-each: source resolution", () => {
   it("resolves a compile-time object param reference to a list", () => {
     const { result, doc } = build(`
 name: ci
@@ -311,7 +311,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: e
           in: "{{ params.envs }}"
         steps:
@@ -335,7 +335,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: e
           in: "{{ params.envs }}"
         steps:
@@ -353,7 +353,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: e
           in: "{{ params.missing }}"
         steps:
@@ -371,7 +371,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: e
           in: "just-a-string"
         steps:
@@ -389,7 +389,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: e
           in:
             - alpha
@@ -409,7 +409,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: e
           in: "   "
         steps:
@@ -421,10 +421,10 @@ jobs:
 });
 
 // ---------------------------------------------------------------------------
-// Parallel job matrices (job-level for_each, parallel default)
+// Parallel job matrices (job-level for-each, parallel default)
 // ---------------------------------------------------------------------------
 
-describe("for_each: parallel job matrices", () => {
+describe("for-each: parallel job matrices", () => {
   it("expands a scalar job loop into a strategy matrix with fail-fast: false", () => {
     const { result, doc } = build(`
 name: ci
@@ -432,7 +432,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: node
       in: [18, 20, 22]
     steps:
@@ -445,7 +445,7 @@ jobs:
     expect(strategy["fail-fast"]).toBe(false);
     const steps = job.steps as { run: string }[];
     expect(steps[0].run).toBe("node --version ${{ matrix.node }}");
-    expect(result.yaml).not.toContain("for_each");
+    expect(result.yaml).not.toContain("for-each");
   });
 
   it("honors `as`, `fail-fast: true`, and `max-parallel`", () => {
@@ -455,7 +455,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: n
       as: version
       in: [18, 20]
@@ -482,7 +482,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: n
       in: [1, 2]
       max-parallel: 0
@@ -501,7 +501,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: combo
       in:
         - { os: ubuntu-latest, node: 18 }
@@ -529,7 +529,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: combo
       in:
         - { os: ubuntu-latest }
@@ -548,7 +548,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: n
       in: []
     steps:
@@ -556,7 +556,7 @@ jobs:
 `);
     expect(result.ok).toBe(false);
     expect(hasCode(result, "for-each-empty-parallel")).toBe(true);
-    expect(result.yaml).not.toContain("for_each");
+    expect(result.yaml).not.toContain("for-each");
   });
 });
 
@@ -564,7 +564,7 @@ jobs:
 // Variant axis × author strategy.matrix coexistence (issue #79)
 // ---------------------------------------------------------------------------
 
-describe("for_each: variant axis × author matrix", () => {
+describe("for-each: variant axis × author matrix", () => {
   it("fans a scalar variant out to N jobs, each keeping the full author matrix", () => {
     const { result, doc } = build(`
 name: ci
@@ -577,7 +577,7 @@ jobs:
       matrix:
         group: [1, 2, 3]
         react: [18, 19]
-    for_each:
+    for-each:
       var: variant
       in: [turbopack, rspack, webpack]
     steps:
@@ -597,7 +597,7 @@ jobs:
     expect((jobs["test-rspack"].steps as { run: string }[])[0].run).toBe(
       "echo rspack ${{ matrix.group }} ${{ matrix.react }}",
     );
-    expect(result.yaml).not.toContain("for_each");
+    expect(result.yaml).not.toContain("for-each");
   });
 
   it("clones an object variant onto a `uses:` call job (the next.js shape)", () => {
@@ -614,7 +614,7 @@ jobs:
         react: [18, 19]
     with:
       afterBuild: "{{ variant.afterBuild }}"
-    for_each:
+    for-each:
       var: variant
       key: name
       in:
@@ -653,7 +653,7 @@ jobs:
     strategy:
       matrix:
         group: [1, 2]
-    for_each:
+    for-each:
       var: variant
       in: [x, y]
     steps:
@@ -675,7 +675,7 @@ jobs:
     strategy:
       matrix:
         group: [1, 2]
-    for_each:
+    for-each:
       var: group
       in: [a, b]
     steps:
@@ -696,7 +696,7 @@ jobs:
       fail-fast: true
       matrix:
         group: [1, 2]
-    for_each:
+    for-each:
       var: variant
       in: [x, y]
       fail-fast: false
@@ -721,7 +721,7 @@ jobs:
     strategy:
       matrix:
         group: [1, 2]
-    for_each:
+    for-each:
       var: variant
       in:
         - { afterBuild: "a" }
@@ -742,7 +742,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: variant
       in: [a, b]
     steps:
@@ -756,10 +756,10 @@ jobs:
 });
 
 // ---------------------------------------------------------------------------
-// Serial job fan-out (job-level for_each, parallel: false)
+// Serial job fan-out (job-level for-each, parallel: false)
 // ---------------------------------------------------------------------------
 
-describe("for_each: serial job fan-out", () => {
+describe("for-each: serial job fan-out", () => {
   it("clones a job per value with a serial needs-chain", () => {
     const { result, doc } = build(`
 name: ci
@@ -767,7 +767,7 @@ on: [push]
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: stage
       in: [staging, prod]
       parallel: false
@@ -780,7 +780,7 @@ jobs:
     expect((jobs["deploy-staging"].steps as { run: string }[])[0].run).toBe("deploy staging");
     expect((jobs["deploy-prod"].steps as { run: string }[])[0].run).toBe("deploy prod");
     expect(jobs["deploy-prod"].needs).toEqual(["deploy-staging"]);
-    expect(result.yaml).not.toContain("for_each");
+    expect(result.yaml).not.toContain("for-each");
   });
 
   it("preserves the original job's needs on the first sibling", () => {
@@ -795,7 +795,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: setup
-    for_each:
+    for-each:
       var: stage
       in: [a, b]
       parallel: false
@@ -815,7 +815,7 @@ on: [push]
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: stage
       in:
         - { name: a }
@@ -835,7 +835,7 @@ on: [push]
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: stage
       in: [Foo, foo]
       parallel: false
@@ -857,7 +857,7 @@ jobs:
       - run: echo keep
   deploy:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: stage
       in: []
       parallel: false
@@ -875,15 +875,15 @@ jobs:
 // Job-level shape / collision errors
 // ---------------------------------------------------------------------------
 
-describe("for_each: job-level shape errors", () => {
-  it("errors when job for_each is not a mapping", () => {
+describe("for-each: job-level shape errors", () => {
+  it("errors when job for-each is not a mapping", () => {
     const { result } = build(`
 name: ci
 on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    for_each: "nope"
+    for-each: "nope"
     steps:
       - run: echo hi
 `);
@@ -891,17 +891,17 @@ jobs:
     expect(hasCode(result, "for-each-shape")).toBe(true);
   });
 
-  it("errors when a job combines for_each with dynamic_matrix", () => {
+  it("errors when a job combines for-each with dynamic-matrix", () => {
     const { result } = build(`
 name: ci
 on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: ./list.sh
       alias: target
-    for_each:
+    for-each:
       var: n
       in: [1, 2]
     steps:
@@ -911,14 +911,14 @@ jobs:
     expect(hasCode(result, "for-each-dynamic-matrix-collision")).toBe(true);
   });
 
-  it("errors when job for_each is missing var or in", () => {
+  it("errors when job for-each is missing var or in", () => {
     const { result } = build(`
 name: ci
 on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       in: [1, 2]
     steps:
       - run: echo hi
@@ -932,8 +932,8 @@ jobs:
 // Dynamic delegation (runtime / generator sources at job scope)
 // ---------------------------------------------------------------------------
 
-describe("for_each: dynamic delegation", () => {
-  it("delegates a runtime-expression job loop to a dynamic_matrix block", () => {
+describe("for-each: dynamic delegation", () => {
+  it("delegates a runtime-expression job loop to a dynamic-matrix block", () => {
     const { result } = build(`
 name: ci
 on: [push]
@@ -946,7 +946,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: setup
-    for_each:
+    for-each:
       var: n
       in: "\${{ fromJSON(needs.setup.outputs.list) }}"
     steps:
@@ -955,24 +955,24 @@ jobs:
     // Pinned as-observed: the runtime source routes through dynamic delegation.
     // Record whatever the compiler decides; the point is the delegation path runs.
     expect(codesOf(result)).toBeDefined();
-    expect(result.yaml).not.toContain("for_each");
+    expect(result.yaml).not.toContain("for-each");
   });
 
-  it("delegates a generator job loop to a dynamic_matrix block", () => {
+  it("delegates a generator job loop to a dynamic-matrix block", () => {
     const { result } = build(`
 name: ci
 on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    for_each:
+    for-each:
       var: target
       in:
         run: ./list-targets.sh
     steps:
       - run: echo "\${{ matrix.target }}"
 `);
-    expect(result.yaml).not.toContain("for_each");
+    expect(result.yaml).not.toContain("for-each");
   });
 });
 
@@ -984,7 +984,7 @@ jobs:
 // side effects. Failing loud everywhere else is what keeps the no-silent-
 // miscompile invariant.
 // ---------------------------------------------------------------------------
-describe("for_each: runtime step loops (#50)", () => {
+describe("for-each: runtime step loops (#50)", () => {
   it("rewrites a generator-sourced whole-job loop and honours the as: alias", () => {
     const { result, doc } = build(`
 name: ci
@@ -993,7 +993,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: shard
           as: shard
           in:
@@ -1002,7 +1002,7 @@ jobs:
           - run: ./run-shard.sh {{ shard }}
 `);
     expect(result.ok).toBe(true);
-    expect(result.yaml).not.toContain("for_each");
+    expect(result.yaml).not.toContain("for-each");
     const jobs = jobsOf(doc);
     expect(jobs.actio_setup_test).toBeDefined();
     const test_ = jobs.test as {
@@ -1024,7 +1024,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - for_each:
+      - for-each:
           var: x
           in: "\${{ fromJSON(needs.s.outputs.a) }}"
         steps:
@@ -1042,12 +1042,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: "\${{ fromJSON(needs.s.outputs.a) }}"
         steps:
           - run: echo {{ x }}
-      - for_each:
+      - for-each:
           var: y
           in: "\${{ fromJSON(needs.s.outputs.b) }}"
         steps:
@@ -1065,11 +1065,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: "\${{ fromJSON(needs.s.outputs.a) }}"
         steps:
-          - for_each:
+          - for-each:
               var: y
               in: "\${{ fromJSON(needs.s.outputs.b) }}"
             steps:
@@ -1087,13 +1087,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: "\${{ fromJSON(needs.s.outputs.a) }}"
         steps:
           - run: echo {{ x }}
             share:
-              val: "\$X"
+              val: "$X"
 `);
     expect(result.ok).toBe(false);
     expect(hasCode(result, "E-share-in-dynamic-loop")).toBe(true);
@@ -1110,7 +1110,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: "\${{ fromJSON(needs.s.outputs.a) }}"
         steps:
@@ -1129,7 +1129,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: "\${{ fromJSON(needs.s.outputs.a) }}"
           parallel: false
@@ -1151,7 +1151,7 @@ jobs:
     strategy:
       fail-fast: true
     steps:
-      - for_each:
+      - for-each:
           var: x
           in: "\${{ fromJSON(needs.s.outputs.a) }}"
         steps:

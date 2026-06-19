@@ -12,7 +12,7 @@ jobs:
   test_changed_services:
     runs-on: ubuntu-latest
 
-    dynamic_matrix:
+    dynamic-matrix:
       script: ./scripts/get-changed-dirs.sh
       alias: service
 

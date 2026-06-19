@@ -21,7 +21,7 @@ Actio is a transpiler. The dangerous failure mode is not a crash, it is silently
 
 Pass order is data-driven with `runsAfter`, not array position. The locked macro pipeline is:
 
-`params (#17) -> job_defaults (#21) -> for_each/dynamic_matrix (#20) -> when_compile (#23) -> fragments/inject (shipped) -> share (#18) -> lifecycle (#24) -> injection-hoist (#22) -> annotate (last)`
+`params (#17) -> job-defaults (#21) -> for-each/dynamic-matrix (#20) -> when-compile (#23) -> fragments/inject (shipped) -> share (#18) -> lifecycle (#24) -> injection-hoist (#22) -> annotate (last)`
 
 `pins (#19)` is orthogonal at emit. Build DAG tiers are `T0 = #17, #19`, `T1 = #23, #21`, `T2 = #20, #18`, and `T3 = #24, #22`.
 

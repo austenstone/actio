@@ -35,7 +35,7 @@ interface ParsedWorkflow {
 
 /** The `everything` fixture exercises every macro in a single workflow. These
  * assertions prove the passes compose — fragments feed retry/fallback, and
- * dynamic_matrix rewrites a job that also carries an inject + job-level fallback. */
+ * dynamic-matrix rewrites a job that also carries an inject + job-level fallback. */
 describe("all features together (everything fixture)", () => {
   const src = readFileSync(join(fixturesDir, "everything", "input.actio.yml"), "utf8");
   const result = transpile(src, { fileName: "input.actio.yml", sourceMap: true });
@@ -76,7 +76,7 @@ describe("all features together (everything fixture)", () => {
     expect(doc.jobs.test.fallback).toBeUndefined();
   });
 
-  it("builds the dynamic_matrix setup job and rewires the consumer", () => {
+  it("builds the dynamic-matrix setup job and rewires the consumer", () => {
     expect(doc.jobs.actio_setup_test).toBeDefined();
     expect(doc.jobs.test.needs).toEqual(["actio_setup_test"]);
     expect(doc.jobs.test.strategy.matrix.shard).toBe(

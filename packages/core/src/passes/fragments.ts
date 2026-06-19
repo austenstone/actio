@@ -5,7 +5,7 @@ import { resolveCompileTimeTextBoundaries } from "./params.js";
 import type { Pass } from "./registry.js";
 
 type FragmentMap = Record<string, Step[]>;
-const FORM_B_KEY_RE = /^static_if\([\s\S]*\)$/;
+const FORM_B_KEY_RE = /^static-if\([\s\S]*\)$/;
 const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
 
 function getFragments(ctx: ParseContext): FragmentMap {
@@ -121,13 +121,13 @@ function stripResidualWhenCompile(ctx: ParseContext, value: unknown, path: Path)
   if (!isObject(value)) return;
 
   for (const key of Object.keys(value)) {
-    if (key === "static_if" || FORM_B_KEY_RE.test(key)) {
+    if (key === "static-if" || FORM_B_KEY_RE.test(key)) {
       pushDiagnostic(
         ctx,
         "error",
         diagnosticMessage(
           "static-if-residual",
-          "Residual static_if directive is not allowed here; move it to a job/step structural position",
+          "Residual static-if directive is not allowed here; move it to a job/step structural position",
         ),
         [...path, key],
       );
@@ -144,7 +144,7 @@ function stripResidualWhenCompile(ctx: ParseContext, value: unknown, path: Path)
 /**
  * fragments pass: collect top-level `fragments:`, expand all `- inject: <name>`
  * entries (in job steps, job fallback, and step fallback), then strip the
- * `fragments:` key. Runs after static_if and strips any residual static_if
+ * `fragments:` key. Runs after static-if and strips any residual static-if
  * directives that reach this stage.
  */
 export function fragmentsPass(ctx: ParseContext): void {
@@ -170,6 +170,6 @@ export function fragmentsPass(ctx: ParseContext): void {
 /** Splice reusable `inject:` steps in first, so later passes see real steps. */
 export const fragments: Pass = {
   name: "fragments",
-  runsAfter: ["params", "when_compile"],
+  runsAfter: ["params", "when-compile"],
   apply: fragmentsPass,
 };

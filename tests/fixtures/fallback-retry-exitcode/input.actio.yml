@@ -9,4 +9,4 @@ jobs:
         fallback:
           retry:
             runs-on: ubuntu-latest-16-cores
-            when_exit_code: [137]
+            when-exit-code: [137]

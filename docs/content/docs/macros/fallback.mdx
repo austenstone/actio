@@ -86,7 +86,7 @@ jobs:
         run: ./build.sh
 ```
 
-### when_exit_code
+### when-exit-code
 
 Only retry on *specific* exit codes (e.g. `137` = SIGKILL/OOM) instead of any
 failure. Actio captures the original step's real exit code via an `EXIT` trap,
@@ -98,7 +98,7 @@ exposes it as a job output, and gates the retry job on it.
   fallback:
     retry:
       runs-on: ubuntu-latest-16-cores
-      when_exit_code: [137]
+      when-exit-code: [137]
 ```
 
 ```yaml title="generated .yml"
@@ -124,10 +124,10 @@ jobs:
         run: ./run-tests.sh
 ```
 
-`when_exit_code` accepts a single number or a list (`[137, 143]`, OR-joined).
+`when-exit-code` accepts a single number or a list (`[137, 143]`, OR-joined).
 
 <Callout type="warn" title="Limitations (v1)">
-  - **`when_exit_code` is `run`-only and POSIX-shell-only.** It relies on a shell
+  - **`when-exit-code` is `run`-only and POSIX-shell-only.** It relies on a shell
     `EXIT` trap, so it's skipped (with a warning) on `uses:` steps or non-POSIX
     shells; the retry then falls back to a plain `if: failure()` gate.
   - **The guarded step must be self-contained.** Preceding in-job setup steps

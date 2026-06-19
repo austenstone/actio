@@ -1,7 +1,7 @@
 name: Executors expansion
 on: [push]
 
-job_defaults:
+job-defaults:
   runs-on: ubuntu-latest
   env:
     FROM_DEFAULT: "1"

@@ -1,12 +1,12 @@
 ---
-title: injectionHoist
+title: injection-hoist
 description: "Auto-defuse script injection by hoisting untrusted ${{ }} out of run: blocks."
 ---
 
 Untrusted `${{ }}` interpolation inside a `run:` body is a classic
 [script-injection](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#understanding-the-risk-of-script-injections)
 sink: an attacker-controlled value (a PR title, a branch name) is spliced into
-your shell command and evaluated. `injectionHoist` defuses it automatically.
+your shell command and evaluated. `injection-hoist` defuses it automatically.
 
 It is **on by default**. Untrusted interpolation is lifted into a step `env:`
 var and the body is rewritten to reference the shell variable instead, so the
@@ -59,7 +59,7 @@ through. Rewrite it to dotted access or hoist the value manually.
 
 ## Modes
 
-Set `injectionHoist:` at the step, job, or root level (closest scope wins;
+Set `injection-hoist:` at the step, job, or root level (closest scope wins;
 default `fix`):
 
 | Mode    | Behavior                                              |
@@ -70,14 +70,14 @@ default `fix`):
 | `off`   | Do nothing.                                            |
 
 ```yaml title=".actio.yml"
-injectionHoist: error          # global default
+injection-hoist: error          # global default
 jobs:
   build:
-    injectionHoist: warn       # per-job override
+    injection-hoist: warn       # per-job override
     runs-on: ubuntu-latest
     steps:
       - run: ./build.sh ${{ github.head_ref }}
-        injectionHoist: fix    # per-step override
+        injection-hoist: fix    # per-step override
 ```
 
 The global default can also be set in [`actio.config`](/docs/configuration) or

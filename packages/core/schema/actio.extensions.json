@@ -3,7 +3,7 @@
   "meta": {
     "$id": "https://raw.githubusercontent.com/austenstone/actio/main/packages/core/schema/actio.schema.json",
     "title": "Actio workflow (.actio.yml)",
-    "description": "Source language for the Actio transpiler: the official GitHub Actions workflow schema (inherited wholesale from SchemaStore) plus Actio macro keywords (fragments/inject, retry, dynamic_matrix, fallback, for_each) that compile into standard workflow YAML. Every standard GitHub Actions key, event, and value is validated and autocompleted from the upstream schema; the macro keys are additive. See https://github.com/austenstone/actio."
+    "description": "Source language for the Actio transpiler: the official GitHub Actions workflow schema (inherited wholesale from SchemaStore) plus Actio macro keywords (fragments/inject, retry, dynamic-matrix, fallback, for-each) that compile into standard workflow YAML. Every standard GitHub Actions key, event, and value is validated and autocompleted from the upstream schema; the macro keys are additive. See https://github.com/austenstone/actio."
   },
   "rootProperties": {
     "fragments": {
@@ -22,7 +22,7 @@
       "description": "Actio macro. Typed compile-time parameters. References are resolved with `{{ params.<name> }}` or `{{ toJSON(params.<name>) }}` and stripped from emitted workflow YAML.",
       "additionalProperties": { "$ref": "#/definitions/actioParam" }
     },
-    "job_defaults": {
+    "job-defaults": {
       "$ref": "#/definitions/jobDefaults",
       "description": "Actio macro. Default job-level settings merged into jobs at compile time. Stripped from generated workflow YAML."
     },
@@ -31,20 +31,20 @@
       "description": "Actio macro. Named runner/container/service presets referenced by `jobs.<id>.executor`. Stripped from generated workflow YAML.",
       "additionalProperties": { "$ref": "#/definitions/executorDefinition" }
     },
-    "call_templates": {
+    "call-templates": {
       "type": "object",
       "description": "Actio macro (compile-time). Named reusable-workflow call-job templates referenced by `jobs.<id>.extends`. Stripped from generated workflow YAML.",
       "additionalProperties": { "$ref": "#/definitions/callTemplateDefinition" }
     },
-    "injectionHoist": {
+    "injection-hoist": {
       "$ref": "#/definitions/injectionHoistMode",
-      "description": "Actio macro. Global default injection-hoist mode for every `run:` in the workflow. Overridden by job- and step-level `injectionHoist`. Stripped from generated workflow YAML."
+      "description": "Actio macro. Global default injection-hoist mode for every `run:` in the workflow. Overridden by job- and step-level `injection-hoist`. Stripped from generated workflow YAML."
     },
     "finally": {
       "$ref": "#/definitions/finallyBlock",
       "title": "finally (Actio macro)",
-      "description": "Actio macro. Workflow-scoped teardown. Each named entry compiles to an aggregator job that `needs:` every real job and runs on the normal path (`if: !cancelled()`), plus an auto cancel-companion (`if: cancelled()`, `timeout-minutes: 5`). Nest `on_success`/`on_failure`/`on_abort` for outcome-branch jobs. Use `ensure:` for job/step-scoped teardown, not `finally:`.",
-      "markdownDescription": "**Actio macro**: workflow-scoped teardown (sibling to `jobs:`).\n\nEach named entry compiles to an aggregator job that `needs:` every real job and runs on the normal path (`if: !cancelled()`), plus an auto cancel-companion (`if: cancelled()`, `timeout-minutes: 5`). Nest `on_success`/`on_failure`/`on_abort` for outcome-branch jobs; `on_abort: []` opts out of the cancel job.\n\n```yaml\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./deploy.sh\nfinally:\n  teardown:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./cleanup.sh\n```\n\nFor job/step teardown use `ensure:` instead."
+      "description": "Actio macro. Workflow-scoped teardown. Each named entry compiles to an aggregator job that `needs:` every real job and runs on the normal path (`if: !cancelled()`), plus an auto cancel-companion (`if: cancelled()`, `timeout-minutes: 5`). Nest `on-success`/`on-failure`/`on-abort` for outcome-branch jobs. Use `ensure:` for job/step-scoped teardown, not `finally:`.",
+      "markdownDescription": "**Actio macro**: workflow-scoped teardown (sibling to `jobs:`).\n\nEach named entry compiles to an aggregator job that `needs:` every real job and runs on the normal path (`if: !cancelled()`), plus an auto cancel-companion (`if: cancelled()`, `timeout-minutes: 5`). Nest `on-success`/`on-failure`/`on-abort` for outcome-branch jobs; `on-abort: []` opts out of the cancel job.\n\n```yaml\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./deploy.sh\nfinally:\n  teardown:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./cleanup.sh\n```\n\nFor job/step teardown use `ensure:` instead."
     }
   },
   "jobOneOf": [{ "$ref": "#/definitions/extendsCallJob" }],
@@ -62,17 +62,17 @@
           "description": "Actio macro. Splice in the steps of the named fragment (defined under top-level `fragments:`) at this position. Replaced inline by `actio build`.",
           "markdownDescription": "**Actio macro**: splice a fragment here.\n\nReplaced inline by `actio build` with the steps of the named fragment from top-level `fragments:`.\n\n```yaml\nsteps:\n  - inject: setup\n  - run: npm test\n```"
         },
-        "static_if": {
+        "static-if": {
           "type": "string",
-          "title": "static_if (Actio macro)",
+          "title": "static-if (Actio macro)",
           "description": "Actio macro. Compile-time structural condition. If false, this entire step map is omitted from emitted workflow YAML.",
-          "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for_each.*`, `define.*`). If the expression is false the entire step is removed from the generated workflow; if true the `static_if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\nsteps:\n  - name: Publish preview\n    static_if: params.deploy\n    run: ./publish.sh\n```"
+          "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for-each.*`, `define.*`). If the expression is false the entire step is removed from the generated workflow; if true the `static-if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\nsteps:\n  - name: Publish preview\n    static-if: params.deploy\n    run: ./publish.sh\n```"
         },
         "retry": { "$ref": "#/definitions/retry" },
         "fallback": { "$ref": "#/definitions/fallback" },
         "share": { "$ref": "#/definitions/share" },
-        "if_changed": { "$ref": "#/definitions/ifChanged" },
-        "injectionHoist": { "$ref": "#/definitions/injectionHoistMode" },
+        "if-changed": { "$ref": "#/definitions/ifChanged" },
+        "injection-hoist": { "$ref": "#/definitions/injectionHoistMode" },
         "unsafe": {
           "type": "boolean",
           "description": "Actio macro (injection-hoist). Opt this step out of injection-hoist entirely (`${{ }}` left inline in `run:`). Stripped from generated workflow YAML."
@@ -92,24 +92,24 @@
           "title": "ensure (Actio macro)",
           "description": "Actio macro. Same-step teardown. The listed steps are spliced in right after this step, each guarded with `if: always()`, so they run even if the step fails or is cancelled."
         },
-        "on_success": {
+        "on-success": {
           "$ref": "#/definitions/lifecycleHook",
-          "title": "on_success (Actio macro)",
+          "title": "on-success (Actio macro)",
           "description": "Actio macro. Steps to run after this step only when the step succeeded. Guarded with `if: success() && steps.<id>.outcome == 'success'`."
         },
-        "on_failure": {
+        "on-failure": {
           "$ref": "#/definitions/lifecycleHook",
-          "title": "on_failure (Actio macro)",
+          "title": "on-failure (Actio macro)",
           "description": "Actio macro. Steps to run after this step only when the step failed. Guarded with `if: !cancelled() && steps.<id>.outcome == 'failure'` (keys on outcome, pre-continue-on-error)."
         },
-        "on_abort": {
+        "on-abort": {
           "$ref": "#/definitions/lifecycleHook",
-          "title": "on_abort (Actio macro)",
+          "title": "on-abort (Actio macro)",
           "description": "Actio macro. Steps to run after this step on cancellation. At step scope this only sees step-level cancellation; run-level cancel belongs in a workflow `finally:`."
         }
       },
       "patternProperties": {
-        "^static_if\\(.+\\)$": {
+        "^static-if\\(.+\\)$": {
           "type": "object",
           "description": "Actio macro. Conditional merge map. When expression is true, merge this mapping into the parent map."
         }
@@ -118,34 +118,34 @@
     },
     "normalJob": {
       "properties": {
-        "static_if": {
+        "static-if": {
           "type": "string",
-          "title": "static_if (Actio macro)",
+          "title": "static-if (Actio macro)",
           "description": "Actio macro. Compile-time structural condition. If false, this entire job map is omitted from emitted workflow YAML.",
-          "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for_each.*`, `define.*`). If the expression is false the entire job is removed from the generated workflow; if true the `static_if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\njobs:\n  release:\n    static_if: params.deploy\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./release.sh\n```"
+          "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for-each.*`, `define.*`). If the expression is false the entire job is removed from the generated workflow; if true the `static-if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\njobs:\n  release:\n    static-if: params.deploy\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./release.sh\n```"
         },
-        "dynamic_matrix": { "$ref": "#/definitions/dynamicMatrix" },
+        "dynamic-matrix": { "$ref": "#/definitions/dynamicMatrix" },
         "fallback": { "$ref": "#/definitions/fallback" },
-        "if_changed": { "$ref": "#/definitions/ifChanged" },
-        "injectionHoist": { "$ref": "#/definitions/injectionHoistMode" },
+        "if-changed": { "$ref": "#/definitions/ifChanged" },
+        "injection-hoist": { "$ref": "#/definitions/injectionHoistMode" },
         "ensure": {
           "$ref": "#/definitions/lifecycleHook",
           "title": "ensure (Actio macro)",
           "description": "Actio macro. Same-job teardown. The listed steps are appended to this job, each guarded with `if: always()`, so they run even if earlier steps fail or the job is cancelled (bounded by the job timeout)."
         },
-        "on_success": {
+        "on-success": {
           "$ref": "#/definitions/lifecycleHook",
-          "title": "on_success (Actio macro)",
+          "title": "on-success (Actio macro)",
           "description": "Actio macro. Steps appended to this job that run only when the job succeeded. Guarded with `if: success()`."
         },
-        "on_failure": {
+        "on-failure": {
           "$ref": "#/definitions/lifecycleHook",
-          "title": "on_failure (Actio macro)",
+          "title": "on-failure (Actio macro)",
           "description": "Actio macro. Steps appended to this job that run only when the job failed. Guarded with `if: failure()`."
         },
-        "on_abort": {
+        "on-abort": {
           "$ref": "#/definitions/lifecycleHook",
-          "title": "on_abort (Actio macro)",
+          "title": "on-abort (Actio macro)",
           "description": "Actio macro. Steps appended to this job that run only when the job was cancelled. Guarded with `if: cancelled()` (bounded by the job timeout)."
         },
         "executor": {
@@ -160,7 +160,7 @@
         }
       },
       "patternProperties": {
-        "^static_if\\(.+\\)$": {
+        "^static-if\\(.+\\)$": {
           "type": "object",
           "description": "Actio macro. Conditional merge map. When expression is true, merge this mapping into the parent map."
         }
@@ -168,7 +168,7 @@
     },
     "env": {
       "patternProperties": {
-        "^static_if\\(.+\\)$": {
+        "^static-if\\(.+\\)$": {
           "type": "object",
           "description": "Actio macro. Conditional merge map. When expression is true, merge this mapping into the parent map."
         }
@@ -177,9 +177,9 @@
   },
   "addDefinitions": {
     "ifChanged": {
-      "title": "if_changed (Actio macro)",
+      "title": "if-changed (Actio macro)",
       "description": "Actio macro. Gate this step or job on file changes. Runs only when files changed in the pull request or push match one of these glob patterns. Compiles to a single shared `dorny/paths-filter` setup job plus a `needs.<setup>.outputs.<flag> == 'true'` guard folded into the existing `if:`. Stripped from generated workflow YAML.",
-      "markdownDescription": "**Actio macro**: file-change gating.\n\nRuns this step or job only when files changed in the pull request or push match one of the glob patterns. Actio synthesizes one shared setup job that runs [`dorny/paths-filter`](https://github.com/dorny/paths-filter) once, publishes a flag output per unique glob group, and folds `if: needs.<setup>.outputs.<flag> == 'true'` (AND-combined with any existing `if:`) plus `needs:` into each guarded node.\n\n```yaml\nsteps:\n  - name: Build docs\n    run: ./build-docs.sh\n    if_changed:\n      - 'docs/**'\n      - '*.md'\n```",
+      "markdownDescription": "**Actio macro**: file-change gating.\n\nRuns this step or job only when files changed in the pull request or push match one of the glob patterns. Actio synthesizes one shared setup job that runs [`dorny/paths-filter`](https://github.com/dorny/paths-filter) once, publishes a flag output per unique glob group, and folds `if: needs.<setup>.outputs.<flag> == 'true'` (AND-combined with any existing `if:`) plus `needs:` into each guarded node.\n\n```yaml\nsteps:\n  - name: Build docs\n    run: ./build-docs.sh\n    if-changed:\n      - 'docs/**'\n      - '*.md'\n```",
       "oneOf": [{ "type": "string", "minLength": 1 }, { "$ref": "#/definitions/globs" }]
     },
     "callTemplateDefinition": {
@@ -195,7 +195,7 @@
       }
     },
     "extendsRef": {
-      "description": "Actio macro. The name (or ordered list of names) of one or more `call_templates:` entries a call job inherits via `extends:`. Later templates win; the job's own inline keys win over all.",
+      "description": "Actio macro. The name (or ordered list of names) of one or more `call-templates:` entries a call job inherits via `extends:`. Later templates win; the job's own inline keys win over all.",
       "oneOf": [
         { "type": "string" },
         { "type": "array", "items": { "type": "string" }, "minItems": 1 }
@@ -204,7 +204,7 @@
     "extendsCallJob": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Actio macro. A reusable-workflow call job whose `uses` is supplied by a `call_templates:` entry via `extends:`. Inline keys override the template.",
+      "description": "Actio macro. A reusable-workflow call job whose `uses` is supplied by a `call-templates:` entry via `extends:`. Inline keys override the template.",
       "required": ["extends"],
       "properties": {
         "name": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/name" },
@@ -488,7 +488,7 @@
                     { "type": "object" }
                   ]
                 },
-                "when_exit_code": {
+                "when-exit-code": {
                   "description": "Only retry when the original step exits with one of these codes. Run-only and requires a POSIX shell (bash/sh).",
                   "anyOf": [
                     { "type": "integer" },
@@ -502,10 +502,10 @@
       ]
     },
     "dynamicMatrix": {
-      "title": "dynamic_matrix (Actio macro)",
+      "title": "dynamic-matrix (Actio macro)",
       "type": "object",
       "description": "Actio macro. Build a matrix at runtime: `script` prints a JSON array (or `{include:[...]}`) to stdout. Actio generates a setup job that publishes the JSON and wires this job to consume it via `fromJSON()` with a fail-fast:false default and an empty-matrix guard.",
-      "markdownDescription": "**Actio macro**: build a matrix at runtime.\n\n`script` prints a JSON array (or `{ include: [...] }`) to stdout. Actio generates a setup job that publishes the JSON and wires this job to consume it via `fromJSON()`, with `fail-fast: false` and an empty-matrix guard by default.\n\n```yaml\njobs:\n  test:\n    dynamic_matrix:\n      script: ./list-targets.sh\n      alias: target\n    steps:\n      - run: ./test ${{ matrix.target }}\n```",
+      "markdownDescription": "**Actio macro**: build a matrix at runtime.\n\n`script` prints a JSON array (or `{ include: [...] }`) to stdout. Actio generates a setup job that publishes the JSON and wires this job to consume it via `fromJSON()`, with `fail-fast: false` and an empty-matrix guard by default.\n\n```yaml\njobs:\n  test:\n    dynamic-matrix:\n      script: ./list-targets.sh\n      alias: target\n    steps:\n      - run: ./test ${{ matrix.target }}\n```",
       "required": ["script"],
       "additionalProperties": true,
       "properties": {
@@ -548,7 +548,7 @@
     "injectionHoistMode": {
       "type": "string",
       "enum": ["fix", "warn", "error", "off"],
-      "title": "injectionHoist mode (Actio macro)",
+      "title": "injection-hoist mode (Actio macro)",
       "description": "Actio macro. Injection-hoist behavior for `run:` `${{ }}` interpolation: `fix` (hoist untrusted values into env and rewrite the body, default), `warn`, `error`, or `off`. Stripped from generated workflow YAML."
     },
     "lifecycleHook": {
@@ -561,15 +561,15 @@
       "type": "object",
       "additionalProperties": { "$ref": "#/definitions/finallyJob" },
       "properties": {
-        "on_success": {
+        "on-success": {
           "$ref": "#/definitions/finallyBranchGroup",
           "description": "Actio macro. Named teardown jobs that run only when the workflow succeeded (`if: success()`)."
         },
-        "on_failure": {
+        "on-failure": {
           "$ref": "#/definitions/finallyBranchGroup",
           "description": "Actio macro. Named teardown jobs that run only when the workflow failed (`if: failure()`)."
         },
-        "on_abort": {
+        "on-abort": {
           "description": "Actio macro. Cancel-path teardown. A mapping of named jobs replaces the auto cancel-companion; an empty list (`[]`) opts out of any cancel job while the normal-path aggregator still runs.",
           "oneOf": [
             { "$ref": "#/definitions/finallyBranchGroup" },

@@ -13,7 +13,7 @@ import {
 import type { Pass } from "./registry.js";
 
 /**
- * The runtime output-writer primitive — the seam `for_each` reuses to emit a
+ * The runtime output-writer primitive — the seam `for-each` reuses to emit a
  * per-iteration writer under a distinct name. It holds no global state: it
  * writes whatever name it is handed.
  */
@@ -512,14 +512,14 @@ function hasNeedsCycle(jobs: Record<string, Job>): boolean {
  * the `needs` edges + `job.outputs` wiring that makes cross-job sharing work.
  *
  * TODO(share-foreach-integration): consume forEach's per-iteration share
- * contracts so a `for_each` producer fans its outputs into sibling jobs.
+ * contracts so a `for-each` producer fans its outputs into sibling jobs.
  */
 export function sharePass(ctx: ParseContext): void {
   const registry = new Map<string, Producer[]>();
 
   // Phase 1 — COLLECT producers and append their output writers.
   visitJobs(ctx, ({ id, job }) => {
-    if (job.for_each != null) return; // defensive: leave for_each jobs to that pass
+    if (job["for-each"] != null) return; // defensive: leave for-each jobs to that pass
     collectJob(ctx, id, job, registry);
   });
 

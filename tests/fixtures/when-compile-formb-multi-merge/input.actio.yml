@@ -14,9 +14,9 @@ jobs:
       - run: echo hi
         env:
           BASE: yes
-          static_if(params.first):
+          static-if(params.first):
             MODE: one
             SHARED: first
-          static_if(params.second):
+          static-if(params.second):
             SHARED: second
             EXTRA: true

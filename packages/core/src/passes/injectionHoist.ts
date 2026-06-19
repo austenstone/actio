@@ -76,7 +76,7 @@ function readModeKey(ctx: ParseContext, value: unknown, path: Path): HoistMode |
   pushDiagnostic(
     ctx,
     "warning",
-    `injectionHoist must be one of "fix" | "warn" | "error" | "off" (got ${
+    `injection-hoist must be one of "fix" | "warn" | "error" | "off" (got ${
       value === null ? "null" : typeof value
     }); using inherited mode`,
     path,
@@ -389,19 +389,19 @@ function processStep(
 export function injectionHoistPass(ctx: ParseContext): void {
   const root = ctx.data as Record<string, unknown>;
   const globalDefault: HoistMode = ctx.internal.injectionHoist ?? "fix";
-  const rootMode = readModeKey(ctx, root.injectionHoist, ["injectionHoist"]) ?? globalDefault;
-  delete root.injectionHoist;
+  const rootMode = readModeKey(ctx, root["injection-hoist"], ["injection-hoist"]) ?? globalDefault;
+  delete root["injection-hoist"];
 
   visitJobs(ctx, ({ id: jobId, job }) => {
     const jobMode =
-      readModeKey(ctx, job.injectionHoist, ["jobs", jobId, "injectionHoist"]) ?? rootMode;
-    delete job.injectionHoist;
+      readModeKey(ctx, job["injection-hoist"], ["jobs", jobId, "injection-hoist"]) ?? rootMode;
+    delete job["injection-hoist"];
 
     transformSteps(ctx, jobId, job, (step, idx) => {
       if (!isObject(step)) return [step];
       const path: Path = ["jobs", jobId, "steps", idx];
       const stepMode =
-        readModeKey(ctx, step.injectionHoist, [...path, "injectionHoist"]) ?? jobMode;
+        readModeKey(ctx, step["injection-hoist"], [...path, "injection-hoist"]) ?? jobMode;
       const unsafe = step.unsafe === true;
       const knobs: StepKnobs = {
         mode: unsafe ? "off" : stepMode,
@@ -410,7 +410,7 @@ export function injectionHoistPass(ctx: ParseContext): void {
       };
 
       // Strip the macro-only knobs so they never leak into emitted GitHub YAML.
-      delete step.injectionHoist;
+      delete step["injection-hoist"];
       delete step.unsafe;
       delete step.trust;
       delete step.force;
@@ -425,6 +425,6 @@ export const injectionHoist: Pass = {
   name: "injection-hoist",
   // TODO(injection-hoist-share-ordering): add "share" once #18 merges so we run
   // after the share macro's sanctioned `share.*` rewrites.
-  runsAfter: ["fragments", "retry", "fallback", "dynamic_matrix", "lifecycle"],
+  runsAfter: ["fragments", "retry", "fallback", "dynamic-matrix", "lifecycle"],
   apply: injectionHoistPass,
 };

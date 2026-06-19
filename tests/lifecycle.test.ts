@@ -71,7 +71,7 @@ jobs:
     steps:
       - run: ./d.sh
 finally:
-  on_failure:
+  on-failure:
     rollback:
       runs-on: ubuntu-latest
       when: ghost.failed
@@ -90,7 +90,7 @@ jobs:
     steps:
       - run: ./d.sh
 finally:
-  on_failure:
+  on-failure:
     rollback:
       runs-on: ubuntu-latest
       when: deploy.exploded
@@ -113,7 +113,7 @@ jobs:
     expectDiag(errors, "hook-not-step-list", /ensure must be a list of steps/);
   });
 
-  it("#6 step-level on_abort warns", () => {
+  it("#6 step-level on-abort warns", () => {
     const { warnings } = diag(`name: x
 on: [push]
 jobs:
@@ -121,10 +121,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: ./x.sh
-        on_abort:
+        on-abort:
           - run: ./cleanup.sh
 `);
-    expectDiag(warnings, "step-on-abort", /step-level on_abort only sees step cancellation/);
+    expectDiag(warnings, "step-on-abort", /step-level on-abort only sees step cancellation/);
   });
 
   it("#7 finally at job scope is an error suggesting ensure", () => {
@@ -202,7 +202,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: ./deploy.sh
-        on_failure:
+        on-failure:
           - run: ./rollback.sh
             ensure:
               - run: ./log.sh
@@ -212,7 +212,7 @@ jobs:
 });
 
 describe("lifecycle guards & job-scope branches", () => {
-  it("emits an outcome-keyed guard for a step-level on_success hook", () => {
+  it("emits an outcome-keyed guard for a step-level on-success hook", () => {
     const yaml = yamlOf(`name: x
 on: [push]
 jobs:
@@ -221,7 +221,7 @@ jobs:
     steps:
       - id: build
         run: ./build.sh
-        on_success:
+        on-success:
           - run: ./notify.sh
 `);
     expect(yaml).toContain("steps.build.outcome == 'success'");
@@ -236,11 +236,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: ./main.sh
-    on_success:
+    on-success:
       - run: ./ok.sh
-    on_failure:
+    on-failure:
       - run: ./bad.sh
-    on_abort:
+    on-abort:
       - run: ./cancel.sh
     ensure:
       - run: ./always.sh
@@ -288,7 +288,7 @@ jobs:
     steps:
       - run: ./d.sh
 finally:
-  on_failure:
+  on-failure:
     rollback:
       runs-on: ubuntu-latest
       when:
@@ -322,7 +322,7 @@ jobs:
     steps:
       - run: ./b.sh
 finally:
-  on_failure:
+  on-failure:
     - run: ./oops.sh
 `);
     expectDiag(errors, "finally-not-mapping", /finally must be a mapping/);
@@ -337,7 +337,7 @@ jobs:
     steps:
       - run: ./b.sh
 finally:
-  on_failure: ./oops.sh
+  on-failure: ./oops.sh
 `);
     expectDiag(errors, "finally-not-mapping", /finally must be a mapping/);
   });
@@ -351,7 +351,7 @@ jobs:
     steps:
       - run: ./b.sh
 finally:
-  on_failure:
+  on-failure:
     rollback: ./r.sh
 `);
     expectDiag(errors, "finally-not-mapping", /finally must be a mapping/);
@@ -366,7 +366,7 @@ jobs:
     steps:
       - run: ./b.sh
 finally:
-  on_failure:
+  on-failure:
     build:
       runs-on: ubuntu-latest
       steps:

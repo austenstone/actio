@@ -1,7 +1,7 @@
 name: Build and test
 on: [push]
 
-call_templates:
+call-templates:
   test:
     uses: ./.github/workflows/test_reusable.yml
     needs: build

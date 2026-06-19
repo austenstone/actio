@@ -3,13 +3,13 @@ on: [push, pull_request]
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if_changed: "services/api/**"
+    if-changed: "services/api/**"
     steps:
       - run: ./deploy.sh
   smoke:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    if_changed: "services/api/**"
+    if-changed: "services/api/**"
     steps:
       - run: ./smoke.sh
-        if_changed: "docs/**"
+        if-changed: "docs/**"

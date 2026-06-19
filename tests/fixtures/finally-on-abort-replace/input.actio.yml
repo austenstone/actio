@@ -12,7 +12,7 @@ finally:
     runs-on: ubuntu-latest
     steps:
       - run: ./cleanup.sh
-  on_abort:
+  on-abort:
     rollback:
       runs-on: ubuntu-latest
       steps:

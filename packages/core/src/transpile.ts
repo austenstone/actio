@@ -41,7 +41,7 @@ export interface TranspileOptions {
   nativeDependencies?: NativeDependencies;
   /**
    * Global default mode for the injection-hoist security pass. Per-block
-   * `injectionHoist:` knobs (root/job/step) override this. Default "fix".
+   * `injection-hoist:` knobs (root/job/step) override this. Default "fix".
    */
   injectionHoist?: "fix" | "warn" | "error" | "off";
 }

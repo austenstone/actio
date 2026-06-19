@@ -75,13 +75,13 @@ jobs:
 
 /**
  * Bug K — PARSER's KEY_ORDER fidelity must survive the passes that REBUILD the
- * jobs map (dynamic_matrix) or CLONE step sub-maps (retry/fallback). The plain
+ * jobs map (dynamic-matrix) or CLONE step sub-maps (retry/fallback). The plain
  * passthrough cases above only exercise a clean copy; once a pass reconstructs
  * or structuredClone()s a node the recorded order is dropped and emit falls back
  * to Object.keys, which hoists integer-like keys.
  */
 describe("passthrough: key order through pass rebuild/clone (Bug K)", () => {
-  it("preserves job key order when a dynamic_matrix job rebuilds the jobs map", () => {
+  it("preserves job key order when a dynamic-matrix job rebuilds the jobs map", () => {
     const source = `name: x
 on: push
 jobs:
@@ -91,7 +91,7 @@ jobs:
       - run: echo ten
   build:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       shell: bash
       script: echo hi
     steps:

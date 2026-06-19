@@ -18,14 +18,14 @@ describe("expression precedence in combined if:", () => {
   // When inputs.b is truthy the job runs even though the matrix guard is false
   // (e.g. an empty matrix). The user's `||` must be grouped so the guard applies
   // to the whole condition, exactly like the spaced form already is.
-  it("parenthesizes a spaceless || so the dynamic_matrix guard binds", () => {
+  it("parenthesizes a spaceless || so the dynamic-matrix guard binds", () => {
     const { doc, errors } = build(`name: x
 on: push
 jobs:
   build:
     runs-on: ubuntu-latest
     if: inputs.a||inputs.b
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["x"]'
     steps:
       - run: echo hi
@@ -82,17 +82,17 @@ jobs:
     expect(doc.jobs.build.steps[0].if).toBe(false);
   });
 
-  // Same drop via dynamic_matrix: the user's `if: false` vanishes and the job's
+  // Same drop via dynamic-matrix: the user's `if: false` vanishes and the job's
   // generated `if` is only the empty-matrix guard, so the disabled job runs
   // whenever the matrix is non-empty.
-  it("keeps a disabled (if: false) dynamic_matrix job from running", () => {
+  it("keeps a disabled (if: false) dynamic-matrix job from running", () => {
     const { doc, errors } = build(`name: x
 on: push
 jobs:
   build:
     runs-on: ubuntu-latest
     if: false
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["x"]'
     steps:
       - run: echo hi

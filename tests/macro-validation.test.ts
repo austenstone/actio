@@ -185,48 +185,48 @@ jobs:
   });
 });
 
-describe("dynamic_matrix validation", () => {
-  it("errors when dynamic_matrix is a scalar with a range", () => {
+describe("dynamic-matrix validation", () => {
+  it("errors when dynamic-matrix is a scalar with a range", () => {
     const { result, errors } = diag(`name: x
 on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix: ./list.sh
+    dynamic-matrix: ./list.sh
     steps:
       - run: echo hi
 `);
     expect(result.ok).toBe(false);
-    ranged(errors, /dynamic_matrix must be a mapping with a "script"/);
+    ranged(errors, /dynamic-matrix must be a mapping with a "script"/);
   });
 
-  it("warns on unknown dynamic_matrix keys", () => {
+  it("warns on unknown dynamic-matrix keys", () => {
     const { warnings } = diag(`name: x
 on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: ./list.sh
       strartegy: bogus
     steps:
       - run: echo hi
 `);
-    ranged(warnings, /dynamic_matrix has unknown key "strartegy"/);
+    ranged(warnings, /dynamic-matrix has unknown key "strartegy"/);
   });
 
-  it("errors when dynamic_matrix has no script", () => {
+  it("errors when dynamic-matrix has no script", () => {
     const { result, errors } = diag(`name: x
 on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       alias: shard
     steps:
       - run: echo hi
 `);
     expect(result.ok).toBe(false);
-    ranged(errors, /dynamic_matrix requires a "script" string/);
+    ranged(errors, /dynamic-matrix requires a "script" string/);
   });
 });

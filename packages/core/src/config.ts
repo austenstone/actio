@@ -36,7 +36,7 @@ export interface ActioConfig {
   target?: ActioTarget;
   /**
    * Global default mode for the injection-hoist security pass that defuses
-   * `${{ }}` script-injection in `run:` blocks. Per-block `injectionHoist:`
+   * `${{ }}` script-injection in `run:` blocks. Per-block `injection-hoist:`
    * knobs override this. Default "fix".
    */
   injectionHoist?: "fix" | "warn" | "error" | "off";

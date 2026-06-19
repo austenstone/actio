@@ -120,7 +120,7 @@ const checkRequiredConfig = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage("for-each-missing-required", `for_each requires "var" and "in"`),
+      diagnosticMessage("for-each-missing-required", `for-each requires "var" and "in"`),
       path,
     );
     return false;
@@ -138,7 +138,7 @@ const resolveInlineCompileSource = (ctx: ParseContext, input: string, path: Path
       "error",
       diagnosticMessage(
         "for-each-in-invalid",
-        `for_each "in" must be a list, object, params reference, or output expression`,
+        `for-each "in" must be a list, object, params reference, or output expression`,
       ),
       path,
     );
@@ -165,7 +165,7 @@ const resolveLoopSource = (
       "error",
       diagnosticMessage(
         "for-each-in-invalid",
-        `for_each "in" must be a list, object, params reference, or output expression`,
+        `for-each "in" must be a list, object, params reference, or output expression`,
       ),
       path,
     );
@@ -181,7 +181,7 @@ const resolveLoopSource = (
       "error",
       diagnosticMessage(
         "for-each-in-invalid",
-        `for_each "in" must be a list, object, params reference, or output expression`,
+        `for-each "in" must be a list, object, params reference, or output expression`,
       ),
       path,
     );
@@ -196,7 +196,7 @@ const resolveLoopSource = (
         "error",
         diagnosticMessage(
           "for-each-in-invalid",
-          `for_each "in" must be a list, object, params reference, or output expression`,
+          `for-each "in" must be a list, object, params reference, or output expression`,
         ),
         path,
       );
@@ -211,7 +211,7 @@ const resolveLoopSource = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage("for-each-in-scalar", `for_each "in" must be a list, not a scalar value`),
+      diagnosticMessage("for-each-in-scalar", `for-each "in" must be a list, not a scalar value`),
       path,
     );
     return undefined;
@@ -222,7 +222,7 @@ const resolveLoopSource = (
     "error",
     diagnosticMessage(
       "for-each-in-invalid",
-      `for_each "in" must be a list, object, params reference, or output expression`,
+      `for-each "in" must be a list, object, params reference, or output expression`,
     ),
     path,
   );
@@ -365,7 +365,7 @@ const bindingSymbols = (
   const indexValue = typeof matrixRef === "string" ? matrixRef : binding.index;
   return [
     matrixSymbol(varName, value),
-    matrixSymbol(`for_each.${varName}`, value),
+    matrixSymbol(`for-each.${varName}`, value),
     matrixSymbol("key", keyValue),
     matrixSymbol("index", indexValue),
   ];
@@ -412,7 +412,7 @@ const maybeWarnSerialOnlyKnob = (ctx: ParseContext, config: LoopConfig, path: Pa
       "warning",
       diagnosticMessage(
         "for-each-serial-option-ignored",
-        `"${key}" only applies to parallel for_each; ignoring`,
+        `"${key}" only applies to parallel for-each; ignoring`,
       ),
       [...path, key],
     );
@@ -453,22 +453,22 @@ const expandLoopInSteps = (
   for (let index = 0; index < steps.length; index++) {
     const step = steps[index];
     if (step === undefined) continue;
-    if (!isObject(step) || !Object.hasOwn(step, "for_each")) {
+    if (!isObject(step) || !Object.hasOwn(step, "for-each")) {
       out.push(step);
       continue;
     }
 
-    const config = normalizedConfig(step.for_each);
+    const config = normalizedConfig(step["for-each"]);
     if (!config) {
       pushDiagnostic(
         ctx,
         "error",
-        diagnosticMessage("for-each-shape", "for_each must be a mapping"),
-        [...path, index, "for_each"],
+        diagnosticMessage("for-each-shape", "for-each must be a mapping"),
+        [...path, index, "for-each"],
       );
       continue;
     }
-    if (!checkRequiredConfig(ctx, [...path, index, "for_each"], config)) continue;
+    if (!checkRequiredConfig(ctx, [...path, index, "for-each"], config)) continue;
     const varName = String(config.var).trim();
     if (scopeVars.includes(varName)) {
       pushDiagnostic(
@@ -476,9 +476,9 @@ const expandLoopInSteps = (
         "warning",
         diagnosticMessage(
           "for-each-shadow",
-          `loop variable "${varName}" shadows an outer for_each`,
+          `loop variable "${varName}" shadows an outer for-each`,
         ),
-        [...path, index, "for_each", "var"],
+        [...path, index, "for-each", "var"],
       );
     }
 
@@ -488,14 +488,14 @@ const expandLoopInSteps = (
         "error",
         diagnosticMessage(
           "for-each-step-parallel",
-          "parallel for_each must be job-level; a step block can only expand serially",
+          "parallel for-each must be job-level; a step block can only expand serially",
         ),
-        [...path, index, "for_each", "parallel"],
+        [...path, index, "for-each", "parallel"],
       );
       continue;
     }
 
-    const source = resolveLoopSource(ctx, config.in, [...path, index, "for_each", "in"]);
+    const source = resolveLoopSource(ctx, config.in, [...path, index, "for-each", "in"]);
     if (!source) continue;
     if (source.kind === "runtime-expr" || source.kind === "generator") {
       // A whole-job runtime loop (the job's only step) is auto-rewritten upstream
@@ -510,14 +510,14 @@ const expandLoopInSteps = (
         "error",
         diagnosticMessage(
           "for-each-step-runtime-partial",
-          "for_each over a runtime list can auto-expand only when it is the job's sole step (it becomes a native matrix job). This job has a non-looped neighbor (e.g. checkout/install) or a nested loop — move the non-looped steps to their own job, or make the whole job the loop, or use a compile-time list",
+          "for-each over a runtime list can auto-expand only when it is the job's sole step (it becomes a native matrix job). This job has a non-looped neighbor (e.g. checkout/install) or a nested loop — move the non-looped steps to their own job, or make the whole job the loop, or use a compile-time list",
         ),
-        [...path, index, "for_each", "in"],
+        [...path, index, "for-each", "in"],
       );
       continue;
     }
 
-    maybeWarnSerialOnlyKnob(ctx, config, [...path, index, "for_each"]);
+    maybeWarnSerialOnlyKnob(ctx, config, [...path, index, "for-each"]);
 
     const rawBody = collectBodySteps(step);
     if (hasInject(rawBody)) {
@@ -539,9 +539,9 @@ const expandLoopInSteps = (
         "warning",
         diagnosticMessage(
           "for-each-empty-literal",
-          `for_each "in" is empty; the loop expands to nothing`,
+          `for-each "in" is empty; the loop expands to nothing`,
         ),
-        [...path, index, "for_each", "in"],
+        [...path, index, "for-each", "in"],
       );
       continue;
     }
@@ -550,7 +550,7 @@ const expandLoopInSteps = (
       source.kind === "static-object" &&
       !validateObjectFields(
         ctx,
-        [...path, index, "for_each", "in"],
+        [...path, index, "for-each", "in"],
         varName,
         rawBody,
         source.values,
@@ -658,7 +658,7 @@ const buildSerialSiblingJobs = (
       "warning",
       diagnosticMessage(
         "for-each-empty-literal",
-        `for_each "in" is empty; the loop expands to nothing`,
+        `for-each "in" is empty; the loop expands to nothing`,
       ),
       [...path, "in"],
     );
@@ -679,7 +679,7 @@ const buildSerialSiblingJobs = (
         "error",
         diagnosticMessage(
           "for-each-job-id-collision",
-          `for_each generates duplicate job id "${siblingId}"`,
+          `for-each generates duplicate job id "${siblingId}"`,
         ),
         path,
       );
@@ -688,7 +688,7 @@ const buildSerialSiblingJobs = (
     seenIds.add(siblingId);
 
     const sibling = cloneNode(ctx, job);
-    delete sibling.for_each;
+    delete sibling["for-each"];
     sibling.needs = previousId ? [previousId] : originalNeeds;
 
     const symbols = bindingSymbols(loopVar, binding);
@@ -783,7 +783,7 @@ const warnCoexistKnobsIgnored = (ctx: ParseContext, config: LoopConfig, path: Pa
       "warning",
       diagnosticMessage(
         "for-each-loop-knob-ignored-coexist",
-        `"${key}" can't target a for_each that multiplies a job with its own strategy.matrix (variants become separate jobs); ignoring`,
+        `"${key}" can't target a for-each that multiplies a job with its own strategy.matrix (variants become separate jobs); ignoring`,
       ),
       [...path, key],
     );
@@ -791,7 +791,7 @@ const warnCoexistKnobsIgnored = (ctx: ParseContext, config: LoopConfig, path: Pa
 };
 
 /**
- * Issue #79: a parallel job-level `for_each` on a job that ALSO has an
+ * Issue #79: a parallel job-level `for-each` on a job that ALSO has an
  * author-written `strategy.matrix`. Rather than folding the variant into that
  * matrix (one combined job, one status check), clone the job once per variant
  * so each keeps its full matrix — producing N separate jobs / status checks,
@@ -820,7 +820,7 @@ const buildParallelVariantJobs = (
       "error",
       diagnosticMessage(
         "for-each-matrix-key-collision",
-        `for_each variable "${name}" reuses strategy.matrix key "${name}"; rename the loop with "as:" so the variant and the matrix axis stay distinct`,
+        `for-each variable "${name}" reuses strategy.matrix key "${name}"; rename the loop with "as:" so the variant and the matrix axis stay distinct`,
       ),
       path,
     );
@@ -834,7 +834,7 @@ const buildParallelVariantJobs = (
       "warning",
       diagnosticMessage(
         "for-each-empty-literal",
-        `for_each "in" is empty; the loop expands to nothing`,
+        `for-each "in" is empty; the loop expands to nothing`,
       ),
       [...path, "in"],
     );
@@ -854,7 +854,7 @@ const buildParallelVariantJobs = (
         "error",
         diagnosticMessage(
           "for-each-job-id-collision",
-          `for_each generates duplicate job id "${siblingId}"`,
+          `for-each generates duplicate job id "${siblingId}"`,
         ),
         path,
       );
@@ -863,7 +863,7 @@ const buildParallelVariantJobs = (
     seenIds.add(siblingId);
 
     const sibling = cloneNode(ctx, job);
-    delete sibling.for_each;
+    delete sibling["for-each"];
 
     const symbols = bindingSymbols(loopVar, binding);
     withScopedSymbols(ctx, symbols, () => {
@@ -894,7 +894,7 @@ const applyParallelMatrixLoop = (
   source: LoopSourceStaticScalar | LoopSourceStaticObject,
   loopVar: string,
 ): void => {
-  delete job.for_each;
+  delete job["for-each"];
   const asName = normalizeAs(config.as, loopVar);
   const strategy = isObject(job.strategy) ? { ...job.strategy } : {};
   const matrix = isObject(strategy.matrix) ? { ...strategy.matrix } : {};
@@ -914,13 +914,13 @@ const applyParallelMatrixLoop = (
     source.kind === "static-scalar"
       ? [
           matrixSymbol(loopVar, `\${{ matrix.${asName} }}`),
-          matrixSymbol(`for_each.${loopVar}`, `\${{ matrix.${asName} }}`),
+          matrixSymbol(`for-each.${loopVar}`, `\${{ matrix.${asName} }}`),
           matrixSymbol("index", `\${{ matrix.${asName} }}`),
           matrixSymbol("key", `\${{ matrix.${asName} }}`),
         ]
       : [
           matrixSymbol(loopVar, matrixSymbolObjectFromInclude(source.values)),
-          matrixSymbol(`for_each.${loopVar}`, matrixSymbolObjectFromInclude(source.values)),
+          matrixSymbol(`for-each.${loopVar}`, matrixSymbolObjectFromInclude(source.values)),
           matrixSymbol("index", `\${{ matrix.${asName} }}`),
           matrixSymbol("key", `\${{ matrix.${asName} }}`),
         ];
@@ -952,14 +952,14 @@ const applyDynamicDelegation = (
       "error",
       diagnosticMessage(
         "E-share-in-dynamic-loop",
-        "share: inside a runtime-list for_each can't emit per-iteration outputs (matrix outputs are last-leg-wins); make the list static or await v2 artifact fan-in",
+        "share: inside a runtime-list for-each can't emit per-iteration outputs (matrix outputs are last-leg-wins); make the list static or await v2 artifact fan-in",
       ),
       path,
     );
     return;
   }
 
-  delete job.for_each;
+  delete job["for-each"];
   const asName = normalizeAs(config.as, loopVar);
   const failFast = normalizeFailFast(config);
   const dynamicBlock: Record<string, unknown> =
@@ -970,7 +970,7 @@ const applyDynamicDelegation = (
           "fail-fast": failFast ?? false,
           script: `echo '${source.expression}'`,
         };
-  job.dynamic_matrix = dynamicBlock;
+  job["dynamic-matrix"] = dynamicBlock;
 
   const strategy = isObject(job.strategy) ? { ...job.strategy } : {};
   const maxParallel = normalizeMaxParallel(config);
@@ -985,30 +985,30 @@ const processJobLoop = (
   jobId: string,
   job: Job,
 ): Record<string, Job> | undefined => {
-  const config = normalizedConfig(job.for_each);
+  const config = normalizedConfig(job["for-each"]);
   if (!config) {
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage("for-each-shape", "for_each must be a mapping"),
-      ["jobs", jobId, "for_each"],
+      diagnosticMessage("for-each-shape", "for-each must be a mapping"),
+      ["jobs", jobId, "for-each"],
     );
     return { [jobId]: job };
   }
-  if (!checkRequiredConfig(ctx, ["jobs", jobId, "for_each"], config)) return { [jobId]: job };
+  if (!checkRequiredConfig(ctx, ["jobs", jobId, "for-each"], config)) return { [jobId]: job };
   const loopVar = String(config.var).trim();
-  const source = resolveLoopSource(ctx, config.in, ["jobs", jobId, "for_each", "in"]);
+  const source = resolveLoopSource(ctx, config.in, ["jobs", jobId, "for-each", "in"]);
   if (!source) return { [jobId]: job };
 
-  if (job.dynamic_matrix != null) {
+  if (job["dynamic-matrix"] != null) {
     pushDiagnostic(
       ctx,
       "error",
       diagnosticMessage(
         "for-each-dynamic-matrix-collision",
-        "job already defines a matrix; remove dynamic_matrix or for_each",
+        "job already defines a matrix; remove dynamic-matrix or for-each",
       ),
-      ["jobs", jobId, "for_each"],
+      ["jobs", jobId, "for-each"],
     );
     return { [jobId]: job };
   }
@@ -1023,19 +1023,19 @@ const processJobLoop = (
           "for-each-serial-job-source",
           "serial job fan-out needs a scalar literal list (can't derive job ids)",
         ),
-        ["jobs", jobId, "for_each", "in"],
+        ["jobs", jobId, "for-each", "in"],
       );
       return { [jobId]: job };
     }
     return buildSerialSiblingJobs(ctx, jobId, job, config, source, loopVar, [
       "jobs",
       jobId,
-      "for_each",
+      "for-each",
     ]);
   }
 
   if (source.kind === "runtime-expr" || source.kind === "generator") {
-    applyDynamicDelegation(ctx, jobId, job, config, source, loopVar, ["jobs", jobId, "for_each"]);
+    applyDynamicDelegation(ctx, jobId, job, config, source, loopVar, ["jobs", jobId, "for-each"]);
     return { [jobId]: job };
   }
 
@@ -1045,9 +1045,9 @@ const processJobLoop = (
       "error",
       diagnosticMessage(
         "for-each-job-step-list",
-        `for_each "in" must be a scalar/object list at job scope`,
+        `for-each "in" must be a scalar/object list at job scope`,
       ),
-      ["jobs", jobId, "for_each", "in"],
+      ["jobs", jobId, "for-each", "in"],
     );
     return { [jobId]: job };
   }
@@ -1058,17 +1058,17 @@ const processJobLoop = (
       "error",
       diagnosticMessage(
         "for-each-empty-parallel",
-        `for_each "in" is empty; parallel literal loops would emit an invalid empty matrix`,
+        `for-each "in" is empty; parallel literal loops would emit an invalid empty matrix`,
       ),
-      ["jobs", jobId, "for_each", "in"],
+      ["jobs", jobId, "for-each", "in"],
     );
-    delete job.for_each;
+    delete job["for-each"];
     return { [jobId]: job };
   }
 
   if (
     source.kind === "static-object" &&
-    !validateObjectFields(ctx, ["jobs", jobId, "for_each", "in"], loopVar, job, source.values)
+    !validateObjectFields(ctx, ["jobs", jobId, "for-each", "in"], loopVar, job, source.values)
   ) {
     return { [jobId]: job };
   }
@@ -1079,7 +1079,7 @@ const processJobLoop = (
     return buildParallelVariantJobs(ctx, jobId, job, config, source, loopVar, [
       "jobs",
       jobId,
-      "for_each",
+      "for-each",
     ]);
   }
 
@@ -1089,10 +1089,10 @@ const processJobLoop = (
 
 /**
  * Case A (issue #50): a job whose entire body is exactly one runtime/generator
- * `for_each` step has a safe native target — a matrix job that is semantically
+ * `for-each` step has a safe native target — a matrix job that is semantically
  * identical to a job-level runtime loop (one job, every iteration a full job
  * run). Detect that shape and reuse the proven job-level dynamic-delegation path
- * (`applyDynamicDelegation` -> the `dynamic_matrix` pass) instead of failing
+ * (`applyDynamicDelegation` -> the `dynamic-matrix` pass) instead of failing
  * loud. Returns `true` when this owns the job (rewrote it OR raised a fail-loud
  * diagnostic); `false` to let the normal serial step-loop expansion proceed.
  *
@@ -1108,9 +1108,9 @@ const tryRewriteWholeJobRuntimeLoop = (ctx: ParseContext, jobId: string, job: Jo
   const steps = job.steps;
   if (!Array.isArray(steps) || steps.length !== 1) return false;
   const step = steps[0];
-  if (!isObject(step) || !Object.hasOwn(step, "for_each")) return false;
+  if (!isObject(step) || !Object.hasOwn(step, "for-each")) return false;
 
-  const config = normalizedConfig(step.for_each);
+  const config = normalizedConfig(step["for-each"]);
   if (!config) return false; // shape error: let expandLoopInSteps own the diagnostic.
 
   const inValue = config.in;
@@ -1120,19 +1120,19 @@ const tryRewriteWholeJobRuntimeLoop = (ctx: ParseContext, jobId: string, job: Jo
   if (!cheapIsRuntime) return false; // static/invalid: expandLoopInSteps is the authority.
 
   // From here we OWN the job: every path either rewrites it or fails loud.
-  const forEachPath: Path = ["jobs", jobId, "steps", 0, "for_each"];
+  const forEachPath: Path = ["jobs", jobId, "steps", 0, "for-each"];
   if (!checkRequiredConfig(ctx, forEachPath, config)) return true;
   const varName = String(config.var).trim();
 
   const hasMatrix =
     isObject(job.strategy) && (job.strategy as Record<string, unknown>).matrix != null;
-  if (hasMatrix || job.dynamic_matrix != null) {
+  if (hasMatrix || job["dynamic-matrix"] != null) {
     pushDiagnostic(
       ctx,
       "error",
       diagnosticMessage(
         "for-each-dynamic-matrix-collision",
-        "job already defines a matrix; a runtime step loop can't add a second one — remove the existing strategy.matrix/dynamic_matrix or lift the loop to its own job",
+        "job already defines a matrix; a runtime step loop can't add a second one — remove the existing strategy.matrix/dynamic-matrix or lift the loop to its own job",
       ),
       forEachPath,
     );
@@ -1146,7 +1146,7 @@ const tryRewriteWholeJobRuntimeLoop = (ctx: ParseContext, jobId: string, job: Jo
       "error",
       diagnosticMessage(
         "for-each-step-runtime",
-        "for_each over a runtime list must run as a parallel matrix; a serial (parallel: false) step loop needs a compile-time list",
+        "for-each over a runtime list must run as a parallel matrix; a serial (parallel: false) step loop needs a compile-time list",
       ),
       [...forEachPath, "parallel"],
     );
@@ -1167,7 +1167,7 @@ const tryRewriteWholeJobRuntimeLoop = (ctx: ParseContext, jobId: string, job: Jo
   job.steps = collectBodySteps(step).filter(isStepRecord) as Step[];
   const symbols = [
     matrixSymbol(varName, matrixRef),
-    matrixSymbol(`for_each.${varName}`, matrixRef),
+    matrixSymbol(`for-each.${varName}`, matrixRef),
     matrixSymbol("index", matrixRef),
     matrixSymbol("key", matrixRef),
   ];
@@ -1180,9 +1180,9 @@ const tryRewriteWholeJobRuntimeLoop = (ctx: ParseContext, jobId: string, job: Jo
   if (Array.isArray(job.steps)) {
     job.steps = expandLoopInSteps(ctx, jobId, job.steps, ["jobs", jobId, "steps"], [varName]);
   }
-  // Reuse the job-level delegation verbatim: it sets `job.dynamic_matrix` and
+  // Reuse the job-level delegation verbatim: it sets `job.dynamic-matrix` and
   // guards `share:` producers (Case E -> `E-share-in-dynamic-loop`). The later
-  // `dynamic_matrix` pass builds the setup job, `fromJSON` matrix, empty-list
+  // `dynamic-matrix` pass builds the setup job, `fromJSON` matrix, empty-list
   // guard, and fail-fast default.
   applyDynamicDelegation(ctx, jobId, job, config, source, varName, forEachPath);
   return true;
@@ -1214,7 +1214,7 @@ export const forEachPass = (ctx: ParseContext): void => {
       continue;
     }
     const job = raw as Job;
-    const transformed = Object.hasOwn(job, "for_each")
+    const transformed = Object.hasOwn(job, "for-each")
       ? processJobLoop(ctx, jobId, job)
       : { [jobId]: job };
     if (!transformed) continue;
@@ -1234,7 +1234,7 @@ export const forEachPass = (ctx: ParseContext): void => {
 
 // TODO(share-foreach-integration): #18 consumes ctx.internal.forEachShareContracts in the joint seam.
 export const forEach: Pass = {
-  name: "for_each",
-  runsAfter: ["params", "job_defaults"],
+  name: "for-each",
+  runsAfter: ["params", "job-defaults"],
   apply: forEachPass,
 };

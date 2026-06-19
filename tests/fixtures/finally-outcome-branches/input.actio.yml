@@ -8,17 +8,17 @@ jobs:
       - run: ./deploy.sh
 
 finally:
-  on_success:
+  on-success:
     notify-success:
       runs-on: ubuntu-latest
       steps:
         - run: ./notify-ok.sh
-  on_failure:
+  on-failure:
     notify-failure:
       runs-on: ubuntu-latest
       steps:
         - run: ./page-oncall.sh
-  on_abort:
+  on-abort:
     notify-abort:
       runs-on: ubuntu-latest
       steps:

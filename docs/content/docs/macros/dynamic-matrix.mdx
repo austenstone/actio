@@ -1,5 +1,5 @@
 ---
-title: dynamic_matrix
+title: dynamic-matrix
 description: The headline feature — generate a matrix at runtime from a script.
 ---
 
@@ -10,7 +10,7 @@ The headline feature. A job-level block whose `script` prints a JSON array (or
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["1", "2", "3"]'
       alias: shard
     steps:
@@ -67,7 +67,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    dynamic_matrix:
+    dynamic-matrix:
       mode: include
       script: |
         gh pr list --state open \
@@ -119,7 +119,7 @@ default when no `alias` is set; set `mode: include` to make it explicit).
 jobs:
   test:
     runs-on: ${{ matrix.runs-on }}
-    dynamic_matrix:
+    dynamic-matrix:
       mode: include
       script: ./scripts/plan-shards.sh
     steps:
@@ -150,7 +150,7 @@ one job definition, heterogeneous runners. The `include` array passes straight i
 
 Reference per-item attributes ergonomically with `runs-on: ${{ matrix.runs-on }}` on
 the job. Actio notices the job's own `runs-on` is a matrix expression and keeps the
-generated **setup** job on a real runner (`runs-on` from `dynamic_matrix.runs-on`,
+generated **setup** job on a real runner (`runs-on` from `dynamic-matrix.runs-on`,
 else `ubuntu-latest`) so it doesn't inherit the empty expression.
 
 <Callout type="warn">
@@ -164,7 +164,7 @@ else `ubuntu-latest`) so it doesn't inherit the empty expression.
 A generated matrix still fans out **one job definition with a shared `steps:`** — you
 can't print a different step list per item. Heterogeneity is limited to per-item
 *attributes* (`runs-on`, `env`, `container`, inputs), not a different step graph per
-entry. Use [`for_each`](/docs/syntax#for_each) or separate jobs if you need
+entry. Use [`for-each`](/docs/syntax#for-each) or separate jobs if you need
 structurally different work.
 
 Matrix is also capped at
@@ -176,7 +176,7 @@ Matrix is also capped at
 scripts skip the auto-checkout (set `checkout: true` if yours reads the repo):
 
 ```yaml title=".actio.yml"
-dynamic_matrix:
+dynamic-matrix:
   alias: pkg
   checkout: true
   script: |

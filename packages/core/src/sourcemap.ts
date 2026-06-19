@@ -98,7 +98,7 @@ function pathsEqual(a: Path, b: Path): boolean {
  * source that happens to sit at its new path:
  *  1. Exact origin — a job/step/fragment the IR seeded. Authoritative even after
  *     a pass relocated it (fragment-injected / retry-fanned steps, the
- *     `dynamic_matrix` setup job).
+ *     `dynamic-matrix` setup job).
  *  2. Descendant of an origin-bearing node — scalar leaves (`uses`/`run`) and
  *     un-origined objects. Resolve against the nearest origin ancestor: if that
  *     ancestor stayed put, the generated path is also the source path; if it
