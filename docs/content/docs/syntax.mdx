@@ -1,6 +1,6 @@
 ---
 title: Syntax reference
-description: Every .actio.yml macro keyword — scope, type, and what it compiles to.
+description: Every .actio.yml macro keyword — scope, type, options, and what it compiles to.
 ---
 
 Actio is a strict **superset** of GitHub Actions workflow syntax. Every standard
@@ -9,24 +9,39 @@ key, event, and value works exactly as it does in a normal workflow — see GitH
 for those. A macro-free `.actio.yml` file *is* a normal workflow.
 
 This page is the dictionary for the keywords Actio **adds**. Each entry lists where
-the keyword is valid, its type, a minimal example, and what `actio build` compiles
-it into. Every macro is stripped or expanded at compile time — none survive in the
-generated `.yml`.
+the keyword is valid, its type, its options, a minimal example, and what `actio build`
+compiles it into. Every macro is stripped or expanded at compile time — none survive
+in the generated `.yml`.
 
-## Where each keyword is valid
+## Quick reference
 
-| Keyword | Scope | Compiles to |
-|---|---|---|
-| [`params`](#params) | workflow | stripped; `{{ params.* }}` tokens resolved |
-| [`fragments`](#fragments) | workflow | stripped; `inject` expanded in place |
-| [`job_defaults`](#job_defaults) | workflow | stripped; merged into every job |
-| [`executors`](#executors) | workflow | stripped; referenced via `executor` |
-| [`executor`](#executor) | job | stripped; preset merged into the job |
-| [`dynamic_matrix`](#dynamic_matrix) | job | setup job + matrix wiring |
-| [`static_if`](#static_if) | job, step | node kept or omitted at compile time |
-| [`inject`](#inject) | step | replaced by the fragment's steps |
-| [`retry`](#retry) | step | chain of conditional attempts |
-| [`fallback`](#fallback) | job, step | try/catch wiring |
+Jump to any keyword. **Scope** is where it may appear; **Compiles to** is what `actio
+build` leaves behind.
+
+| Keyword | Scope | Type | Compiles to |
+|---|---|---|---|
+| [`params`](#params) | workflow | map of param defs | stripped; `{{ params.* }}` resolved |
+| [`fragments`](#fragments) | workflow | map of step lists | stripped; `inject` expanded in place |
+| [`job_defaults`](#job_defaults) | workflow | map of job keys | stripped; merged into every job |
+| [`executors`](#executors) | workflow | map of presets | stripped; referenced via `executor` |
+| [`injectionHoist`](#injectionhoist) | workflow, job, step | enum | stripped; controls `${{ }}` hoisting in `run:` |
+| [`finally`](#finally) | workflow | map | stripped; teardown jobs with `needs` + guards |
+| [`executor`](#executor) | job | string or list | stripped; preset merged into the job |
+| [`dynamic_matrix`](#dynamic_matrix) | job | map | setup job + matrix wiring |
+| [`static_if`](#static_if) | job, step | string (bare expr) | node kept or omitted at compile time |
+| [`static_if(<expr>)`](#static_if-merge) | job, step | keyed map | merged into parent when true |
+| [`inject`](#inject) | step | string | replaced by the fragment's steps |
+| [`for_each`](#for_each) | step | map | expanded into repeated steps (or a matrix) |
+| [`retry`](#retry) | step | integer or map | chain of conditional attempts |
+| [`share`](#share) | step | map of outputs | `job.outputs` + `needs` wiring |
+| [`fallback`](#fallback) | job, step | list or map | try/catch wiring |
+| [`unsafe`](#unsafe) | step | boolean | stripped; step left un-hoisted |
+| [`trust`](#trust) | step | list of paths | stripped; listed paths left inline |
+| [`force`](#force) | step | list of paths | stripped; listed paths hoisted to `env` |
+| [`ensure`](#ensure) | job, step | list of steps | guarded steps (`if: always()`) |
+| [`on_success`](#on_success) | job, step | list of steps | guarded steps (`success()`) |
+| [`on_failure`](#on_failure) | job, step | list of steps | guarded steps (`failure()` / outcome) |
+| [`on_abort`](#on_abort) | job, step | list of steps | guarded steps (`cancelled()`) |
 
 ## Interpolation tokens
 
@@ -47,47 +62,68 @@ Actio distinguishes compile-time from runtime expansion by the brace style:
 
 ## Workflow keys
 
-### params
+{/* macro:params */}
+### `params` [#params]
 
-> Typed compile-time parameters. References are resolved with `{{ params.<name> }}`
-> or `{{ toJSON(params.<name>) }}` and stripped from emitted workflow YAML.
+Typed compile-time parameters. References resolve with `{{ params.<name> }}` (or
+`{{ toJSON(params.<name>) }}`) and are stripped from the emitted workflow YAML.
 
-- **Scope:** top-level
-- **Type:** map of name → param definition (`type`, plus `values`/`default`)
+- **Valid in:** top level
+- **Type:** map of name → param definition
+- **Compiles to:** nothing; every `{{ params.* }}` token is replaced with its value
 
-```yaml title=".actio.yml"
-params:
-  env:
-    type: enum
-    values: [dev, staging, prod]
-    default: staging
-  retries:
-    type: number
-    default: 3
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "env={{ params.env }} retries={{ params.retries }}"
-```
+<TypeTable
+  type={{
+    type: { type: 'string', description: 'Param kind: string, number, boolean, enum, object, stepList, or steps.', required: true },
+    values: { type: 'string[]', description: 'Allowed values. Required when type is enum.' },
+    default: { type: 'any', description: 'Value used when the param is not supplied at build time.' },
+  }}
+/>
 
-```yaml title="generated .yml"
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "env=staging retries=3"
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
+
+  ```yaml
+  params:
+    env:
+      type: enum
+      values: [dev, staging, prod]
+      default: staging
+    retries:
+      type: number
+      default: 3
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo "env={{ params.env }} retries={{ params.retries }}"
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo "env=staging retries=3"
+  ```
+
+  </Tab>
+</Tabs>
 
 Full guide: [params](/docs/macros/params).
 
-### fragments
+{/* macro:fragments */}
+### `fragments` [#fragments]
 
-> Reusable, named lists of steps. Splice a fragment into a job with
-> `- inject: <name>`. The `fragments` key is stripped from the generated workflow.
+Reusable, named lists of steps. Splice a fragment into a job with `- inject: <name>`.
+The `fragments` key is stripped from the generated workflow.
 
-- **Scope:** top-level
+- **Valid in:** top level
 - **Type:** map of name → list of steps
+- **Compiles to:** nothing; each `inject` is replaced in place with the fragment's steps
 
 ```yaml title=".actio.yml"
 fragments:
@@ -104,37 +140,65 @@ jobs:
 
 See [`inject`](#inject) for the call site. Full guide: [fragments + inject](/docs/macros/fragments).
 
-### job_defaults
+{/* macro:job_defaults */}
+### `job_defaults` [#job_defaults]
 
-> Default job-level settings merged into every job at compile time. Stripped from
-> generated workflow YAML.
+Default job-level settings merged into every job at compile time. Stripped from the
+generated workflow YAML.
 
-- **Scope:** top-level
-- **Type:** map of job-level keys (`runs-on`, `env`, `timeout-minutes`, `if`, …)
+- **Valid in:** top level
+- **Type:** map of job-level keys
+- **Compiles to:** nothing; each key is merged into every job per the rules below
+
+<TypeTable
+  type={{
+    if: { type: 'string', description: 'AND-combined with each job if condition.' },
+    permissions: { type: 'map', description: 'Replaces the job permissions when the job omits its own.' },
+    concurrency: { type: 'map', description: 'Replaces job concurrency on presence.' },
+    strategy: { type: 'map', description: 'Replaces job strategy on presence.' },
+    'continue-on-error': { type: 'boolean', description: 'Inline job value wins when set.' },
+    environment: { type: 'string | map', description: 'Inline job value wins when set.' },
+    'timeout-minutes': { type: 'number', description: 'Inline job value wins when set.' },
+    'runs-on': { type: 'string | string[]', description: 'Inline job value wins when set.' },
+    env: { type: 'map', description: 'Deep-merged with job env.' },
+    container: { type: 'string | map', description: 'Deep-merged with job container.' },
+    services: { type: 'map', description: 'Deep-merged with job services.' },
+    defaults: { type: 'map', description: 'Deep-merged with job defaults.' },
+  }}
+/>
 
 Merge semantics vary by key: `if` is **AND-combined** (`default && inline`);
 `permissions`/`concurrency`/`strategy` **replace on presence**; `runs-on`,
 `timeout-minutes`, `continue-on-error`, `environment` are **inline-wins**; `env`,
 `container`, `services`, `defaults` are **deep-merged**.
 
-```yaml title=".actio.yml"
-job_defaults:
-  runs-on: ubuntu-latest
-  timeout-minutes: 30
-jobs:
-  test:
-    steps:
-      - run: npm test
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
 
-```yaml title="generated .yml"
-jobs:
-  test:
+  ```yaml
+  job_defaults:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    steps:
-      - run: npm test
-```
+  jobs:
+    test:
+      steps:
+        - run: npm test
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+      timeout-minutes: 30
+      steps:
+        - run: npm test
+  ```
+
+  </Tab>
+</Tabs>
 
 <Callout title="Reusable-workflow call jobs">
   Jobs with `uses:` only receive the call-compatible subset: `if`, `permissions`,
@@ -144,13 +208,28 @@ jobs:
 
 Full guide: [job_defaults](/docs/macros/job-defaults).
 
-### executors
+{/* macro:executors */}
+### `executors` [#executors]
 
-> Named runner/container/service presets referenced by `jobs.<id>.executor`.
-> Stripped from generated workflow YAML.
+Named runner/container/service presets referenced by `jobs.<id>.executor`. Stripped
+from the generated workflow YAML.
 
-- **Scope:** top-level
-- **Type:** map of name → executor definition (job runner keys)
+- **Valid in:** top level
+- **Type:** map of name → executor definition
+- **Compiles to:** nothing; the referenced preset is merged into each job that names it
+
+<TypeTable
+  type={{
+    'runs-on': { type: 'string | string[]', description: 'Runner label(s) for jobs using this executor.' },
+    'timeout-minutes': { type: 'number', description: 'Default job timeout.' },
+    permissions: { type: 'map', description: 'Default GITHUB_TOKEN permissions.' },
+    concurrency: { type: 'map', description: 'Default concurrency group.' },
+    defaults: { type: 'map', description: 'Default run settings such as shell and working-directory.' },
+    container: { type: 'string | map', description: 'Default job container.' },
+    services: { type: 'map', description: 'Default service containers.' },
+    env: { type: 'map', description: 'Default job-level env.' },
+  }}
+/>
 
 ```yaml title=".actio.yml"
 executors:
@@ -166,18 +245,91 @@ jobs:
 
 See [`executor`](#executor) for the call site. Full guide: [executors](/docs/macros/job-defaults#executors).
 
+{/* macro:injectionHoist */}
+### `injectionHoist` [#injectionhoist]
+
+Controls how Actio handles `${{ }}` interpolation inside `run:` bodies — the script-
+injection mitigation that hoists untrusted context values into `env:` and rewrites the
+script to reference them. Set it at the workflow, job, or step level; the narrowest
+scope wins.
+
+- **Valid in:** top level, `jobs.<job_id>`, `jobs.<job_id>.steps[*]`
+- **Type:** string enum
+- **Compiles to:** nothing; it only changes how `run:` bodies are rewritten
+
+| Mode | Behavior |
+|---|---|
+| `fix` | Hoist untrusted `${{ }}` values into `env` and rewrite the `run` body. **Default.** |
+| `warn` | Leave the value inline, emit a build warning. |
+| `error` | Fail the build when an untrusted value is found. |
+| `off` | Disable hoisting entirely. |
+
+```yaml title=".actio.yml"
+injectionHoist: error
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ github.event.issue.title }}"
+```
+
+Per-step overrides live in [`unsafe`](#unsafe), [`trust`](#trust), and [`force`](#force).
+Full guide: [injection-hoist](/docs/macros/injection-hoist).
+
+{/* macro:finally */}
+### `finally` [#finally]
+
+Workflow-level teardown. Declares jobs that run after the rest of the workflow,
+gated on overall outcome. Actio injects `needs:` over all real jobs and the matching
+outcome guard at compile time.
+
+- **Valid in:** top level
+- **Type:** map of outcome branch groups (`on_success`/`on_failure`/`on_abort`), each
+  containing named teardown jobs; named jobs may also be declared directly with the
+  `when:` sugar
+- **Compiles to:** ordinary jobs with `needs` + an `if:` outcome guard
+
+<TypeTable
+  type={{
+    on_success: { type: 'job map', description: 'Teardown jobs that run only when the workflow succeeded.' },
+    on_failure: { type: 'job map', description: 'Teardown jobs that run only when the workflow failed.' },
+    on_abort: { type: 'job map', description: 'Teardown jobs that run only when the workflow was cancelled.' },
+  }}
+/>
+
+```yaml title=".actio.yml"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+finally:
+  on_failure:
+    page:
+      runs-on: ubuntu-latest
+      steps:
+        - run: ./page-oncall.sh
+```
+
+<Callout title="when: sugar">
+  A teardown job declared directly under `finally:` may use `when:` to gate on another
+  job's result (e.g. `when: deploy.failed`) instead of an outcome branch group.
+</Callout>
+
 ---
 
 ## Job keys
 
-### executor
+{/* macro:executor */}
+### `jobs.<job_id>.executor` [#executor]
 
-> Name (or ordered list of names) from top-level `executors:`. Expanded during
-> compile and stripped from output.
+Name (or ordered list of names) from top-level `executors:`. Expanded during compile
+and stripped from output.
 
-- **Scope:** `jobs.<job_id>`
+- **Valid in:** `jobs.<job_id>`
 - **Type:** string, or list of strings (composed left-to-right; later entries win;
   inline job keys always win)
+- **Compiles to:** nothing; the preset is merged into the job
 
 ```yaml title=".actio.yml"
 jobs:
@@ -187,16 +339,31 @@ jobs:
       - run: ./build.sh
 ```
 
-### dynamic_matrix
+Full guide: [executors](/docs/macros/job-defaults#executors).
 
-> Generate a job's `strategy.matrix` at runtime from a script. Splits into a setup
-> job that prints JSON to `$GITHUB_OUTPUT` and a matrix job wired with `needs` +
-> `fromJSON()` + an empty-matrix guard.
+{/* macro:dynamic_matrix */}
+### `jobs.<job_id>.dynamic_matrix` [#dynamic_matrix]
 
-- **Scope:** `jobs.<job_id>`
-- **Type:** map. Options: `script` (required), `alias`, `checkout` (default `true`
-  for local-path scripts), `runs-on`, `shell` (`bash`/`sh`/`pwsh`/`python`),
-  `compact` (default `true`), `fail-fast` (default `false`), `id`.
+Generate a job's `strategy.matrix` at runtime from a script. Splits into a setup job
+that prints JSON to `$GITHUB_OUTPUT` and a matrix job wired with `needs` + `fromJSON()`
++ an empty-matrix guard.
+
+- **Valid in:** `jobs.<job_id>`
+- **Type:** map
+- **Compiles to:** a setup job plus a matrix job with `needs` and `fromJSON()` wiring
+
+<TypeTable
+  type={{
+    script: { type: 'string', description: 'Path or inline command that prints matrix JSON to GITHUB_OUTPUT.', required: true },
+    alias: { type: 'string', description: 'Rename the matrix entry key (default is matrix).' },
+    'runs-on': { type: 'string | string[]', description: 'Runner for the generated setup job.', default: 'ubuntu-latest' },
+    shell: { type: 'string', description: 'Shell for the script: bash, sh, pwsh, powershell, or python.', default: 'bash' },
+    compact: { type: 'boolean', description: 'Collapse the setup job into a compact form.', default: 'true' },
+    checkout: { type: 'boolean', description: 'Auto checkout before a local-path script.', default: 'true' },
+    'fail-fast': { type: 'boolean', description: 'Cancel sibling legs when one matrix leg fails.', default: 'false' },
+    id: { type: 'string', description: 'Explicit id for the generated setup job.' },
+  }}
+/>
 
 ```yaml title=".actio.yml"
 jobs:
@@ -211,49 +378,71 @@ jobs:
 
 `script` may be a path **or** an inline command. Full guide: [dynamic_matrix](/docs/macros/dynamic-matrix).
 
-### static_if
+{/* macro:static_if */}
+### `jobs.<job_id>.static_if` [#static_if]
 
-> Compile-time structural condition. The expression is evaluated by `actio build`;
-> if it's false, the entire job (or step) map is omitted from the emitted YAML.
+Compile-time structural condition. The expression is evaluated by `actio build`; if it
+is false, the entire job (or step) map is omitted from the emitted YAML.
 
-- **Scope:** `jobs.<job_id>` and `jobs.<job_id>.steps[*]`
+- **Valid in:** `jobs.<job_id>` and `jobs.<job_id>.steps[*]`
 - **Type:** string — a bare compile-time boolean expression
-- **Expression language:** references (`params.*` and compile-time symbols),
-  comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), boolean operators (`&&`, `||`,
-  `!`), literals, and function calls.
+- **Compiles to:** the node is kept verbatim or dropped entirely
+- **Expression language:** references (`params.*` and compile-time symbols), comparisons
+  (`==`, `!=`, `<`, `<=`, `>`, `>=`), boolean operators (`&&`, `||`, `!`), literals, and
+  function calls.
 
-Use it to switch jobs or steps on a `param` at build time, instead of smearing a
-runtime `if:` across the workflow:
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
 
-```yaml title=".actio.yml"
-params:
-  deploy:
-    type: boolean
-    default: false
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - run: ./build.sh
-  publish:
-    static_if: params.deploy
-    runs-on: ubuntu-latest
-    steps:
-      - run: ./publish.sh
-```
+  ```yaml
+  params:
+    deploy:
+      type: boolean
+      default: false
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - run: ./build.sh
+    publish:
+      static_if: params.deploy
+      runs-on: ubuntu-latest
+      steps:
+        - run: ./publish.sh
+  ```
 
-With `deploy` false, the whole `publish` job disappears:
+  </Tab>
+  <Tab value="generated .yml">
 
-```yaml title="generated .yml"
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - run: ./build.sh
-```
+  ```yaml
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - run: ./build.sh
+  ```
 
-**Conditional merge (form B).** A key shaped like `static_if(<expr>)` maps to an
-object that is merged into the parent only when the expression is true:
+  </Tab>
+</Tabs>
+
+<Callout title="Compile-time only">
+  `static_if` cannot reference runtime contexts like `github.*`, `env.*`, or
+  `secrets.*`, and rejects `${{ }}` wrappers. For runtime conditions, use the
+  standard [`if:`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idif)
+  key instead.
+</Callout>
+
+Full guide: [static_if](/docs/macros/static-if).
+
+{/* macro:static_if() */}
+### `static_if(<expr>)` [#static_if-merge]
+
+Conditional merge form. A key shaped like `static_if(<expr>)` maps to an object that is
+merged into the parent **only when the expression is true**.
+
+- **Valid in:** `jobs.<job_id>` and `jobs.<job_id>.steps[*]`
+- **Type:** keyed map (the key carries the expression; the value is the patch)
+- **Compiles to:** the patch object merged into the parent, or nothing
 
 ```yaml title=".actio.yml"
 params:
@@ -270,24 +459,21 @@ jobs:
             RUNNER_DEBUG: "1"
 ```
 
-<Callout title="Compile-time only">
-  `static_if` cannot reference runtime contexts like `github.*`, `env.*`, or
-  `secrets.*`, and rejects `${{ }}` wrappers. For runtime conditions, use the
-  standard [`if:`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idif)
-  key instead.
-</Callout>
+Full guide: [static_if](/docs/macros/static-if).
 
 ---
 
 ## Step keys
 
-### inject
+{/* macro:inject */}
+### `jobs.<job_id>.steps[*].inject` [#inject]
 
-> Splice in the steps of the named fragment (defined under top-level `fragments:`)
-> at this position. Replaced inline by `actio build`.
+Splice in the steps of the named fragment (defined under top-level `fragments:`) at this
+position. Replaced inline by `actio build`.
 
-- **Scope:** `jobs.<job_id>.steps[*]`
+- **Valid in:** `jobs.<job_id>.steps[*]`
 - **Type:** string (a fragment name)
+- **Compiles to:** the fragment's steps, in place
 
 ```yaml title=".actio.yml"
 steps:
@@ -295,18 +481,55 @@ steps:
   - run: npm test
 ```
 
-See [`fragments`](#fragments).
+See [`fragments`](#fragments). Full guide: [fragments + inject](/docs/macros/fragments).
 
-### retry
+{/* macro:for_each */}
+### `jobs.<job_id>.steps[*].for_each` [#for_each]
 
-> Retry a flaky step with optional backoff; expands into a chain of conditional
-> attempts where attempt N runs only if attempt N-1 failed. Works with `run:` and
-> `uses:` steps.
+Expand one step into many by looping over a list at compile time. Reference the loop
+variable with the compile-time token `{{ <var> }}` (or `{{ <var>.<field> }}` for object
+elements). A `parallel` loop must be job-level and becomes a matrix.
 
-- **Scope:** `jobs.<job_id>.steps[*]`
-- **Type:** integer (≥ 2), or map. Options: `attempts` (required, ≥ 2), `delay`
-  (optional, e.g. `10s`, `2m`, `1h` — injects `sleep` steps). Shorthand
-  `retry: 3` == `retry: { attempts: 3 }`.
+- **Valid in:** `jobs.<job_id>.steps[*]`
+- **Type:** map
+- **Compiles to:** repeated steps (serial) or matrix wiring (`parallel: true`)
+
+| Option | Type | Description |
+|---|---|---|
+| `var` | string | Loop variable name (required). |
+| `in` | list / object / `params.*` / output expr | Source to iterate (required). |
+| `parallel` | boolean | Expand to a job matrix instead of inline serial steps. |
+
+```yaml title=".actio.yml"
+steps:
+  - for_each:
+      var: svc
+      in: [api, web, worker]
+    run: ./deploy.sh {{ svc }}
+```
+
+<Callout type="warn" title="Not in the JSON Schema">
+  `for_each` is a shipping macro but is **not** described in `actio.schema.json` yet, so
+  the editor extension will not autocomplete or validate it. Mistyped options fail at
+  `actio build`, not in your editor.
+</Callout>
+
+{/* macro:retry */}
+### `jobs.<job_id>.steps[*].retry` [#retry]
+
+Retry a flaky step with optional backoff; expands into a chain of conditional attempts
+where attempt N runs only if attempt N-1 failed. Works with `run:` and `uses:` steps.
+
+- **Valid in:** `jobs.<job_id>.steps[*]`
+- **Type:** integer (≥ 2), or map. Shorthand `retry: 3` == `retry: { attempts: 3 }`.
+- **Compiles to:** a chain of conditional attempt steps (plus `sleep` steps for `delay`)
+
+<TypeTable
+  type={{
+    attempts: { type: 'number', description: 'Total attempts, minimum 2.', required: true },
+    delay: { type: 'string | number', description: 'Backoff between attempts, e.g. 10s, 2m, 1h, or seconds as a number.' },
+  }}
+/>
 
 ```yaml title=".actio.yml"
 steps:
@@ -318,15 +541,59 @@ steps:
 
 Full guide: [retry](/docs/macros/retry).
 
-### fallback
+{/* macro:share */}
+### `jobs.<job_id>.steps[*].share` [#share]
 
-> A native try/catch. Default (**notify**): the fallback runs on failure via
-> `if: failure()` but the job still fails. With `recover: true` the guarded step
-> gets `continue-on-error: true` and the fallback keys off `outcome`, so the job
-> can pass.
+Publish step outputs so other jobs can consume them. Reference anywhere with
+`${{ share.<name> }}`; Actio wires `job.outputs` and `needs` automatically and strips the
+`share` key from the generated workflow.
 
-- **Scope:** `jobs.<job_id>.steps[*]` and `jobs.<job_id>` (job-level)
+- **Valid in:** `jobs.<job_id>.steps[*]`
+- **Type:** map of `<name>` → output definition (value-form or capture-form)
+- **Compiles to:** `job.outputs` entries + `needs` on every consuming job
+
+<TypeTable
+  type={{
+    value: { type: 'string', description: 'Static value to publish (value-form).' },
+    run: { type: 'string', description: 'Command whose stdout is captured and published (capture-form).' },
+    required: { type: 'boolean', description: 'Fail the build if the output is empty.' },
+    json: { type: 'boolean', description: 'Parse the captured value as JSON before exposing it.' },
+    type: { type: 'string', description: 'Assert the output type: string, number, boolean, enum, or object.' },
+  }}
+/>
+
+```yaml title=".actio.yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build.sh
+        share:
+          version:
+            run: cat VERSION
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh ${{ share.version }}
+```
+
+{/* macro:fallback */}
+### `jobs.<job_id>.steps[*].fallback` [#fallback]
+
+A native try/catch. Default (**notify**): the fallback runs on failure via `if: failure()`
+but the job still fails. With `recover: true` the guarded step gets `continue-on-error:
+true` and the fallback keys off `outcome`, so the job can pass.
+
+- **Valid in:** `jobs.<job_id>.steps[*]` and `jobs.<job_id>` (job-level)
 - **Type:** list of steps (notify mode), or map with `recover` + `steps`
+- **Compiles to:** the guarded step plus outcome-gated fallback steps
+
+<TypeTable
+  type={{
+    steps: { type: 'step[]', description: 'Steps to run when the guarded step fails.', required: true },
+    recover: { type: 'boolean', description: 'Let the job pass: guarded step gets continue-on-error and the fallback keys off outcome.', default: 'false' },
+  }}
+/>
 
 ```yaml title=".actio.yml"
 steps:
@@ -338,6 +605,142 @@ steps:
 ```
 
 Full guide: [fallback](/docs/macros/fallback).
+
+{/* macro:unsafe */}
+### `jobs.<job_id>.steps[*].unsafe` [#unsafe]
+
+Opt this step out of injection-hoist entirely — `${{ }}` is left inline in `run:`. Use
+only when you fully control the interpolated values.
+
+- **Valid in:** `jobs.<job_id>.steps[*]`
+- **Type:** boolean
+- **Compiles to:** nothing; the step's `run:` body is left untouched
+
+```yaml title=".actio.yml"
+steps:
+  - run: echo "${{ github.sha }}"
+    unsafe: true
+```
+
+See [`injectionHoist`](#injectionhoist). Full guide: [injection-hoist](/docs/macros/injection-hoist).
+
+{/* macro:trust */}
+### `jobs.<job_id>.steps[*].trust` [#trust]
+
+Context paths that should **not** be hoisted out of `run:` even if Actio would classify
+them as untrusted — you vouch for them.
+
+- **Valid in:** `jobs.<job_id>.steps[*]`
+- **Type:** list of context paths
+- **Compiles to:** nothing; the listed paths stay inline
+
+```yaml title=".actio.yml"
+steps:
+  - run: echo "${{ github.event.pull_request.title }}"
+    trust: [github.event.pull_request.title]
+```
+
+See [`injectionHoist`](#injectionhoist). Full guide: [injection-hoist](/docs/macros/injection-hoist).
+
+{/* macro:force */}
+### `jobs.<job_id>.steps[*].force` [#force]
+
+Context paths to hoist into `env:` even if Actio would classify them as trusted —
+belt-and-suspenders for values you would rather keep out of the script body.
+
+- **Valid in:** `jobs.<job_id>.steps[*]`
+- **Type:** list of context paths
+- **Compiles to:** nothing; the listed paths are moved into `env` and referenced there
+
+```yaml title=".actio.yml"
+steps:
+  - run: echo "$TITLE"
+    force: [github.event.issue.title]
+```
+
+See [`injectionHoist`](#injectionhoist). Full guide: [injection-hoist](/docs/macros/injection-hoist).
+
+---
+
+## Lifecycle hooks
+
+`ensure`, `on_success`, `on_failure`, and `on_abort` attach teardown/outcome steps to a
+**step** or a **job**. The steps are spliced in (step scope) or appended (job scope) and
+each is wrapped in the matching guard, then the hook key is stripped.
+
+| Hook | Step-level guard | Job-level guard |
+|---|---|---|
+| `ensure` | `if: always()` | `if: always()` |
+| `on_success` | `success() && steps.<id>.outcome == 'success'` | `if: success()` |
+| `on_failure` | `!cancelled() && steps.<id>.outcome == 'failure'` | `if: failure()` |
+| `on_abort` | step-level cancellation | `if: cancelled()` |
+
+{/* macro:ensure */}
+### `ensure` [#ensure]
+
+Always-run teardown. The listed steps run even if the target step fails or the job is
+cancelled (bounded by the job timeout).
+
+- **Valid in:** `jobs.<job_id>` and `jobs.<job_id>.steps[*]`
+- **Type:** list of steps
+- **Compiles to:** guarded steps with `if: always()`
+
+```yaml title=".actio.yml"
+steps:
+  - run: ./start-db.sh
+    ensure:
+      - run: ./stop-db.sh
+```
+
+{/* macro:on_success */}
+### `on_success` [#on_success]
+
+Steps that run only when the target step or job succeeded.
+
+- **Valid in:** `jobs.<job_id>` and `jobs.<job_id>.steps[*]`
+- **Type:** list of steps
+- **Compiles to:** guarded steps (`success()`; step scope also checks `outcome`)
+
+```yaml title=".actio.yml"
+steps:
+  - run: ./build.sh
+    on_success:
+      - run: ./publish-artifact.sh
+```
+
+{/* macro:on_failure */}
+### `on_failure` [#on_failure]
+
+Steps that run only when the target step or job failed. At step scope the guard keys on
+`outcome` (pre-`continue-on-error`).
+
+- **Valid in:** `jobs.<job_id>` and `jobs.<job_id>.steps[*]`
+- **Type:** list of steps
+- **Compiles to:** guarded steps (`failure()` / outcome check)
+
+```yaml title=".actio.yml"
+steps:
+  - run: ./build.sh
+    on_failure:
+      - run: ./upload-logs.sh
+```
+
+{/* macro:on_abort */}
+### `on_abort` [#on_abort]
+
+Steps that run on cancellation. At step scope this only sees step-level cancellation;
+run-level cancel belongs in a workflow [`finally:`](#finally).
+
+- **Valid in:** `jobs.<job_id>` and `jobs.<job_id>.steps[*]`
+- **Type:** list of steps
+- **Compiles to:** guarded steps (`cancelled()`)
+
+```yaml title=".actio.yml"
+steps:
+  - run: ./long-task.sh
+    on_abort:
+      - run: ./cleanup.sh
+```
 
 ## See also
 
