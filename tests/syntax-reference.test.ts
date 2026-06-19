@@ -65,6 +65,7 @@ function collectMacros(container: unknown): Set<string> {
 const schemaMacros = new Set<string>([
   ...collectMacros(schema),
   ...collectMacros(defs.normalJob),
+  ...collectMacros(defs.reusableWorkflowCallJob),
   ...collectMacros(defs.step),
 ]);
 
@@ -112,6 +113,7 @@ const OPTION_DEFS: Record<string, string> = {
   params: "actioParam",
   job_defaults: "jobDefaults",
   executors: "executorDefinition",
+  call_templates: "callTemplateDefinition",
   finally: "finallyBlock",
   dynamic_matrix: "dynamicMatrix",
   retry: "retry",

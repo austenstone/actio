@@ -42,6 +42,13 @@ export function buildSchema() {
 
   s.definitions = { ...s.definitions, ...ext.addDefinitions };
 
+  if (ext.jobOneOf) {
+    const jobsPattern = s.properties.jobs?.patternProperties;
+    if (!jobsPattern) throw new Error("upstream schema is missing jobs.patternProperties");
+    const branch = Object.values(jobsPattern)[0];
+    branch.oneOf = [...(branch.oneOf ?? []), ...ext.jobOneOf];
+  }
+
   const out = fileURLToPath(new URL("actio.schema.json", schemaDir));
   writeFileSync(out, `${JSON.stringify(s, null, 2)}\n`, "utf8");
   return out;
