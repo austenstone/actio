@@ -56,8 +56,10 @@ export interface ActioLock {
 
 interface LockState {
   path: string;
-  data: ActioLock;
+  data: LockFileData;
 }
+
+type LockFileData = ActioLock & Record<string, unknown>;
 
 type ResolverKind = "action" | "import";
 
@@ -315,7 +317,9 @@ export const createGitHubResolver = (): PinResolver => ({
   },
 });
 
-const defaultLock = (): ActioLock => ({ version: 1, actions: {}, imports: {} });
+const defaultLock = (): LockFileData => ({ version: 1, actions: {}, imports: {} });
+
+const serializeLock = (lock: LockState): string => `${JSON.stringify(lock.data, null, 2)}\n`;
 
 const readLock = async (cwd: string, lockPath?: string): Promise<LockState> => {
   const fullPath = path.resolve(cwd, lockPath ?? "actio.lock");
@@ -323,10 +327,11 @@ const readLock = async (cwd: string, lockPath?: string): Promise<LockState> => {
     return { path: fullPath, data: defaultLock() };
   }
   const text = await readFile(fullPath, "utf8");
-  const parsed = JSON.parse(text) as Partial<ActioLock>;
+  const parsed = JSON.parse(text) as Partial<ActioLock> & Record<string, unknown>;
   return {
     path: fullPath,
     data: {
+      ...parsed,
       version: 1,
       actions: parsed.actions ?? {},
       imports: parsed.imports ?? {},
@@ -335,9 +340,8 @@ const readLock = async (cwd: string, lockPath?: string): Promise<LockState> => {
 };
 
 const writeLock = async (lock: LockState): Promise<void> => {
-  const body = `${JSON.stringify(lock.data, null, 2)}\n`;
   await mkdir(path.dirname(lock.path), { recursive: true });
-  await writeFile(lock.path, body, "utf8");
+  await writeFile(lock.path, serializeLock(lock), "utf8");
 };
 
 const resolveAndHashAction = async (
@@ -632,7 +636,7 @@ export const runPinsUpdate = async (
     return 0;
   }
   const lock = await readLock(cwd, options.lockPath);
-  const lockBefore = `${JSON.stringify(lock.data, null, 2)}\n`;
+  const lockBefore = serializeLock(lock);
   const nowIso = new Date().toISOString();
   const sourceChanges: FileChangeSet[] = [];
   const generatedChanges: FileChangeSet[] = [];
@@ -677,6 +681,7 @@ export const runPinsUpdate = async (
         oldLock.integrity !== resolved.integrity;
       if (actionChanged) {
         lock.data.actions[entry.action] = {
+          ...oldLock,
           action: entry.action,
           sourceRef: targetRef,
           digest: resolved.digest,
@@ -767,7 +772,7 @@ export const runPinsUpdate = async (
         existingLock.immutableRef !== entry.immutableRef ||
         existingLock.integrity !== entry.integrity;
       if (importChanged) {
-        lock.data.imports[importLine.spec] = entry;
+        lock.data.imports[importLine.spec] = existingLock ? { ...existingLock, ...entry } : entry;
       }
       if (existingPinned !== entry.integrity) {
         const replacement = emitImportLine(importLine.prefix, importLine.spec, entry.integrity);
@@ -791,7 +796,11 @@ export const runPinsUpdate = async (
     await mkdir(path.dirname(change.path), { recursive: true });
     await writeFile(change.path, change.after, "utf8");
   }
-  await writeLock(lock);
+  const lockAfter = serializeLock(lock);
+  const lockChanged = lockBefore !== lockAfter;
+  if (lockChanged) {
+    await writeLock(lock);
+  }
 
   if (singleBumpDelta && bumpCount === 1) {
     await writeDelta(cwd, options.deltaOut ?? DEFAULT_DELTA_PATH, singleBumpDelta);
@@ -801,13 +810,12 @@ export const runPinsUpdate = async (
     await options.runBuild?.(patterns, cwd);
   }
 
-  const lockAfter = `${JSON.stringify(lock.data, null, 2)}\n`;
-  if (lockBefore === lockAfter && sourceChanges.length === 0 && generatedChanges.length === 0) {
+  if (!lockChanged && sourceChanges.length === 0 && generatedChanges.length === 0) {
     process.stderr.write(`${pc.bold("pins")}: no changes\n`);
   } else {
-    process.stderr.write(
-      `${pc.bold("pins")}: updated ${sourceChanges.length} source, ${generatedChanges.length} generated, lockfile\n`,
-    );
+    const updated = [`${sourceChanges.length} source`, `${generatedChanges.length} generated`];
+    if (lockChanged) updated.push("lockfile");
+    process.stderr.write(`${pc.bold("pins")}: updated ${updated.join(", ")}\n`);
   }
   return 0;
 };
