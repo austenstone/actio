@@ -43,6 +43,20 @@ Left inline (trusted): `secrets.*`, `github.sha`, `github.run_id`,
 Only `run:` bodies are rewritten. `if:`, `name:`, `with:`, `env:`,
 `concurrency:`, and `uses:` are never touched.
 
+## Bracket notation
+
+Context paths are canonicalized before taint classification, so bracket-quoted
+and numeric access is treated identically to dotted access:
+
+```yaml title=".actio.yml"
+run: echo ${{ github['event']['issue']['title'] }}   # → hoisted like github.event.issue.title
+```
+
+A **dynamic** index that can't be resolved statically (for example
+`github['event'][github.event.action]`) is left inline but raises a loud
+`injection-hoist-unanalyzable-path` warning — it is never silently passed
+through. Rewrite it to dotted access or hoist the value manually.
+
 ## Modes
 
 Set `injectionHoist:` at the step, job, or root level (closest scope wins;
