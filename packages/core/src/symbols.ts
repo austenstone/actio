@@ -54,6 +54,12 @@ const isIdentifierStart = (char: string): boolean => /[A-Za-z_]/.test(char);
 
 const isIdentifierPart = (char: string): boolean => /[A-Za-z0-9_]/.test(char);
 
+const hasOddBackslashRun = (value: string, index: number): boolean => {
+  let count = 0;
+  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor--) count++;
+  return count % 2 === 1;
+};
+
 export function collectExpressionRoots(
   expression: string,
   rootsOfInterest?: ReadonlySet<string>,
@@ -70,7 +76,7 @@ export function collectExpressionRoots(
         index++;
         continue;
       }
-      if (quote === '"' && expression[index - 1] === "\\") continue;
+      if (quote === '"' && hasOddBackslashRun(expression, index)) continue;
       quote = undefined;
       continue;
     }

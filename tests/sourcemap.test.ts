@@ -163,4 +163,25 @@ describe("source map", () => {
     expect(sourceLineOf(m, genLineOf(yaml, "echo setup-b"))).not.toBe(13);
     expect(sourceLineOf(m, genLineOf(yaml, "echo last"))).toBe(13);
   });
+
+  it("maps static-if form B merged objects to the conditional payload", () => {
+    const src = [
+      "name: Static merge", // 1
+      "on: [push]", // 2
+      "jobs:", // 3
+      "  build:", // 4
+      "    runs-on: ubuntu-latest", // 5
+      "    static-if(true):", // 6
+      "      env:", // 7
+      "        FROM_STATIC: yes", // 8
+      "    steps:", // 9
+      "      - run: echo hi", // 10
+      "",
+    ].join("\n");
+
+    const { yaml, map } = transpile(src, { fileName: "static.actio.yml", sourceMap: true });
+    const m = map as SourceMap;
+    expect(sourceLineOf(m, genLineOf(yaml, "FROM_STATIC: yes"))).toBe(8);
+    expect(sourceLineOf(m, genLineOf(yaml, "FROM_STATIC: yes"))).not.toBe(4);
+  });
 });

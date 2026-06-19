@@ -1,7 +1,7 @@
 import { type Pass, type SymbolDef, transpile } from "actio-core";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import { RUNTIME_CONTEXT_ROOTS } from "../packages/core/src/symbols.js";
+import { collectExpressionRoots, RUNTIME_CONTEXT_ROOTS } from "../packages/core/src/symbols.js";
 
 function transpileErrors(source: string) {
   const result = transpile(source, { fileName: "t.actio.yml" });
@@ -47,6 +47,10 @@ jobs:
     expect(
       errors.some((diagnostic) => diagnostic.message.includes("[static-if-runtime-context]")),
     ).toBe(true);
+  });
+
+  it("finds roots after double-quoted strings ending in even backslashes", () => {
+    expect([...collectExpressionRoots('"literal\\\\" github.ref')]).toContain("github");
   });
 
   it("keeps static-if runtime-root checks in parity with the shared runtime root list", () => {
@@ -438,6 +442,34 @@ jobs:
         diagnostic.message.includes("must resolve to a boolean expression"),
       ),
     ).toBe(true);
+  });
+
+  it("applies boolean static-if values at job and step scope", () => {
+    const result = transpileResult(`name: x
+on: [push]
+jobs:
+  keep:
+    static-if: true
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo kept
+      - run: echo dropped
+        static-if: false
+      - run: echo also-kept
+        static-if: true
+  drop:
+    static-if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hidden
+`);
+    expect(result.ok).toBe(true);
+    const doc = parse(result.yaml) as {
+      jobs: Record<string, { steps: Array<{ run?: string; "static-if"?: unknown }> }>;
+    };
+    expect(Object.keys(doc.jobs)).toEqual(["keep"]);
+    expect(doc.jobs.keep?.steps.map((step) => step.run)).toEqual(["echo kept", "echo also-kept"]);
+    expect(doc.jobs.keep?.steps.every((step) => !Object.hasOwn(step, "static-if"))).toBe(true);
   });
 
   it("errors on residual non-structural static-if keys", () => {
@@ -880,6 +912,28 @@ jobs:
       "echo keep-decimal",
       "echo keep-double-quote",
       "echo keep-single-quote",
+    ]);
+  });
+
+  it("parses double-quoted static-if strings ending in even backslashes", () => {
+    const result = transpileResult(`name: x
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo keep-even-backslash
+        static-if: '"path\\\\" == "path\\\\"'
+      - run: echo keep-after-even-backslash
+        static-if: '"path\\\\" != "other"'
+`);
+    expect(result.ok).toBe(true);
+    const doc = parse(result.yaml) as {
+      jobs: { build: { steps: Array<{ run?: string }> } };
+    };
+    expect(doc.jobs.build.steps.map((step) => step.run)).toEqual([
+      "echo keep-even-backslash",
+      "echo keep-after-even-backslash",
     ]);
   });
 
