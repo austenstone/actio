@@ -11,6 +11,7 @@
 /out/
 /build
 *.tsbuildinfo
+/public/monaco/
 
 # misc
 .DS_Store

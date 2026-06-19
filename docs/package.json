@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "api": "typedoc",
-    "build": "typedoc && next build",
-    "dev": "typedoc && next dev",
+    "build": "npm run build:workers && typedoc && next build",
+    "dev": "npm run build:workers && typedoc && next dev",
     "lint": "typedoc && fumadocs-mdx && tsx scripts/lint.ts",
     "start": "serve out",
     "types:check": "typedoc && fumadocs-mdx && next typegen && tsc --noEmit",
-    "postinstall": "fumadocs-mdx"
+    "postinstall": "fumadocs-mdx",
+    "build:workers": "node scripts/build-monaco-workers.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
