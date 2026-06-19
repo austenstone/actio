@@ -149,6 +149,16 @@ export function collectUsedStepIds(steps: Step[] | undefined): Set<string> {
   return used;
 }
 
+export function sourcePathFor(
+  ctx: ParseContext,
+  node: object,
+  fallbackPath?: Path,
+  suffix: Path = [],
+): Path | undefined {
+  const base = ctx.origins.get(node)?.path ?? fallbackPath;
+  return base ? [...base, ...suffix] : undefined;
+}
+
 export function pushDiagnostic(
   ctx: ParseContext,
   severity: Diagnostic["severity"],

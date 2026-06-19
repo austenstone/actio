@@ -1,4 +1,4 @@
-import { transpile } from "actio-core";
+import { type Diagnostic, transpile } from "actio-core";
 import { describe, expect, it } from "vitest";
 
 /** Transpile and return diagnostics for assertion. */
@@ -12,11 +12,11 @@ function diag(source: string) {
 }
 
 /** Find a diagnostic whose message matches and assert it carries a source range. */
-function ranged(diags: { message: string; range?: unknown }[], re: RegExp) {
+function ranged(diags: Diagnostic[], re: RegExp): Diagnostic {
   const hit = diags.find((d) => re.test(d.message));
   expect(hit, `expected a diagnostic matching ${re}`).toBeTruthy();
-  expect((hit as { range?: unknown }).range, `diagnostic ${re} should carry a range`).toBeTruthy();
-  return hit as { message: string; range?: unknown };
+  expect(hit?.range, `diagnostic ${re} should carry a range`).toBeTruthy();
+  return hit as Diagnostic;
 }
 
 describe("retry validation", () => {
@@ -140,6 +140,26 @@ jobs:
 `);
     ranged(warnings, /fallback\.recover must be a boolean/);
   });
+
+  it("warns on invalid fallback from an injected fragment with the fragment source range", () => {
+    const { warnings } = diag(`name: x
+on: [push]
+fragments:
+  fragile:
+    - run: ./x.sh
+      fallback:
+        recover: maybe
+        steps:
+          - run: ./cleanup.sh
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: fragile
+`);
+    const warning = ranged(warnings, /fallback\.recover must be a boolean/);
+    expect(warning.range?.start.line).toBe(7);
+  });
 });
 
 describe("fragments validation", () => {
@@ -179,9 +199,27 @@ jobs:
           name: s
 `);
     expect(result.ok).toBe(false);
-    expect(errors.some((d) => /inject must name a fragment as a string/.test(d.message))).toBe(
-      true,
-    );
+    const error = ranged(errors, /inject must name a fragment as a string/);
+    expect(error.range?.start.line).toBe(7);
+  });
+
+  it("explains residual static-if inside injected fragments should gate the inject site", () => {
+    const { result, errors } = diag(`name: x
+on: [push]
+fragments:
+  gated:
+    - static-if: true
+      run: echo gated
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: gated
+`);
+    expect(result.ok).toBe(false);
+    const error = ranged(errors, /Residual static-if directive is not allowed inside fragments/);
+    expect(error.message).toContain("gate the inject site");
+    expect(error.range?.start.line).toBe(5);
   });
 });
 
@@ -208,11 +246,11 @@ jobs:
     runs-on: ubuntu-latest
     dynamic-matrix:
       script: ./list.sh
-      strartegy: bogus
+      strategy: bogus
     steps:
       - run: echo hi
 `);
-    ranged(warnings, /dynamic-matrix has unknown key "strartegy"/);
+    ranged(warnings, /dynamic-matrix has unknown key "strategy"/);
   });
 
   it("errors when dynamic-matrix has no script", () => {

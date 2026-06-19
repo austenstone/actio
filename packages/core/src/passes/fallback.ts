@@ -7,6 +7,7 @@ import {
   ensureStepId,
   isObject,
   pushDiagnostic,
+  sourcePathFor,
 } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
@@ -129,11 +130,8 @@ function expandStepFallback(
   collector: RetryCollector,
 ): Step[] {
   if (!isObject(step) || step.fallback == null) return [step];
-  const {
-    steps: fbSteps,
-    recover,
-    retry,
-  } = normalizeFallback(ctx, step.fallback, ["jobs", jobId, "steps", idx, "fallback"]);
+  const fallbackPath = sourcePathFor(ctx, step, ["jobs", jobId, "steps", idx], ["fallback"]);
+  const { steps: fbSteps, recover, retry } = normalizeFallback(ctx, step.fallback, fallbackPath);
   delete step.fallback;
 
   // retry mode: lift the guarded step into a sibling recovery job (different runner).
@@ -184,7 +182,12 @@ function liftRetryStep(
   let gateExpr: string | undefined;
   const codes = retry.whenExitCodes;
   if (codes && codes.length > 0) {
-    const path: Path = ["jobs", jobId, "steps", idx, "fallback", "retry", "when-exit-code"];
+    const path = sourcePathFor(
+      ctx,
+      step,
+      ["jobs", jobId, "steps", idx],
+      ["fallback", "retry", "when-exit-code"],
+    );
     const shell = step.shell;
     const posix = shell === undefined || shell === "bash" || shell === "sh";
     if (typeof step.run !== "string") {
@@ -233,18 +236,15 @@ function processStepFallbacks(
 /** Expand a job-level `fallback:` block into notify steps gated on `failure()`. */
 function processJobFallback(ctx: ParseContext, job: Job, jobId: string): void {
   if (job.fallback == null) return;
-  const {
-    steps: fbSteps,
-    recover,
-    retry,
-  } = normalizeFallback(ctx, job.fallback, ["jobs", jobId, "fallback"]);
+  const fallbackPath = sourcePathFor(ctx, job, ["jobs", jobId], ["fallback"]);
+  const { steps: fbSteps, recover, retry } = normalizeFallback(ctx, job.fallback, fallbackPath);
   delete job.fallback;
   if (retry) {
     pushDiagnostic(
       ctx,
       "warning",
       `Job "${jobId}": fallback.retry is only supported on step-level fallback; ignoring`,
-      ["jobs", jobId, "fallback", "retry"],
+      sourcePathFor(ctx, job, ["jobs", jobId], ["fallback", "retry"]),
     );
   }
   // A reusable-workflow job (`uses:`) cannot also declare `steps:`; appending
@@ -254,7 +254,7 @@ function processJobFallback(ctx: ParseContext, job: Job, jobId: string): void {
       ctx,
       "warning",
       `Job "${jobId}": job-level fallback is not supported on a reusable-workflow (uses) job; ignoring`,
-      ["jobs", jobId, "fallback"],
+      fallbackPath,
     );
     return;
   }
@@ -263,7 +263,7 @@ function processJobFallback(ctx: ParseContext, job: Job, jobId: string): void {
       ctx,
       "warning",
       `Job "${jobId}": recover is only supported on step-level fallback; treating job-level fallback as notify`,
-      ["jobs", jobId, "fallback"],
+      fallbackPath,
     );
   }
   if (!Array.isArray(job.steps)) job.steps = [];

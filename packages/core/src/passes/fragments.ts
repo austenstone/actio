@@ -1,6 +1,6 @@
 import { cloneNode, type Job, type Step, visitJobs } from "../ir.js";
 import type { ParseContext, Path } from "../parser.js";
-import { asStepArray, isObject, mapFallbackSteps, pushDiagnostic } from "./helpers.js";
+import { asStepArray, isObject, pushDiagnostic, sourcePathFor } from "./helpers.js";
 import { resolveCompileTimeTextBoundaries } from "./params.js";
 import type { Pass } from "./registry.js";
 
@@ -56,14 +56,17 @@ function expandList(
   ctx: ParseContext,
   fragments: FragmentMap,
   stack: string[],
+  listPath?: Path,
 ): Step[] {
   const out: Step[] = [];
-  for (const step of list) {
+  for (const [index, step] of list.entries()) {
+    const stepPath = listPath ? [...listPath, index] : undefined;
     if (hasBadInject(step)) {
       pushDiagnostic(
         ctx,
         "error",
         `inject must name a fragment as a string (got ${typeof (step as Step).inject})`,
+        sourcePathFor(ctx, step, stepPath),
       );
       continue;
     }
@@ -75,25 +78,37 @@ function expandList(
           ctx,
           "warning",
           `inject of "${name}" ignores extra keys (${extraKeys.join(", ")}); parameterized fragments are not supported yet`,
+          sourcePathFor(ctx, step, stepPath, [extraKeys[0] ?? "inject"]),
         );
       }
       if (!(name in fragments)) {
-        pushDiagnostic(ctx, "error", `Unknown fragment "${name}"`, undefined, {
-          hint: `Define it under top-level "fragments:" (available: ${
-            Object.keys(fragments).join(", ") || "none"
-          })`,
-        });
+        pushDiagnostic(
+          ctx,
+          "error",
+          `Unknown fragment "${name}"`,
+          sourcePathFor(ctx, step, stepPath, ["inject"]),
+          {
+            hint: `Define it under top-level "fragments:" (available: ${
+              Object.keys(fragments).join(", ") || "none"
+            })`,
+          },
+        );
         continue;
       }
       if (stack.includes(name)) {
-        pushDiagnostic(ctx, "error", `Fragment cycle detected: ${[...stack, name].join(" -> ")}`);
+        pushDiagnostic(
+          ctx,
+          "error",
+          `Fragment cycle detected: ${[...stack, name].join(" -> ")}`,
+          sourcePathFor(ctx, step, stepPath, ["inject"]),
+        );
         continue;
       }
       const copies = (fragments[name] ?? []).map((s) => cloneNode(ctx, s));
       out.push(...expandList(copies, ctx, fragments, [...stack, name]));
     } else {
       if (isObject(step) && step.fallback != null) {
-        expandFallbackInPlace(step, ctx, fragments, stack);
+        expandFallbackInPlace(step, ctx, fragments, stack, sourcePathFor(ctx, step, stepPath));
       }
       out.push(step);
     }
@@ -107,8 +122,26 @@ function expandFallbackInPlace(
   ctx: ParseContext,
   fragments: FragmentMap,
   stack: string[],
+  containerPath?: Path,
 ): void {
-  mapFallbackSteps(container, (steps) => expandList(steps, ctx, fragments, stack));
+  const fb = container.fallback;
+  if (Array.isArray(fb)) {
+    container.fallback = expandList(
+      asStepArray(fb),
+      ctx,
+      fragments,
+      stack,
+      containerPath ? [...containerPath, "fallback"] : undefined,
+    );
+  } else if (isObject(fb) && Array.isArray(fb.steps)) {
+    fb.steps = expandList(
+      asStepArray(fb.steps),
+      ctx,
+      fragments,
+      stack,
+      containerPath ? [...containerPath, "fallback", "steps"] : undefined,
+    );
+  }
 }
 
 function stripResidualWhenCompile(ctx: ParseContext, value: unknown, path: Path): void {
@@ -122,14 +155,16 @@ function stripResidualWhenCompile(ctx: ParseContext, value: unknown, path: Path)
 
   for (const key of Object.keys(value)) {
     if (key === "static-if" || FORM_B_KEY_RE.test(key)) {
+      const diagnosticPath = sourcePathFor(ctx, value, path, [key]);
+      const message =
+        diagnosticPath?.[0] === "fragments"
+          ? "Residual static-if directive is not allowed inside fragments; gate the inject site or move it to a concrete job/step"
+          : "Residual static-if directive is not allowed here; move it to a job/step structural position";
       pushDiagnostic(
         ctx,
         "error",
-        diagnosticMessage(
-          "static-if-residual",
-          "Residual static-if directive is not allowed here; move it to a job/step structural position",
-        ),
-        [...path, key],
+        diagnosticMessage("static-if-residual", message),
+        diagnosticPath,
       );
       delete value[key];
       continue;
@@ -151,10 +186,10 @@ export function fragmentsPass(ctx: ParseContext): void {
   const fragments = getFragments(ctx);
   visitJobs(ctx, ({ id, job }) => {
     if (Array.isArray(job.steps)) {
-      job.steps = expandList(job.steps, ctx, fragments, []);
+      job.steps = expandList(job.steps, ctx, fragments, [], ["jobs", id, "steps"]);
     }
     if (job.fallback != null) {
-      expandFallbackInPlace(job, ctx, fragments, []);
+      expandFallbackInPlace(job, ctx, fragments, [], sourcePathFor(ctx, job, ["jobs", id]));
     }
     resolveCompileTimeTextBoundaries(ctx, job, ["jobs", id], {
       validateRuntimeExpressions: false,
