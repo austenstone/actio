@@ -1,0 +1,153 @@
+---
+title: call_templates
+description: Template the plumbing of reusable-workflow call jobs and share it across jobs with extends.
+---
+
+`job_defaults` and `executors` cover normal jobs, but they deliberately skip the
+plumbing of reusable-workflow **call jobs** — `uses:`, `with:`, `needs:`, and
+`secrets:` must be restated on every job. In matrix-heavy repos that plumbing is
+the single biggest source of copy-paste: e.g. `vercel/next.js` has ~8 nearly
+byte-identical `test-*` call jobs that differ only in one `with.afterBuild` value.
+
+`call_templates` defines a named call-job preset; a job `extends:` it and overrides
+only the deltas. Actio merges the template at compile time and strips both
+`call_templates` and `extends` from the output — the generated YAML is byte-identical
+to the hand-written call jobs.
+
+```yaml title=".actio.yml"
+name: Build and test
+on: [push]
+call_templates:
+  test:
+    uses: ./.github/workflows/test_reusable.yml
+    needs: build
+    with:
+      testTimingsArtifact: test-timings
+    secrets: inherit
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+  test-unit:
+    extends: test
+    with:
+      afterBuild: pnpm test:unit
+  test-integration:
+    extends: test
+    with:
+      afterBuild: pnpm test:integration
+```
+
+Each job inherits `uses`, `needs`, `secrets`, and the shared `with` keys; only the
+per-job `afterBuild` differs:
+
+```yaml title="generated .yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+  test-unit:
+    uses: ./.github/workflows/test_reusable.yml
+    needs: build
+    with:
+      testTimingsArtifact: test-timings
+      afterBuild: pnpm test:unit
+    secrets: inherit
+  test-integration:
+    uses: ./.github/workflows/test_reusable.yml
+    needs: build
+    with:
+      testTimingsArtifact: test-timings
+      afterBuild: pnpm test:integration
+    secrets: inherit
+```
+
+## Merge semantics
+
+| Key | Behaviour |
+|---|---|
+| `with` | **Shallow per-key** — `{ ...template, ...inline }`. Each `with.<key>` the job sets replaces the template's; unspecified keys inherit. |
+| `needs` | **Order-preserving union** — template deps plus inline deps, de-duplicated. |
+| `secrets` | If either side is the string `inherit`, **inline wins** (replace). If both are maps, **shallow per-key** merge like `with`. |
+| `if` | **AND-combined** — `template && inline`, consistent with `job_defaults`. |
+| `uses`, `permissions`, `concurrency`, `strategy` | **Replace-on-presence** — inline value wins entirely; template only applies when the key is absent. |
+
+A template may declare any of `uses`, `with`, `needs`, `secrets`, `if`,
+`permissions`, `concurrency`, and `strategy`. Runner keys (`runs-on`, `env`,
+`container`, …) and `steps` are rejected — call jobs have no runner.
+
+## Composing templates
+
+`extends:` accepts a single name or a list. Templates are merged left-to-right
+(later wins), and an inline value on the job always wins over all of them:
+
+```yaml title=".actio.yml"
+call_templates:
+  base:
+    uses: ./.github/workflows/reuse.yml
+    needs: build
+    with:
+      shared: base-shared
+      kept: base-kept
+    secrets:
+      TOKEN: ${{ secrets.BASE }}
+    if: ${{ github.event_name == 'push' }}
+  extra:
+    needs: lint
+    with:
+      shared: extra-shared
+    secrets:
+      EXTRA: ${{ secrets.EXTRA }}
+jobs:
+  composed:
+    extends: [base, extra]
+    needs: deploy
+    with:
+      shared: inline-shared
+      added: inline-added
+    if: ${{ success() }}
+```
+
+`needs` unions across both templates and the job; `with.shared` resolves to the
+inline value while `kept` and `added` survive; the two `secrets` maps merge; and
+both `if` gates combine:
+
+```yaml title="generated .yml"
+jobs:
+  composed:
+    uses: ./.github/workflows/reuse.yml
+    needs:
+      - build
+      - lint
+      - deploy
+    with:
+      shared: inline-shared
+      kept: base-kept
+      added: inline-added
+    secrets:
+      TOKEN: ${{ secrets.BASE }}
+      EXTRA: ${{ secrets.EXTRA }}
+    if: github.event_name == 'push' && success()
+```
+
+## Precedence with job_defaults
+
+`call_templates` resolves **before** `job_defaults`, so a fully materialized call
+job is what `job_defaults` sees. For the call-safe keys (`if`, `permissions`,
+`concurrency`, `strategy`), a value supplied by the template or inline blocks the
+default from overwriting it — precedence is **inline > extends > job_defaults**
+(`if` AND-combines all three).
+
+<Callout title="Call-job only">
+  `extends:` is for reusable-workflow call jobs. A job that sets inline `steps:`
+  cannot `extends:`, and if no template in the chain provides `uses:` (and the job
+  sets none) Actio errors — the result would not be a call job. Templates carry
+  the call plumbing; they never carry runner configuration.
+</Callout>
+
+<Callout title="Compile-time interpolation">
+  `{{ params.* }}` inside a `call_templates` block resolves before the template is
+  merged, so templates can be parameterized like any other Actio source.
+</Callout>

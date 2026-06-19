@@ -3,6 +3,7 @@
   "pages": [
     "params",
     "job-defaults",
+    "call-templates",
     "fragments",
     "static-if",
     "retry",
