@@ -561,6 +561,201 @@ jobs:
 });
 
 // ---------------------------------------------------------------------------
+// Variant axis × author strategy.matrix coexistence (issue #79)
+// ---------------------------------------------------------------------------
+
+describe("for_each: variant axis × author matrix", () => {
+  it("fans a scalar variant out to N jobs, each keeping the full author matrix", () => {
+    const { result, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3]
+        react: [18, 19]
+    for_each:
+      var: variant
+      in: [turbopack, rspack, webpack]
+    steps:
+      - run: echo {{ variant }} \${{ matrix.group }} \${{ matrix.react }}
+`);
+    expect(result.ok).toBe(true);
+    const jobs = jobsOf(doc);
+    expect(Object.keys(jobs)).toEqual(["test-turbopack", "test-rspack", "test-webpack"]);
+    expect(jobs.test).toBeUndefined();
+
+    const variant = jobs["test-turbopack"];
+    const strategy = variant.strategy as Record<string, unknown>;
+    expect(strategy.matrix).toEqual({ group: [1, 2, 3], react: [18, 19] });
+    expect(strategy["fail-fast"]).toBe(false);
+    const steps = variant.steps as { run: string }[];
+    expect(steps[0].run).toBe("echo turbopack ${{ matrix.group }} ${{ matrix.react }}");
+    expect((jobs["test-rspack"].steps as { run: string }[])[0].run).toBe(
+      "echo rspack ${{ matrix.group }} ${{ matrix.react }}",
+    );
+    expect(result.yaml).not.toContain("for_each");
+  });
+
+  it("clones an object variant onto a `uses:` call job (the next.js shape)", () => {
+    const { result, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  test:
+    uses: ./.github/workflows/build_reusable.yml
+    secrets: inherit
+    strategy:
+      matrix:
+        group: [1, 2, 3]
+        react: [18, 19]
+    with:
+      afterBuild: "{{ variant.afterBuild }}"
+    for_each:
+      var: variant
+      key: name
+      in:
+        - { name: turbopack-dev, afterBuild: "pnpm test-dev" }
+        - { name: turbopack-prod, afterBuild: "pnpm test-prod" }
+`);
+    expect(result.ok).toBe(true);
+    const jobs = jobsOf(doc);
+    expect(Object.keys(jobs)).toEqual(["test-turbopack_dev", "test-turbopack_prod"]);
+
+    const dev = jobs["test-turbopack_dev"];
+    expect(dev.uses).toBe("./.github/workflows/build_reusable.yml");
+    expect(dev.secrets).toBe("inherit");
+    expect((dev.with as Record<string, unknown>).afterBuild).toBe("pnpm test-dev");
+    expect((dev.strategy as Record<string, unknown>).matrix).toEqual({
+      group: [1, 2, 3],
+      react: [18, 19],
+    });
+    expect((jobs["test-turbopack_prod"].with as Record<string, unknown>).afterBuild).toBe(
+      "pnpm test-prod",
+    );
+  });
+
+  it("copies the original `needs` onto every variant (parallel, not a serial chain)", () => {
+    const { result, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+  test:
+    runs-on: ubuntu-latest
+    needs: [build]
+    strategy:
+      matrix:
+        group: [1, 2]
+    for_each:
+      var: variant
+      in: [x, y]
+    steps:
+      - run: echo {{ variant }}
+`);
+    expect(result.ok).toBe(true);
+    const jobs = jobsOf(doc);
+    expect(jobs["test-x"].needs).toEqual(["build"]);
+    expect(jobs["test-y"].needs).toEqual(["build"]);
+  });
+
+  it("errors when the loop var reuses an author matrix key", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        group: [1, 2]
+    for_each:
+      var: group
+      in: [a, b]
+    steps:
+      - run: echo {{ group }}
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "for-each-matrix-key-collision")).toBe(true);
+  });
+
+  it("warns and ignores loop-level fail-fast/max-parallel, preserving the author's", () => {
+    const { result, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        group: [1, 2]
+    for_each:
+      var: variant
+      in: [x, y]
+      fail-fast: false
+      max-parallel: 3
+    steps:
+      - run: echo {{ variant }}
+`);
+    expect(result.ok).toBe(true);
+    expect(hasCode(result, "for-each-loop-knob-ignored-coexist")).toBe(true);
+    const strategy = jobsOf(doc)["test-x"].strategy as Record<string, unknown>;
+    expect(strategy["fail-fast"]).toBe(true);
+    expect(strategy["max-parallel"]).toBeUndefined();
+  });
+
+  it("falls back to the index when an object variant has no slug field", () => {
+    const { result, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        group: [1, 2]
+    for_each:
+      var: variant
+      in:
+        - { afterBuild: "a" }
+        - { afterBuild: "b" }
+    steps:
+      - run: echo {{ variant.afterBuild }}
+`);
+    expect(result.ok).toBe(true);
+    expect(hasCode(result, "for-each-variant-id-fallback")).toBe(true);
+    const jobs = jobsOf(doc);
+    expect(Object.keys(jobs)).toEqual(["test-0", "test-1"]);
+  });
+
+  it("leaves the single-job fold untouched when there is no author matrix", () => {
+    const { result, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    for_each:
+      var: variant
+      in: [a, b]
+    steps:
+      - run: echo {{ variant }}
+`);
+    expect(result.ok).toBe(true);
+    const jobs = jobsOf(doc);
+    expect(Object.keys(jobs)).toEqual(["test"]);
+    expect((jobs.test.strategy as Record<string, unknown>).matrix).toEqual({ variant: ["a", "b"] });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Serial job fan-out (job-level for_each, parallel: false)
 // ---------------------------------------------------------------------------
 
