@@ -1,32 +1,44 @@
 import type { ShikiTransformer, ThemedToken } from '@shikijs/types';
 
-// Actio-only macro keywords (source spellings used across the docs examples).
-// Underscore aliases are included defensively; the docs use hyphenated forms.
+// Actio-only macro keywords. Source of truth: the keyword table in
+// docs/content/docs/syntax.mdx (plus call-templates/extends/if-changed, which
+// are real macros documented in their detailed sections). Keep this in sync
+// with that table — grouped by scope to make drift obvious.
 const ACTIO_KEYWORDS = new Set([
+  // workflow
   'params',
   'fragments',
-  'executors',
-  'executor',
-  'call-templates',
-  'extends',
   'job-defaults',
+  'executors',
+  'call-templates',
+  'injection-hoist',
+  'finally',
+  // job
+  'executor',
   'dynamic-matrix',
+  'extends',
+  // job / step
   'static-if',
-  'if-changed',
-  'for-each',
-  'inject',
-  'retry',
   'fallback',
-  'call_templates',
-  'job_defaults',
-  'dynamic_matrix',
-  'static_if',
-  'if_changed',
-  'for_each',
+  'ensure',
+  'on-success',
+  'on-failure',
+  'on-abort',
+  'if-changed',
+  // step
+  'inject',
+  'for-each',
+  'retry',
+  'share',
+  'unsafe',
+  'trust',
+  'force',
 ]);
 
 // Matches the first mapping key on a line, with an optional `- ` list marker.
-const KEY_RE = /^(\s*(?:-\s+)?)([A-Za-z][\w-]*)\s*:/;
+// The optional `(...)` tail covers the `static-if(<expr>)` keyed-merge form;
+// only the keyword name (group 2) is highlighted, not the expression.
+const KEY_RE = /^(\s*(?:-\s+)?)([A-Za-z][\w-]*)(?:\([^)]*\))?\s*:/;
 const MARK = '__actioKeyword';
 
 const isActioBlock = (meta: { title?: unknown; __raw?: unknown } | undefined): boolean => {
