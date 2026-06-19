@@ -1,0 +1,7 @@
+# Allow symbolic (tag) pins like `actions/checkout@v4`, matching this repo's
+# convention. zizmor v1.20+ defaults to requiring SHA pins on all actions.
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        "*": ref-pin

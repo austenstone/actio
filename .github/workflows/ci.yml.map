@@ -100,7 +100,7 @@
       },
       "source": 0,
       "original": {
-        "line": 26,
+        "line": 28,
         "col": 3
       },
       "path": "jobs"
@@ -111,7 +111,7 @@
       },
       "source": 0,
       "original": {
-        "line": 27,
+        "line": 29,
         "col": 14
       },
       "path": "jobs.build.runs-on"
@@ -122,7 +122,7 @@
       },
       "source": 0,
       "original": {
-        "line": 29,
+        "line": 31,
         "col": 18
       },
       "path": "jobs.build.strategy.fail-fast"
@@ -133,7 +133,7 @@
       },
       "source": 0,
       "original": {
-        "line": 31,
+        "line": 33,
         "col": 9
       },
       "path": "jobs.build.strategy.matrix"
@@ -144,7 +144,7 @@
       },
       "source": 0,
       "original": {
-        "line": 31,
+        "line": 33,
         "col": 24
       },
       "path": "jobs.build.strategy.matrix.node-version.0"
@@ -155,7 +155,7 @@
       },
       "source": 0,
       "original": {
-        "line": 31,
+        "line": 33,
         "col": 28
       },
       "path": "jobs.build.strategy.matrix.node-version.1"
@@ -173,14 +173,14 @@
     },
     {
       "generated": {
-        "line": 27
+        "line": 28
       },
       "source": 0,
       "original": {
-        "line": 19,
-        "col": 13
+        "line": 20,
+        "col": 30
       },
-      "path": "jobs.build.steps.1.uses"
+      "path": "jobs.build.steps.0.with.persist-credentials"
     },
     {
       "generated": {
@@ -189,20 +189,9 @@
       "source": 0,
       "original": {
         "line": 21,
-        "col": 23
+        "col": 13
       },
-      "path": "jobs.build.steps.1.with.node-version"
-    },
-    {
-      "generated": {
-        "line": 30
-      },
-      "source": 0,
-      "original": {
-        "line": 22,
-        "col": 16
-      },
-      "path": "jobs.build.steps.1.with.cache"
+      "path": "jobs.build.steps.1.uses"
     },
     {
       "generated": {
@@ -211,9 +200,9 @@
       "source": 0,
       "original": {
         "line": 23,
-        "col": 12
+        "col": 23
       },
-      "path": "jobs.build.steps.2.run"
+      "path": "jobs.build.steps.1.with.node-version"
     },
     {
       "generated": {
@@ -221,10 +210,10 @@
       },
       "source": 0,
       "original": {
-        "line": 34,
-        "col": 14
+        "line": 24,
+        "col": 16
       },
-      "path": "jobs.build.steps.3.run"
+      "path": "jobs.build.steps.1.with.cache"
     },
     {
       "generated": {
@@ -232,10 +221,10 @@
       },
       "source": 0,
       "original": {
-        "line": 35,
-        "col": 14
+        "line": 25,
+        "col": 12
       },
-      "path": "jobs.build.steps.4.run"
+      "path": "jobs.build.steps.2.run"
     },
     {
       "generated": {
@@ -246,7 +235,7 @@
         "line": 36,
         "col": 14
       },
-      "path": "jobs.build.steps.5.run"
+      "path": "jobs.build.steps.3.run"
     },
     {
       "generated": {
@@ -257,7 +246,7 @@
         "line": 37,
         "col": 14
       },
-      "path": "jobs.build.steps.6.run"
+      "path": "jobs.build.steps.4.run"
     },
     {
       "generated": {
@@ -268,7 +257,18 @@
         "line": 38,
         "col": 14
       },
-      "path": "jobs.build.steps.7.run"
+      "path": "jobs.build.steps.5.run"
+    },
+    {
+      "generated": {
+        "line": 37
+      },
+      "source": 0,
+      "original": {
+        "line": 39,
+        "col": 14
+      },
+      "path": "jobs.build.steps.6.run"
     },
     {
       "generated": {
@@ -276,10 +276,10 @@
       },
       "source": 0,
       "original": {
-        "line": 41,
+        "line": 40,
         "col": 14
       },
-      "path": "jobs.workflows.runs-on"
+      "path": "jobs.build.steps.7.run"
     },
     {
       "generated": {
@@ -288,31 +288,20 @@
       "source": 0,
       "original": {
         "line": 43,
+        "col": 14
+      },
+      "path": "jobs.workflows.runs-on"
+    },
+    {
+      "generated": {
+        "line": 42
+      },
+      "source": 0,
+      "original": {
+        "line": 45,
         "col": 15
       },
       "path": "jobs.workflows.steps.0.uses"
-    },
-    {
-      "generated": {
-        "line": 41
-      },
-      "source": 0,
-      "original": {
-        "line": 44,
-        "col": 15
-      },
-      "path": "jobs.workflows.steps.1.uses"
-    },
-    {
-      "generated": {
-        "line": 43
-      },
-      "source": 0,
-      "original": {
-        "line": 46,
-        "col": 25
-      },
-      "path": "jobs.workflows.steps.1.with.node-version"
     },
     {
       "generated": {
@@ -321,9 +310,9 @@
       "source": 0,
       "original": {
         "line": 47,
-        "col": 18
+        "col": 32
       },
-      "path": "jobs.workflows.steps.1.with.cache"
+      "path": "jobs.workflows.steps.0.with.persist-credentials"
     },
     {
       "generated": {
@@ -332,20 +321,9 @@
       "source": 0,
       "original": {
         "line": 48,
-        "col": 14
+        "col": 15
       },
-      "path": "jobs.workflows.steps.2.run"
-    },
-    {
-      "generated": {
-        "line": 46
-      },
-      "source": 0,
-      "original": {
-        "line": 49,
-        "col": 14
-      },
-      "path": "jobs.workflows.steps.3.run"
+      "path": "jobs.workflows.steps.1.uses"
     },
     {
       "generated": {
@@ -354,9 +332,9 @@
       "source": 0,
       "original": {
         "line": 50,
-        "col": 15
+        "col": 25
       },
-      "path": "jobs.workflows.steps.4.name"
+      "path": "jobs.workflows.steps.1.with.node-version"
     },
     {
       "generated": {
@@ -365,9 +343,130 @@
       "source": 0,
       "original": {
         "line": 51,
+        "col": 18
+      },
+      "path": "jobs.workflows.steps.1.with.cache"
+    },
+    {
+      "generated": {
+        "line": 49
+      },
+      "source": 0,
+      "original": {
+        "line": 52,
+        "col": 14
+      },
+      "path": "jobs.workflows.steps.2.run"
+    },
+    {
+      "generated": {
+        "line": 50
+      },
+      "source": 0,
+      "original": {
+        "line": 53,
+        "col": 14
+      },
+      "path": "jobs.workflows.steps.3.run"
+    },
+    {
+      "generated": {
+        "line": 51
+      },
+      "source": 0,
+      "original": {
+        "line": 54,
+        "col": 15
+      },
+      "path": "jobs.workflows.steps.4.name"
+    },
+    {
+      "generated": {
+        "line": 52
+      },
+      "source": 0,
+      "original": {
+        "line": 55,
         "col": 14
       },
       "path": "jobs.workflows.steps.4.run"
+    },
+    {
+      "generated": {
+        "line": 54
+      },
+      "source": 0,
+      "original": {
+        "line": 58,
+        "col": 11
+      },
+      "path": "jobs.zizmor.name"
+    },
+    {
+      "generated": {
+        "line": 55
+      },
+      "source": 0,
+      "original": {
+        "line": 59,
+        "col": 14
+      },
+      "path": "jobs.zizmor.runs-on"
+    },
+    {
+      "generated": {
+        "line": 57
+      },
+      "source": 0,
+      "original": {
+        "line": 61,
+        "col": 17
+      },
+      "path": "jobs.zizmor.permissions.contents"
+    },
+    {
+      "generated": {
+        "line": 59
+      },
+      "source": 0,
+      "original": {
+        "line": 63,
+        "col": 15
+      },
+      "path": "jobs.zizmor.steps.0.uses"
+    },
+    {
+      "generated": {
+        "line": 61
+      },
+      "source": 0,
+      "original": {
+        "line": 65,
+        "col": 32
+      },
+      "path": "jobs.zizmor.steps.0.with.persist-credentials"
+    },
+    {
+      "generated": {
+        "line": 62
+      },
+      "source": 0,
+      "original": {
+        "line": 66,
+        "col": 15
+      },
+      "path": "jobs.zizmor.steps.1.uses"
+    },
+    {
+      "generated": {
+        "line": 64
+      },
+      "source": 0,
+      "original": {
+        "line": 68,
+        "col": 30
+      },
+      "path": "jobs.zizmor.steps.1.with.advanced-security"
     }
   ]
 }
