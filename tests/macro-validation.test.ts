@@ -11,12 +11,20 @@ function diag(source: string) {
   };
 }
 
+type RangedDiagnostic = Diagnostic & { range: NonNullable<Diagnostic["range"]> };
+
 /** Find a diagnostic whose message matches and assert it carries a source range. */
-function ranged(diags: Diagnostic[], re: RegExp): Diagnostic {
+function ranged(diags: Diagnostic[], re: RegExp): RangedDiagnostic {
   const hit = diags.find((d) => re.test(d.message));
   expect(hit, `expected a diagnostic matching ${re}`).toBeTruthy();
   expect(hit?.range, `diagnostic ${re} should carry a range`).toBeTruthy();
-  return hit as Diagnostic;
+  return hit as RangedDiagnostic;
+}
+
+function lineOf(source: string, needle: string): number {
+  const line = source.split("\n").findIndex((l) => l.includes(needle));
+  expect(line, `expected source to contain ${needle}`).toBeGreaterThanOrEqual(0);
+  return line + 1;
 }
 
 describe("retry validation", () => {
@@ -42,6 +50,28 @@ jobs:
         retry: 1
 `);
     ranged(warnings, /retry attempts must be a number >= 2/);
+  });
+
+  it("reports non-finite shorthand values accurately", () => {
+    const { warnings: infinityWarnings } = diag(`name: x
+on: [push]
+jobs:
+  a:\n    runs-on: ubuntu-latest
+    steps:
+      - run: ./x.sh
+        retry: .inf
+`);
+    ranged(infinityWarnings, /retry attempts must be a number >= 2 \(got Infinity\)/);
+
+    const { warnings: nanWarnings } = diag(`name: x
+on: [push]
+jobs:
+  a:\n    runs-on: ubuntu-latest
+    steps:
+      - run: ./x.sh
+        retry: .nan
+`);
+    ranged(nanWarnings, /retry attempts must be a number >= 2 \(got NaN\)/);
   });
 
   it("warns on non-numeric retry.attempts", () => {
@@ -96,6 +126,40 @@ jobs:
           backoff: linear
 `);
     ranged(warnings, /retry has unknown key "backoff"/);
+  });
+
+  it("ranges retry diagnostics on fragment-injected steps back to the fragment source", () => {
+    const source = `name: x
+on: [push]
+fragments:
+  flaky:
+    - run: ./x.sh
+      retry: "soon"
+jobs:
+  a:\n    runs-on: ubuntu-latest
+    steps:
+      - inject: flaky
+`;
+    const { warnings } = diag(source);
+    const hit = ranged(warnings, /retry must be a number or a mapping/);
+    expect(hit.range.start.line).toBe(lineOf(source, 'retry: "soon"'));
+  });
+
+  it("ranges retry diagnostics on fallback-nested steps back to the nested source", () => {
+    const source = `name: x
+on: [push]
+jobs:
+  a:\n    runs-on: ubuntu-latest
+    steps:
+      - run: ./x.sh
+        fallback:
+          steps:
+            - run: ./cleanup.sh
+              retry: "soon"
+`;
+    const { warnings } = diag(source);
+    const hit = ranged(warnings, /retry must be a number or a mapping/);
+    expect(hit.range.start.line).toBe(lineOf(source, 'retry: "soon"'));
   });
 });
 

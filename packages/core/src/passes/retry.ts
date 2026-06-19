@@ -1,6 +1,15 @@
-import { cloneNode, deriveNode, type Job, type Step, transformSteps, visitJobs } from "../ir.js";
+import {
+  cloneNode,
+  deriveNode,
+  type Job,
+  originOf,
+  type Step,
+  transformSteps,
+  visitJobs,
+} from "../ir.js";
 import type { ParseContext, Path } from "../parser.js";
 import {
+  asStepArray,
   collectUsedStepIds,
   combineIf,
   isObject,
@@ -16,6 +25,24 @@ interface NormalizedRetry {
   attempts: number;
   delaySeconds?: number;
   delayLabel?: string;
+}
+
+function formatRetryValue(value: unknown): string {
+  if (typeof value === "number") return String(value);
+  return JSON.stringify(value) ?? String(value);
+}
+
+function reserveUsedStepIds(used: Set<string>, steps: Step[] | undefined): void {
+  for (const id of collectUsedStepIds(steps)) used.add(id);
+}
+
+function reserveFallbackStepIds(used: Set<string>, container: { fallback?: unknown }): void {
+  const fallback = container.fallback;
+  if (Array.isArray(fallback)) {
+    reserveUsedStepIds(used, asStepArray(fallback));
+  } else if (isObject(fallback) && Array.isArray(fallback.steps)) {
+    reserveUsedStepIds(used, asStepArray(fallback.steps));
+  }
 }
 
 /** Parse a `delay` value ("10s" | "2m" | "1h" | number-of-seconds) into seconds. */
@@ -47,7 +74,7 @@ function normalizeRetry(ctx: ParseContext, raw: unknown, path?: Path): Normalize
       pushDiagnostic(
         ctx,
         "warning",
-        `retry attempts must be a number >= 2 (got ${JSON.stringify(raw)}); ignoring retry`,
+        `retry attempts must be a number >= 2 (got ${formatRetryValue(raw)}); ignoring retry`,
         path,
         { hint: "use `retry: 3` or `retry: { attempts: 3 }`" },
       );
@@ -73,7 +100,7 @@ function normalizeRetry(ctx: ParseContext, raw: unknown, path?: Path): Normalize
         pushDiagnostic(
           ctx,
           "warning",
-          `retry.attempts must be a number (got ${JSON.stringify(attemptsRaw)}); ignoring retry`,
+          `retry.attempts must be a number (got ${formatRetryValue(attemptsRaw)}); ignoring retry`,
           path ? [...path, "attempts"] : path,
         );
         return null;
@@ -136,10 +163,12 @@ function buildRetryAttempts(
   idx: number,
   used: Set<string>,
   cfg: NormalizedRetry,
+  sourcePath?: Path,
 ): Step[] {
   const label = stepLabel(step);
   const slug = slugify(label);
   const base = slug ? `step_${slug}` : `actio_${jobId}_step_${idx + 1}`;
+  const idPath: Path = sourcePath ? [...sourcePath, "id"] : ["jobs", jobId, "steps", idx, "id"];
   // A user-supplied `id` is reclaimed onto the FINAL attempt only. That attempt
   // is gated on the prior attempt FAILING, so on the common first-attempt-success
   // path it (and the reclaimed id) is skipped — downstream `steps.<id>.outputs`
@@ -153,12 +182,13 @@ function buildRetryAttempts(
       `Step "${userId}" in job "${jobId}": retry reclaims this id onto the final attempt, ` +
         `which only runs after an earlier attempt fails; downstream ` +
         `steps.${userId}.outputs/.outcome are empty on first-attempt success`,
-      ["jobs", jobId, "steps", idx, "id"],
+      idPath,
     );
   }
   // Keep `userId` reserved in `used` so a synthesized `${base}_attempt_${n}` can
   // never claim that exact value (the `while (used.has(id))` guard below skips
   // it); the final attempt then reclaims it as a unique id.
+  if (userId) used.add(userId);
   // Preserve a falsy boolean/number `if` (e.g. `if: false` / `if: 0`) — both
   // are valid "never run" gates that must survive onto the first attempt.
   const originalIf =
@@ -226,20 +256,22 @@ function expandRetryInList(
   steps: Step[],
   used: Set<string>,
 ): Step[] {
+  reserveUsedStepIds(used, steps);
   const out: Step[] = [];
   steps.forEach((step, idx) => {
+    const sourcePath = isObject(step) ? originOf(ctx, step)?.path : undefined;
     if (isObject(step) && step.fallback != null) expandRetryInFallback(ctx, jobId, step, used);
     if (!isObject(step) || step.retry == null) {
       out.push(step);
       return;
     }
-    const cfg = normalizeRetry(ctx, step.retry);
+    const cfg = normalizeRetry(ctx, step.retry, sourcePath ? [...sourcePath, "retry"] : undefined);
     delete step.retry;
     if (cfg == null) {
       out.push(step);
       return;
     }
-    out.push(...buildRetryAttempts(ctx, jobId, step, idx, used, cfg));
+    out.push(...buildRetryAttempts(ctx, jobId, step, idx, used, cfg, sourcePath));
   });
   return out;
 }
@@ -257,14 +289,22 @@ function expandRetryInFallback(
 /** Expand step-level `retry:` blocks into a chain of conditional attempts. */
 function processStepRetries(ctx: ParseContext, jobId: string, job: Job): void {
   const used = collectUsedStepIds(Array.isArray(job.steps) ? job.steps : []);
+  reserveFallbackStepIds(used, job);
   if (Array.isArray(job.steps)) {
     transformSteps(ctx, jobId, job, (step, idx) => {
+      const sourcePath = isObject(step)
+        ? (originOf(ctx, step)?.path ?? ["jobs", jobId, "steps", idx])
+        : undefined;
       if (isObject(step) && step.fallback != null) expandRetryInFallback(ctx, jobId, step, used);
       if (!isObject(step) || step.retry == null) return [step];
-      const cfg = normalizeRetry(ctx, step.retry, ["jobs", jobId, "steps", idx, "retry"]);
+      const cfg = normalizeRetry(
+        ctx,
+        step.retry,
+        sourcePath ? [...sourcePath, "retry"] : undefined,
+      );
       delete step.retry;
       if (cfg == null) return [step];
-      return buildRetryAttempts(ctx, jobId, step, idx, used, cfg);
+      return buildRetryAttempts(ctx, jobId, step, idx, used, cfg, sourcePath);
     });
   }
   // A job-level `fallback` may itself contain steps carrying `retry:`.

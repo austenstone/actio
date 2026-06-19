@@ -143,9 +143,7 @@ export function ensureStepId(step: Step, used: Set<string>, fallbackBase: string
 
 export function collectUsedStepIds(steps: Step[] | undefined): Set<string> {
   const used = new Set<string>();
-  for (const s of steps ?? []) {
-    if (s && typeof s.id === "string" && s.id) used.add(s.id);
-  }
+  collectUsedStepIdsInto(steps, used);
   return used;
 }
 
@@ -157,6 +155,19 @@ export function sourcePathFor(
 ): Path | undefined {
   const base = ctx.origins.get(node)?.path ?? fallbackPath;
   return base ? [...base, ...suffix] : undefined;
+}
+
+function collectUsedStepIdsInto(steps: Step[] | undefined, used: Set<string>): void {
+  for (const s of steps ?? []) {
+    if (!isObject(s)) continue;
+    if (typeof s.id === "string" && s.id) used.add(s.id);
+    const fallback = s.fallback;
+    if (Array.isArray(fallback)) {
+      collectUsedStepIdsInto(asStepArray(fallback), used);
+    } else if (isObject(fallback) && Array.isArray(fallback.steps)) {
+      collectUsedStepIdsInto(asStepArray(fallback.steps), used);
+    }
+  }
 }
 
 export function pushDiagnostic(
