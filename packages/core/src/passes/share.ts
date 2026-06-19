@@ -34,27 +34,24 @@ export function buildOutputWriter(spec: OutputWriterSpec): string {
     .split("\n")
     .map((l) => `  ${l}`)
     .join("\n");
+  // `delimiter` is a static prefix only; a runtime-random nonce is appended in-shell
+  // so the heredoc terminator is unguessable from the compiled source. This prevents
+  // a crafted output value from spoofing the closing token and injecting extra outputs.
+  // `openssl` ships on all GitHub-hosted runners; `$RANDOM` is the bash fallback.
+  const dvar = "__ACTIO_EOF";
+  const ref = `\${${dvar}}`;
   return [
     "{",
-    `  echo '${spec.name}<<${spec.delimiter}'`,
+    `  ${dvar}="${spec.delimiter}_$(openssl rand -hex 8 2>/dev/null || echo \${RANDOM}\${RANDOM})"`,
+    `  echo "${spec.name}<<${ref}"`,
     body,
-    `  echo ${spec.delimiter}`,
+    `  echo "${ref}"`,
     '} >> "$GITHUB_OUTPUT"',
   ].join("\n");
 }
 
 const NAME_RE = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 const PARAM_TYPES: ReadonlySet<string> = new Set(["string", "number", "boolean", "enum", "object"]);
-
-/** Deterministic FNV-1a (32-bit) hash, hex, first 6 chars — for heredoc delimiter uniqueness. */
-function fnv1a(s: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return (h >>> 0).toString(16).padStart(8, "0").slice(0, 6);
-}
 
 interface Producer {
   jobId: string;
@@ -63,6 +60,8 @@ interface Producer {
   name: string;
   json: boolean;
   referencedCrossJob: boolean;
+  isMatrix: boolean;
+  path: Path;
 }
 
 type ParsedSource =
@@ -423,16 +422,6 @@ function collectJob(
           { code: "share-secret" },
         );
       }
-      if (isMatrix) {
-        pushDiagnostic(
-          ctx,
-          "warning",
-          `share output "${rawName}" is produced by matrix job "${jobId}"; concurrent matrix legs race on the same output`,
-          [...sharePath, rawName],
-          { code: "share-matrix-race" },
-        );
-      }
-
       seenNames.add(rawName);
       if (!stepId) {
         stepId = ensureStepId(
@@ -452,14 +441,23 @@ function collectJob(
           }),
         );
       } else {
-        const delimiter = `ACTIO_EOF_${rawName}_${fnv1a(`${jobId}:${stepId}:${rawName}`)}`;
+        const delimiter = `ACTIO_EOF_${rawName}`;
         writers.push(
           buildOutputWriter({ kind: "capture", name: rawName, body: spec.body, delimiter }),
         );
       }
 
       const list = registry.get(rawName) ?? [];
-      list.push({ jobId, job, stepId, name: rawName, json: spec.json, referencedCrossJob: false });
+      list.push({
+        jobId,
+        job,
+        stepId,
+        name: rawName,
+        json: spec.json,
+        referencedCrossJob: false,
+        isMatrix,
+        path: [...sharePath, rawName],
+      });
       registry.set(rawName, list);
 
       ctx.symbols.set(`share:${jobId}:${rawName}`, {
@@ -538,6 +536,19 @@ export function sharePass(ctx: ParseContext): void {
   for (const list of registry.values()) {
     for (const p of list) {
       if (!p.referencedCrossJob) continue;
+      if (p.isMatrix) {
+        // GitHub collapses a matrix job's entire `outputs:` map down to whichever
+        // leg finishes last, so a cross-job-referenced matrix output silently loses
+        // every other leg's value. Hard-fail instead of emitting lossy YAML.
+        pushDiagnostic(
+          ctx,
+          "error",
+          `share output "${p.name}" escapes matrix job "${p.jobId}" via job outputs, but GitHub collapses a matrix job's outputs map to a single leg — only the last leg's value survives. Use distinct output names within one serial job, N distinct (non-matrix) jobs for static parallelism, or artifact fan-in for the dynamic case.`,
+          p.path,
+          { code: "share-matrix-output-clobber" },
+        );
+        continue;
+      }
       if (!isObject(p.job.outputs)) p.job.outputs = {};
       p.job.outputs[p.name] = `\${{ steps.${p.stepId}.outputs.${p.name} }}`;
     }

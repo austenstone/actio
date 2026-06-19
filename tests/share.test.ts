@@ -179,19 +179,18 @@ jobs:
       - run: echo "\${{ share.notes }}"
 `;
 
-  it("emits a brace-group heredoc with a per-output delimiter and wires the consumer", () => {
+  it("emits a brace-group heredoc with a runtime-random delimiter and wires the consumer", () => {
     const { result, errors, doc } = build(SRC);
     expect(result.ok).toBe(true);
     expect(errors).toHaveLength(0);
     const run = String(steps(jobsOf(doc).build)[0].run);
-    // Per-output delimiter (brief §35): ACTIO_EOF_<name>_<deterministic-suffix>.
-    expect(run).toMatch(/echo 'notes<<ACTIO_EOF_notes_[0-9a-f]+'/);
+    // The closing token is computed at runtime (unguessable from source): a static
+    // prefix plus an in-shell nonce, captured once and reused in open + close.
+    expect(run).toMatch(/__ACTIO_EOF="ACTIO_EOF_notes_\$\(openssl rand -hex 8/);
+    expect(run).toContain('echo "notes<<${__ACTIO_EOF}"');
     expect(run).toMatch(/git log --oneline -n 20/);
+    expect(run).toContain('echo "${__ACTIO_EOF}"');
     expect(run).toContain('} >> "$GITHUB_OUTPUT"');
-    // Opening and closing delimiter must match exactly.
-    const open = run.match(/notes<<(ACTIO_EOF_notes_[0-9a-f]+)/)?.[1];
-    expect(open).toBeTruthy();
-    expect(run).toContain(`echo ${open}`);
     expect(String(steps(jobsOf(doc).publish)[0].run)).toBe(
       'echo "${{ needs.build.outputs.notes }}"',
     );
@@ -438,7 +437,7 @@ jobs:
     expect(warnings.length).toBeGreaterThan(0);
   });
 
-  it("5.8 warns when a producer job uses a matrix strategy", () => {
+  it("5.8 hard-errors when a matrix-produced output escapes via job outputs", () => {
     const { result } = build(`
 name: e
 on: [push]
@@ -457,7 +456,31 @@ jobs:
     steps:
       - run: echo "\${{ share.x }}"
 `);
-    expect(hasCode(result, "share-matrix-race")).toBe(true);
+    expect(hasCode(result, "share-matrix-output-clobber")).toBe(true);
+    expect(result.ok).toBe(false);
+    // Old race warning is gone — replaced by the precise cross-job error.
+    expect(hasCode(result, "share-matrix-race")).toBe(false);
+  });
+
+  it("5.8b does not flag a matrix share consumed within the same job", () => {
+    const { result } = build(`
+name: e
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20]
+    steps:
+      - run: echo hi
+        share:
+          x: $A
+      - run: echo "\${{ share.x }}"
+`);
+    expect(hasCode(result, "share-matrix-output-clobber")).toBe(false);
+    expect(hasCode(result, "share-matrix-race")).toBe(false);
+    expect(result.ok).toBe(true);
   });
 
   it("5.9 warns when a shared value derives from a secret", () => {
@@ -501,16 +524,18 @@ describe("buildOutputWriter primitive", () => {
     expect(out).toContain('[ -n "$V" ] || { echo "::error::empty share value"; exit 1; }');
   });
 
-  it("builds a capture-form heredoc framing the body with the given delimiter", () => {
+  it("builds a capture-form heredoc with a runtime-random delimiter from the given prefix", () => {
     const out = buildOutputWriter({
       kind: "capture",
       name: "notes",
       body: "git log",
-      delimiter: "ACTIO_EOF_notes_abc123",
+      delimiter: "ACTIO_EOF_notes",
     });
-    expect(out).toContain("echo 'notes<<ACTIO_EOF_notes_abc123'");
+    // Prefix seeds an in-shell nonce; the nonce (not the prefix) terminates the heredoc.
+    expect(out).toMatch(/__ACTIO_EOF="ACTIO_EOF_notes_\$\(openssl rand -hex 8/);
+    expect(out).toContain('echo "notes<<${__ACTIO_EOF}"');
     expect(out).toContain("git log");
-    expect(out).toContain("echo ACTIO_EOF_notes_abc123");
+    expect(out).toContain('echo "${__ACTIO_EOF}"');
     expect(out).toContain('} >> "$GITHUB_OUTPUT"');
   });
 });
