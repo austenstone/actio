@@ -109,18 +109,16 @@ else `ubuntu-latest`) so it doesn't inherit the empty expression.
   `runs-on`.
 </Callout>
 
-### Limits vs Buildkite
+### Limits
 
-[Buildkite's dynamic pipelines](https://buildkite.com/docs/pipelines/configure/dynamic-pipelines)
-let the generator print a completely different step list per item. GitHub Actions
-cannot: it's still **one job definition with a shared `steps:`**. Heterogeneity is
-limited to per-item *attributes* (`runs-on`, `env`, `container`, inputs) — not a
-different step graph per entry. Use [`for_each`](/docs/macros/for-each) or separate
-jobs if you need structurally different work.
+A generated matrix still fans out **one job definition with a shared `steps:`** — you
+can't print a different step list per item. Heterogeneity is limited to per-item
+*attributes* (`runs-on`, `env`, `container`, inputs), not a different step graph per
+entry. Use [`for_each`](/docs/syntax#for_each) or separate jobs if you need
+structurally different work.
 
 Matrix is also capped at
-[256 jobs per run](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow#using-a-matrix-strategy);
-Buildkite allows far more.
+[256 jobs per run](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow#using-a-matrix-strategy).
 
 ## Inline scripts
 

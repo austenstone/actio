@@ -3,26 +3,55 @@ title: Introduction
 description: A transpiler that compiles a clean .actio.yml source into the verbose GitHub Actions YAML you'd otherwise hand-write.
 ---
 
-Writing **dynamic** GitHub Actions workflows in raw YAML is painful. Actio adds a
-small set of macro keywords — [`params`](/docs/macros/params),
-[`fragments`](/docs/macros/fragments), [`retry`](/docs/macros/retry),
-[`dynamic_matrix`](/docs/macros/dynamic-matrix), and [`fallback`](/docs/macros/fallback) —
-that expand into the boilerplate GitHub requires. Everything else is passthrough,
-so a macro-free `.actio.yml` file is just a normal workflow.
+Actio adds a handful of macro keywords on top of standard workflow YAML. They expand
+at **build time** — nothing survives into the generated output, so there's no runtime
+and no lock-in. Everything that isn't a macro is passthrough: a macro-free
+`.actio.yml` is already a valid workflow.
 
-Inspired by [Buildkite](https://buildkite.com/docs/pipelines/configure/dynamic-pipelines)'s
-runtime `pipeline upload`. GitHub Actions can't inject steps at runtime — but we
-**can** generate the correct YAML ahead of time from a higher-level source.
+Here's the smallest useful example. [`fragments`](/docs/macros/fragments) defines
+reusable steps, `inject` splices them in, and ordinary steps pass straight through:
+
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
+
+  ```yaml
+  fragments:
+    setup:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+      steps:
+        - inject: setup
+        - run: npm test
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-node@v4
+        - run: npm test
+  ```
+
+  </Tab>
+</Tabs>
 
 ## Why
 
-| Pain in raw YAML | Actio |
+| Pain in raw YAML | Macro |
 | --- | --- |
-| Dynamic matrix needs a hand-built setup job that prints JSON to `$GITHUB_OUTPUT`, consumed downstream via `fromJSON()`, with escaping and empty-guard gotchas | `dynamic_matrix: { script, alias }` |
-| Reusing 3 steps forces a separate [composite action](https://docs.github.com/en/actions/sharing-automations/creating-actions/creating-a-composite-action) or [reusable workflow](https://docs.github.com/en/actions/sharing-automations/reusing-workflows) file | in-file `fragments` + `inject` |
-| Retrying flaky steps requires bash loops or third-party actions | `retry: { attempts, delay }` |
-| try/catch means smearing `if: failure()` / `continue-on-error` across steps | `fallback:` block |
-| Compile-time constants and structured defaults are hard to keep typed in plain YAML | top-level `params:` + `{{ params.* }}` |
+| Dynamic matrix needs a hand-built setup job that prints JSON to `$GITHUB_OUTPUT`, consumed downstream via `fromJSON()`, with escaping and empty-guard gotchas | [`dynamic_matrix`](/docs/macros/dynamic-matrix) |
+| Reusing steps forces a separate [composite action](https://docs.github.com/en/actions/sharing-automations/creating-actions/creating-a-composite-action) or [reusable workflow](https://docs.github.com/en/actions/sharing-automations/reusing-workflows) file | [`fragments`](/docs/macros/fragments) |
+| Retrying flaky steps requires bash loops or third-party actions | [`retry`](/docs/macros/retry) |
+| try/catch means smearing `if: failure()` / `continue-on-error` across steps | [`fallback`](/docs/macros/fallback) |
+| Compile-time constants and structured defaults are hard to keep typed in plain YAML | [`params`](/docs/macros/params) |
 
 Prior art ([`github-actions-workflow-ts`](https://github.com/emmanuelnk/github-actions-workflow-ts),
 [`github-actions-wac`](https://github.com/webiny/github-actions-wac),
