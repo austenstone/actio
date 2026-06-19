@@ -606,6 +606,30 @@ steps:
 
 Full guide: [fallback](/docs/macros/fallback).
 
+{/* macro:if_changed */}
+### `jobs.<job_id>.steps[*].if_changed` [#if_changed]
+
+Gate a step or job on file changes: it runs only when files changed in the pull request
+or push match one of the glob patterns. Actio synthesizes one shared setup job that runs
+[`dorny/paths-filter`](https://github.com/dorny/paths-filter) once, publishes a flag
+output per unique glob group, and folds `if: needs.<setup>.outputs.<flag> == 'true'`
+(AND-combined with any existing `if:`) plus `needs:` into each guarded node.
+
+- **Valid in:** `jobs.<job_id>.steps[*]` and `jobs.<job_id>` (job-level)
+- **Type:** glob string, or list of glob strings
+- **Compiles to:** a shared `dorny/paths-filter` setup job plus a `needs` + folded `if:` guard on each gated step/job
+
+```yaml title=".actio.yml"
+steps:
+  - name: Build docs
+    run: ./build-docs.sh
+    if_changed:
+      - 'docs/**'
+      - '*.md'
+```
+
+Full guide: [if-changed](/docs/macros/if-changed).
+
 {/* macro:unsafe */}
 ### `jobs.<job_id>.steps[*].unsafe` [#unsafe]
 
