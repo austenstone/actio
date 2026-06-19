@@ -5,7 +5,7 @@
 **[documentation →](https://austenstone.github.io/actio)**
 
 ```bash
-npx actio-cli init ci.actio.yml
+npx actio-cli init
 ```
 
 [MIT](LICENSE) © Austen Stone
