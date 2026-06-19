@@ -1,0 +1,9 @@
+name: If Changed Job
+on: pull_request
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if_changed: "services/api/**"
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./deploy.sh

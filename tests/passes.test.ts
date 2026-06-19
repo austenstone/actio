@@ -100,6 +100,7 @@ describe("sortPasses", () => {
       "fallback",
       "dynamic_matrix",
       "lifecycle",
+      "if_changed",
       "injection-hoist",
     ]);
   });
@@ -129,6 +130,7 @@ describe("PassRegistry", () => {
       "fallback",
       "dynamic_matrix",
       "lifecycle",
+      "if_changed",
       "injection-hoist",
       "post",
     ]);
@@ -166,6 +168,7 @@ describe("createRegistry", () => {
       "fallback",
       "dynamic_matrix",
       "lifecycle",
+      "if_changed",
       "injection-hoist",
     ]);
   });

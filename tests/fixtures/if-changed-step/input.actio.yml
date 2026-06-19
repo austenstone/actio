@@ -1,0 +1,14 @@
+name: If Changed Step
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build docs
+        run: ./build-docs.sh
+        if_changed:
+          - "docs/**"
+          - "*.md"
+      - name: Always run
+        run: ./test.sh

@@ -649,6 +649,9 @@
         "share": {
           "$ref": "#/definitions/share"
         },
+        "if_changed": {
+          "$ref": "#/definitions/ifChanged"
+        },
         "injectionHoist": {
           "$ref": "#/definitions/injectionHoistMode"
         },
@@ -1102,6 +1105,9 @@
         "fallback": {
           "$ref": "#/definitions/fallback"
         },
+        "if_changed": {
+          "$ref": "#/definitions/ifChanged"
+        },
         "injectionHoist": {
           "$ref": "#/definitions/injectionHoistMode"
         },
@@ -1292,6 +1298,20 @@
         }
       ],
       "additionalProperties": false
+    },
+    "ifChanged": {
+      "title": "if_changed (Actio macro)",
+      "description": "Actio macro. Gate this step or job on file changes. Runs only when files changed in the pull request or push match one of these glob patterns. Compiles to a single shared `dorny/paths-filter` setup job plus a `needs.<setup>.outputs.<flag> == 'true'` guard folded into the existing `if:`. Stripped from generated workflow YAML.",
+      "markdownDescription": "**Actio macro**: file-change gating.\n\nRuns this step or job only when files changed in the pull request or push match one of the glob patterns. Actio synthesizes one shared setup job that runs [`dorny/paths-filter`](https://github.com/dorny/paths-filter) once, publishes a flag output per unique glob group, and folds `if: needs.<setup>.outputs.<flag> == 'true'` (AND-combined with any existing `if:`) plus `needs:` into each guarded node.\n\n```yaml\nsteps:\n  - name: Build docs\n    run: ./build-docs.sh\n    if_changed:\n      - 'docs/**'\n      - '*.md'\n```",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "$ref": "#/definitions/globs"
+        }
+      ]
     },
     "share": {
       "title": "share (Actio macro)",
