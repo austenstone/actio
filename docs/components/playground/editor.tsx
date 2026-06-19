@@ -7,6 +7,7 @@ import * as monaco from 'monaco-editor';
 import { configureMonacoYaml } from 'monaco-yaml';
 import { useEffect, useMemo, useState } from 'react';
 import { basePath } from '@/lib/shared';
+import { GITHUB_DARK, GITHUB_LIGHT, registerGithubThemes } from './github-themes';
 
 // Model paths. monaco-yaml scopes schemas via `fileMatch` against the model URI,
 // so the editable source matches the schema while the generated output stays plain.
@@ -27,6 +28,7 @@ if (typeof window !== 'undefined') {
     },
   };
   loader.config({ monaco });
+  registerGithubThemes(monaco);
   configureMonacoYaml(monaco, {
     enableSchemaRequest: false,
     schemas: [
@@ -91,7 +93,7 @@ export function Editor({ value, onChange, readOnly, ariaLabel }: EditorProps) {
       path={readOnly ? OUTPUT_PATH : SOURCE_PATH}
       value={value}
       onChange={(next) => onChange?.(next ?? '')}
-      theme={isDark ? 'vs-dark' : 'vs'}
+      theme={isDark ? GITHUB_DARK : GITHUB_LIGHT}
       options={options}
       loading={
         <div className="px-4 py-3 text-sm text-fd-muted-foreground">Loading editor…</div>
