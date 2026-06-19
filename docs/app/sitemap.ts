@@ -1,20 +1,34 @@
+import { execFileSync } from 'node:child_process';
 import type { MetadataRoute } from 'next';
+import { siteUrl } from '@/lib/shared';
 import { source } from '@/lib/source';
-
-// The site is served from a subpath on GitHub Pages (e.g. /actio), so every
-// emitted URL must include that prefix. CI sets PAGES_BASE_PATH; locally it
-// stays empty and the site serves from root.
-const host = 'https://austenstone.github.io';
-const basePath = process.env.PAGES_BASE_PATH ?? '';
-const baseUrl = `${host}${basePath}`;
 
 export const revalidate = false;
 
+// One timestamp per build so pages without their own git history still get a
+// stable, monotonic lastModified.
+const buildDate = new Date();
+
+// Last commit date for a docs source file. On shallow CI checkouts this may
+// resolve to the tip commit for every file, which is acceptable.
+function lastModified(sourcePath: string): Date {
+  try {
+    const iso = execFileSync('git', ['log', '-1', '--format=%cI', '--', sourcePath], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    }).trim();
+    return iso ? new Date(iso) : buildDate;
+  } catch {
+    return buildDate;
+  }
+}
+
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
-    { url: `${baseUrl}/` },
+    { url: `${siteUrl}/`, lastModified: buildDate },
     ...source.getPages().map((page) => ({
-      url: `${baseUrl}${page.url}`,
+      url: `${siteUrl}${page.url}`,
+      lastModified: lastModified(`content/docs/${page.path}`),
     })),
   ];
 }

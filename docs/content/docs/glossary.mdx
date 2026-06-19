@@ -1,0 +1,85 @@
+---
+title: Glossary
+description: Definitions of the core Actio terms — transpile, macro, fragment, hoist, executor, source map, drift check, and more.
+---
+
+A quick reference for the terms used throughout these docs. Most map directly to a
+[macro keyword](/docs/syntax) or a piece of the [compiler pipeline](/docs/architecture).
+
+## Core concepts
+
+**Actio** — A transpiler that compiles a `.actio.yml` source into standard GitHub
+Actions workflow YAML. It adds a small set of compile-time macros on top of the
+normal workflow syntax.
+
+**Transpile / compile** — The act of expanding macros and resolving compile-time
+tokens with `actio build`, producing plain `.yml` files. Every macro is stripped or
+expanded; none survive into the output.
+
+**Superset** — Actio is a strict superset of GitHub Actions workflow syntax. Every
+standard key, event, and value works exactly as it does in a normal workflow, so a
+macro-free `.actio.yml` file *is* a normal workflow.
+
+**Macro** — A keyword Actio adds (`params`, `fragments`, `job_defaults`,
+`executors`, `dynamic_matrix`, `static_if`, `inject`, `retry`, `fallback`) that
+expands into the boilerplate GitHub requires.
+
+**Pass** — A single transform step in the compiler pipeline. Built-in passes
+implement the macros; you can register [custom passes](/docs/configuration#custom-passes)
+that are merged into the pipeline and ordered by their `runsAfter` dependencies.
+
+**Drift check** — `actio check` (alias for `build --check`): verifies the committed
+workflows match what the sources would generate, failing CI if they're stale.
+
+## Interpolation
+
+**Compile-time token** — `{{ ... }}`. Resolved by `actio build` and baked into the
+output (e.g. `{{ params.env }}`, `{{ toJSON(params.matrix) }}`).
+
+**Runtime passthrough** — `${{ ... }}`. Emitted verbatim for the GitHub Actions
+runner to evaluate at run time.
+
+## Macro keywords
+
+**params** — Typed compile-time parameters, referenced with `{{ params.<name> }}`
+and stripped from the emitted YAML. See [params](/docs/macros/params).
+
+**fragments / inject** — A `fragment` is a reusable, named list of steps; `inject`
+splices it into a job at a call site. See [fragments](/docs/macros/fragments).
+
+**job_defaults** — Default job-level settings merged into every job at compile time.
+See [job_defaults](/docs/macros/job-defaults).
+
+**executors / executor** — `executors` defines named runner/container/service
+presets; a job references one (or an ordered list) via `executor`.
+
+**dynamic_matrix** — Generates a job's `strategy.matrix` at runtime from a script,
+splitting into a setup job that prints JSON to `$GITHUB_OUTPUT` and a matrix job
+wired with `needs` + `fromJSON()`. See [dynamic_matrix](/docs/macros/dynamic-matrix).
+
+**static_if** — A compile-time structural condition. If the expression is false, the
+whole job, step, or keyed object is omitted from the output. See [static_if](/docs/macros/static-if).
+
+**retry** — Expands a flaky step into a chain of conditional attempts with optional
+backoff `delay`. See [retry](/docs/macros/retry).
+
+**fallback** — A native try/catch for steps and jobs: *notify* on failure by
+default, or set `recover: true` to let the job pass. See [fallback](/docs/macros/fallback).
+
+**injectionHoist** — A security transform that defuses script injection by hoisting
+untrusted `${{ }}` interpolation out of `run:` bodies into `env:`. See
+[injectionHoist](/docs/macros/injection-hoist).
+
+## Output
+
+**Target profile** — The output flavor selected with `--target`: `legacy` (default)
+or `github-actions-native-dependencies-preview`.
+
+**Source map** — A `.yml.map` file written beside each generated workflow that maps
+generated lines back to the `.actio.yml` source. See [source maps](/docs/source-maps).
+
+**Header banner** — The generated-by-Actio comment stamped at the top of each output
+file (suppress with `--no-header`).
+
+**Modeline** — An editor hint comment that opts a file into Actio's JSON Schema for
+autocomplete. See [editor support](/docs/editor-support).
