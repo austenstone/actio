@@ -9,18 +9,19 @@ job_defaults:
 call_templates:
   test:
     uses: ./.github/workflows/reuse.yml
-    permissions:
-      contents: write
     if: ${{ github.event_name == 'push' }}
+    with:
+      region: us-east-1
+      tier: base
 
 jobs:
   from-template:
     extends: test
     with:
-      x: "1"
+      tier: gold
   inline-wins:
     extends: test
-    permissions:
-      actions: write
+    if: ${{ success() }}
     with:
-      x: "2"
+      region: eu-west-1
+      tier: gold

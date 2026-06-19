@@ -191,10 +191,7 @@
         "with": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/with" },
         "needs": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/needs" },
         "secrets": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/secrets" },
-        "if": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/if" },
-        "permissions": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/permissions" },
-        "concurrency": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/concurrency" },
-        "strategy": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/strategy" }
+        "if": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/if" }
       }
     },
     "extendsRef": {

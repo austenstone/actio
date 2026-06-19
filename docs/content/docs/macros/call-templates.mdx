@@ -72,11 +72,14 @@ jobs:
 | `needs` | **Order-preserving union** — template deps plus inline deps, de-duplicated. |
 | `secrets` | If either side is the string `inherit`, **inline wins** (replace). If both are maps, **shallow per-key** merge like `with`. |
 | `if` | **AND-combined** — `template && inline`, consistent with `job_defaults`. |
-| `uses`, `permissions`, `concurrency`, `strategy` | **Replace-on-presence** — inline value wins entirely; template only applies when the key is absent. |
+| `uses` | **Replace-on-presence** — inline value wins entirely; the template only applies when the job sets no inline `uses`. |
 
-A template may declare any of `uses`, `with`, `needs`, `secrets`, `if`,
-`permissions`, `concurrency`, and `strategy`. Runner keys (`runs-on`, `env`,
-`container`, …) and `steps` are rejected — call jobs have no runner.
+A v1 template may declare only the call quad: `uses`, `with`, `needs`,
+`secrets`, and `if`. Runner keys (`runs-on`, `env`, `container`, …), `steps`,
+and the broader job knobs (`permissions`, `concurrency`, `strategy`) are
+rejected — keep `strategy` on the job so [`for_each`](/docs/macros/for-each)
+stays its sole owner, and set `permissions`/`concurrency` per job or via
+[`job_defaults`](/docs/macros/job-defaults).
 
 ## Composing templates
 
@@ -135,10 +138,11 @@ jobs:
 ## Precedence with job_defaults
 
 `call_templates` resolves **before** `job_defaults`, so a fully materialized call
-job is what `job_defaults` sees. For the call-safe keys (`if`, `permissions`,
-`concurrency`, `strategy`), a value supplied by the template or inline blocks the
-default from overwriting it — precedence is **inline > extends > job_defaults**
-(`if` AND-combines all three).
+job is what `job_defaults` sees. A template value (or inline job value) already
+present blocks the default from overwriting it — precedence is
+**inline > extends > job_defaults**. The `if` key AND-combines all three; for
+keys a template can't carry (`permissions`, `concurrency`, `strategy`),
+`job_defaults` fills them on the materialized call job.
 
 <Callout title="Call-job only">
   `extends:` is for reusable-workflow call jobs. A job that sets inline `steps:`

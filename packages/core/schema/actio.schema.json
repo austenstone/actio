@@ -1335,15 +1335,6 @@
         },
         "if": {
           "$ref": "#/definitions/reusableWorkflowCallJob/properties/if"
-        },
-        "permissions": {
-          "$ref": "#/definitions/reusableWorkflowCallJob/properties/permissions"
-        },
-        "concurrency": {
-          "$ref": "#/definitions/reusableWorkflowCallJob/properties/concurrency"
-        },
-        "strategy": {
-          "$ref": "#/definitions/reusableWorkflowCallJob/properties/strategy"
         }
       }
     },
