@@ -1,7 +1,7 @@
 name: Job defaults uses partition
 on: [push]
 
-job_defaults:
+job-defaults:
   if: github.ref == 'refs/heads/main'
   permissions:
     contents: read

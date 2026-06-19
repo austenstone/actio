@@ -72,13 +72,13 @@ jobs:
   });
 });
 
-describe("dynamic_matrix", () => {
+describe("dynamic-matrix", () => {
   const src = `name: x
 on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: ./list.sh
       alias: shard
     steps:
@@ -108,10 +108,10 @@ jobs:
     expect(job.if).toContain("!= ''");
   });
 
-  it("keeps inline strategy over dynamic_matrix while dynamic_matrix still overrides inherited defaults", () => {
+  it("keeps inline strategy over dynamic-matrix while dynamic-matrix still overrides inherited defaults", () => {
     const { doc, errors } = build(`name: x
 on: [push]
-job_defaults:
+job-defaults:
   strategy:
     matrix:
       from_default: [a, b]
@@ -119,7 +119,7 @@ job_defaults:
 jobs:
   inline_wins:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["x"]'
       alias: shard
     strategy:
@@ -130,7 +130,7 @@ jobs:
       - run: echo \${{ matrix.keep }}
   defaults_overridden:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["y"]'
       alias: shard
     steps:
@@ -147,10 +147,10 @@ jobs:
     });
   });
 
-  it("applies fail-fast precedence as inline > dynamic_matrix > job_defaults", () => {
+  it("applies fail-fast precedence as inline > dynamic-matrix > job-defaults", () => {
     const { result, errors, doc } = build(`name: x
 on: [push]
-job_defaults:
+job-defaults:
   strategy:
     matrix:
       from_default: [a, b]
@@ -158,7 +158,7 @@ job_defaults:
 jobs:
   inline_full:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["x"]'
       alias: shard
       fail-fast: false
@@ -170,7 +170,7 @@ jobs:
       - run: echo \${{ matrix.keep }}
   inline_missing_fail_fast:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["y"]'
       alias: shard
       fail-fast: false
@@ -181,7 +181,7 @@ jobs:
       - run: echo \${{ matrix.keep }}
   defaults_only:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["z"]'
       alias: shard
       fail-fast: false
@@ -206,7 +206,7 @@ jobs:
         (d) =>
           d.severity === "warning" &&
           d.message.includes("inline strategy.fail-fast is preserved") &&
-          d.message.includes("dynamic_matrix fail-fast is ignored"),
+          d.message.includes("dynamic-matrix fail-fast is ignored"),
       ),
     ).toBe(true);
   });
@@ -222,7 +222,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["a","b"]'
     steps:
       - run: echo hi
@@ -238,7 +238,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: |
         a=1
         echo "[$a]"
@@ -261,7 +261,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["a","b"]'
     steps:
       - run: echo hi
@@ -279,7 +279,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       shell: pwsh
       script: |
         $d = Get-ChildItem -Directory packages | ForEach-Object { $_.Name }
@@ -306,7 +306,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       shell: python
       script: |
         import json, pathlib
@@ -332,7 +332,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       shell: cmd
       script: echo ["a"]
     steps:
@@ -348,7 +348,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       shell: pwsh
       compact: true
       script: '"[1]"'
@@ -365,7 +365,7 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: ./m.sh
     steps:
       - run: echo hi
@@ -453,11 +453,11 @@ jobs:
   });
 });
 
-describe("job_defaults + executors", () => {
+describe("job-defaults + executors", () => {
   it("partitions uses jobs and reports skipped runner defaults", () => {
     const { result, errors, doc } = build(`name: x
 on: [push]
-job_defaults:
+job-defaults:
   if: \${{ github.ref == 'refs/heads/main' }}
   permissions:
     contents: read
@@ -518,10 +518,10 @@ jobs:
     expect(errors.some((d) => d.message.includes("executor-unknown"))).toBe(true);
   });
 
-  it("errors when job_defaults or executors are not mappings", () => {
+  it("errors when job-defaults or executors are not mappings", () => {
     const { result, errors } = build(`name: x
 on: [push]
-job_defaults: bad
+job-defaults: bad
 executors: bad
 jobs:
   test:
@@ -530,7 +530,7 @@ jobs:
       - run: echo hi
 `);
     expect(result.ok).toBe(false);
-    expect(errors.some((d) => d.message.includes('"job_defaults" must be a mapping'))).toBe(true);
+    expect(errors.some((d) => d.message.includes('"job-defaults" must be a mapping'))).toBe(true);
     expect(errors.some((d) => d.message.includes('"executors" must be a mapping'))).toBe(true);
   });
 
@@ -641,7 +641,7 @@ jobs:
 
     const source = `name: x
 on: [push]
-job_defaults:
+job-defaults:
   timeout-minutes: 11
   env:
     CI: "true"
@@ -666,11 +666,11 @@ jobs:
     expect(ctx.internal.jobDefaults?.executors).toEqual({
       hardened: { env: { HARDENED: "true" } },
     });
-    expect(ctx.data.job_defaults).toBeUndefined();
+    expect(ctx.data["job-defaults"]).toBeUndefined();
     expect(ctx.data.executors).toBeUndefined();
 
     const emitted = parse(transpile(source, { fileName: "t.actio.yml" }).yaml);
-    expect(emitted.job_defaults).toBeUndefined();
+    expect(emitted["job-defaults"]).toBeUndefined();
     expect(emitted.executors).toBeUndefined();
 
     const singleJob: Job = {
@@ -691,7 +691,7 @@ jobs:
   it("AND-combines wrapped expressions without mangling runtime syntax", () => {
     const { result, errors, doc } = build(`name: x
 on: [push]
-job_defaults:
+job-defaults:
   if: \${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
 jobs:
   test:
@@ -710,7 +710,7 @@ jobs:
   it("replaces permissions map when a job defines its own permissions", () => {
     const { result, errors, doc } = build(`name: x
 on: [push]
-job_defaults:
+job-defaults:
   runs-on: ubuntu-latest
   permissions:
     contents: read
@@ -726,10 +726,10 @@ jobs:
     expect(doc.jobs.test.permissions).toEqual({ issues: "write" });
   });
 
-  it("applies and replaces continue-on-error/environment from job_defaults", () => {
+  it("applies and replaces continue-on-error/environment from job-defaults", () => {
     const { result, errors, doc } = build(`name: x
 on: [push]
-job_defaults:
+job-defaults:
   continue-on-error: true
   environment: staging
 jobs:
@@ -809,7 +809,7 @@ jobs:
   it("replaces runs-on objects for REPLACE_KEYS across executor compose and apply", () => {
     const { result, errors, doc } = build(`name: x
 on: [push]
-job_defaults:
+job-defaults:
   runs-on:
     group: default-group
     labels: default-label
@@ -832,10 +832,10 @@ jobs:
     expect(doc.jobs.test["runs-on"]).toEqual({ group: "final-group" });
   });
 
-  it("rejects structural keys in job_defaults", () => {
+  it("rejects structural keys in job-defaults", () => {
     const { result, errors } = build(`name: x
 on: [push]
-job_defaults:
+job-defaults:
   steps:
     - run: echo nope
 jobs:
@@ -850,11 +850,11 @@ jobs:
   });
 });
 
-describe("call_templates + extends", () => {
-  it("materializes a call job from a template before job_defaults partitions it", () => {
+describe("call-templates + extends", () => {
+  it("materializes a call job from a template before job-defaults partitions it", () => {
     const { errors, doc } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./.github/workflows/reuse.yml
     needs: build
@@ -885,7 +885,7 @@ jobs:
   it("merges with shallow per-key, inline winning", () => {
     const { errors, doc } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./reuse.yml
     with:
@@ -909,7 +909,7 @@ jobs:
   it("unions needs across templates and inline, order-preserving", () => {
     const { errors, doc } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   base:
     uses: ./reuse.yml
     needs: build
@@ -939,7 +939,7 @@ jobs:
   it("merges secrets maps but lets a string replace", () => {
     const { errors, doc } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   mapsecrets:
     uses: ./reuse.yml
     secrets:
@@ -967,7 +967,7 @@ jobs:
   it("combines template and inline if with &&", () => {
     const { errors, doc } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./reuse.yml
     if: \${{ github.event_name == 'push' }}
@@ -983,7 +983,7 @@ jobs:
   it("lets an inline key win over the template (uses replace)", () => {
     const { errors, doc } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./base.yml
 jobs:
@@ -999,7 +999,7 @@ jobs:
     for (const key of ["permissions", "concurrency", "strategy"]) {
       const { result, errors } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./reuse.yml
     ${key}:
@@ -1019,7 +1019,7 @@ jobs:
   it("composes a chain of templates left-to-right, later winning", () => {
     const { errors, doc } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   a:
     uses: ./a.yml
     with:
@@ -1043,7 +1043,7 @@ params:
   flow:
     type: string
     default: reuse
-call_templates:
+call-templates:
   test:
     uses: ./.github/workflows/{{ params.flow }}.yml
 jobs:
@@ -1054,22 +1054,22 @@ jobs:
     expect(doc.jobs.unit.uses).toBe("./.github/workflows/reuse.yml");
   });
 
-  it("errors when call_templates is not a mapping", () => {
+  it("errors when call-templates is not a mapping", () => {
     const { result, errors } = build(`name: x
 on: [push]
-call_templates: nope
+call-templates: nope
 jobs:
   unit:
     uses: ./reuse.yml
 `);
     expect(result.ok).toBe(false);
-    expect(errors.some((d) => d.message.includes('"call_templates" must be a mapping'))).toBe(true);
+    expect(errors.some((d) => d.message.includes('"call-templates" must be a mapping'))).toBe(true);
   });
 
   it("errors when a template definition is not a mapping", () => {
     const { result, errors } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   test: ./reuse.yml
 jobs:
   unit:
@@ -1084,7 +1084,7 @@ jobs:
   it("rejects unsupported keys in a template definition", () => {
     const { result, errors } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./reuse.yml
     runs-on: ubuntu-latest
@@ -1099,7 +1099,7 @@ jobs:
   it("errors on an unknown template name", () => {
     const { result, errors } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./reuse.yml
 jobs:
@@ -1113,7 +1113,7 @@ jobs:
   it("rejects extends on a job that defines steps", () => {
     const { result, errors } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./reuse.yml
 jobs:
@@ -1129,7 +1129,7 @@ jobs:
   it("rejects extends when no template in the chain provides uses", () => {
     const { result, errors } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   partial:
     with:
       x: "1"
@@ -1144,7 +1144,7 @@ jobs:
   it("errors when extends is the wrong type", () => {
     const { result, errors } = build(`name: x
 on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./reuse.yml
 jobs:

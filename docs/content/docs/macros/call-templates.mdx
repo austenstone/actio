@@ -1,17 +1,17 @@
 ---
-title: call_templates
+title: call-templates
 description: Template the plumbing of reusable-workflow call jobs and share it across jobs with extends.
 ---
 
-`job_defaults` and `executors` cover normal jobs, but they deliberately skip the
+`job-defaults` and `executors` cover normal jobs, but they deliberately skip the
 plumbing of reusable-workflow **call jobs** — `uses:`, `with:`, `needs:`, and
 `secrets:` must be restated on every job. In matrix-heavy repos that plumbing is
 the single biggest source of copy-paste: e.g. `vercel/next.js` has ~8 nearly
 byte-identical `test-*` call jobs that differ only in one `with.afterBuild` value.
 
-`call_templates` defines a named call-job preset; a job `extends:` it and overrides
+`call-templates` defines a named call-job preset; a job `extends:` it and overrides
 only the deltas. Actio merges the template at compile time and strips both
-`call_templates` and `extends` from the output — the generated YAML is byte-identical
+`call-templates` and `extends` from the output — the generated YAML is byte-identical
 to the hand-written call jobs.
 
 Each job inherits `uses`, `needs`, `secrets`, and the shared `with` keys; only the
@@ -22,7 +22,7 @@ per-job `afterBuild` differs:
 ```yaml title=".actio.yml"
 name: Build and test
 on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./.github/workflows/test_reusable.yml
     needs: build
@@ -75,15 +75,15 @@ jobs:
 | `with` | **Shallow per-key** — `{ ...template, ...inline }`. Each `with.<key>` the job sets replaces the template's; unspecified keys inherit. |
 | `needs` | **Order-preserving union** — template deps plus inline deps, de-duplicated. |
 | `secrets` | If either side is the string `inherit`, **inline wins** (replace). If both are maps, **shallow per-key** merge like `with`. |
-| `if` | **AND-combined** — `template && inline`, consistent with `job_defaults`. |
+| `if` | **AND-combined** — `template && inline`, consistent with `job-defaults`. |
 | `uses` | **Replace-on-presence** — inline value wins entirely; the template only applies when the job sets no inline `uses`. |
 
 A v1 template may declare only the call quad: `uses`, `with`, `needs`,
 `secrets`, and `if`. Runner keys (`runs-on`, `env`, `container`, …), `steps`,
 and the broader job knobs (`permissions`, `concurrency`, `strategy`) are
-rejected — keep `strategy` on the job so [`for_each`](/docs/macros/for-each)
+rejected — keep `strategy` on the job so [`for-each`](/docs/macros/for-each)
 stays its sole owner, and set `permissions`/`concurrency` per job or via
-[`job_defaults`](/docs/macros/job-defaults).
+[`job-defaults`](/docs/macros/job-defaults).
 
 ## Composing templates
 
@@ -97,7 +97,7 @@ both `if` gates combine:
 <CodeCompare>
 
 ```yaml title=".actio.yml"
-call_templates:
+call-templates:
   base:
     uses: ./.github/workflows/reuse.yml
     needs: build
@@ -143,14 +143,14 @@ jobs:
 
 </CodeCompare>
 
-## Precedence with job_defaults
+## Precedence with job-defaults
 
-`call_templates` resolves **before** `job_defaults`, so a fully materialized call
-job is what `job_defaults` sees. A template value (or inline job value) already
+`call-templates` resolves **before** `job-defaults`, so a fully materialized call
+job is what `job-defaults` sees. A template value (or inline job value) already
 present blocks the default from overwriting it — precedence is
-**inline > extends > job_defaults**. The `if` key AND-combines all three; for
+**inline > extends > job-defaults**. The `if` key AND-combines all three; for
 keys a template can't carry (`permissions`, `concurrency`, `strategy`),
-`job_defaults` fills them on the materialized call job.
+`job-defaults` fills them on the materialized call job.
 
 <Callout title="Call-job only">
   `extends:` is for reusable-workflow call jobs. A job that sets inline `steps:`
@@ -160,6 +160,6 @@ keys a template can't carry (`permissions`, `concurrency`, `strategy`),
 </Callout>
 
 <Callout title="Compile-time interpolation">
-  `{{ params.* }}` inside a `call_templates` block resolves before the template is
+  `{{ params.* }}` inside a `call-templates` block resolves before the template is
   merged, so templates can be parameterized like any other Actio source.
 </Callout>

@@ -4,13 +4,13 @@ import { combineIf, isObject, mergeNeeds, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
 // The single shared setup job and the paths-filter step inside it. One setup
-// job serves every `if_changed` guard in the workflow; identical glob groups
+// job serves every `if-changed` guard in the workflow; identical glob groups
 // collapse onto one named filter so the diff is computed exactly once.
 const SETUP_ID = "actio_changes";
 const FILTER_STEP_ID = "actio_filter";
 
 interface Usage {
-  /** The node carrying `if_changed` (a job for job-level, a step for step-level). */
+  /** The node carrying `if-changed` (a job for job-level, a step for step-level). */
   node: Job | Step;
   /** The job that must gain `needs: [actio_changes]` (the parent job either way). */
   job: Job;
@@ -18,7 +18,7 @@ interface Usage {
   globs: string[];
 }
 
-/** Order jobs the way dynamic_matrix does: honor KEY_ORDER, append stragglers. */
+/** Order jobs the way dynamic-matrix does: honor KEY_ORDER, append stragglers. */
 function jobOrder(jobs: Record<string, unknown>): string[] {
   const recorded = (jobs as Record<symbol, unknown>)[KEY_ORDER] as string[] | undefined;
   if (!recorded) return Object.keys(jobs);
@@ -26,7 +26,7 @@ function jobOrder(jobs: Record<string, unknown>): string[] {
   return [...recorded.filter((k) => k in jobs), ...Object.keys(jobs).filter((k) => !seen.has(k))];
 }
 
-/** Coerce a string-or-list `if_changed` value into a clean glob list. */
+/** Coerce a string-or-list `if-changed` value into a clean glob list. */
 function normalizeGlobs(
   ctx: ParseContext,
   value: unknown,
@@ -36,17 +36,17 @@ function normalizeGlobs(
   const globs: string[] = [];
   for (const g of raw) {
     if (typeof g === "string" && g.trim() !== "") globs.push(g.trim());
-    else pushDiagnostic(ctx, "warning", `if_changed entries must be non-empty glob strings`, path);
+    else pushDiagnostic(ctx, "warning", `if-changed entries must be non-empty glob strings`, path);
   }
   if (globs.length === 0) {
-    pushDiagnostic(ctx, "warning", `if_changed has no usable glob patterns; ignoring`, path);
+    pushDiagnostic(ctx, "warning", `if-changed has no usable glob patterns; ignoring`, path);
     return undefined;
   }
   return globs;
 }
 
 /**
- * if_changed pass: every step/job carrying an `if_changed` glob list is gated on
+ * if-changed pass: every step/job carrying an `if-changed` glob list is gated on
  * whether its files changed in the triggering diff. A single generated
  * `actio_changes` job runs `dorny/paths-filter` once (one named filter per unique
  * glob group), publishes a boolean output per group, and each guarded node folds
@@ -67,20 +67,26 @@ export function ifChangedPass(ctx: ParseContext): void {
     const job = (jobs as Record<string, unknown>)[jobId];
     if (!isObject(job)) continue;
     const j = job as Job;
-    if (j.if_changed !== undefined) {
-      const globs = normalizeGlobs(ctx, j.if_changed, ["jobs", jobId, "if_changed"]);
+    if (j["if-changed"] !== undefined) {
+      const globs = normalizeGlobs(ctx, j["if-changed"], ["jobs", jobId, "if-changed"]);
       if (globs) usages.push({ node: j, job: j, jobId, globs });
-      else delete j.if_changed;
+      else delete j["if-changed"];
     }
     const steps = j.steps;
     if (Array.isArray(steps)) {
       steps.forEach((step, i) => {
         if (!isObject(step)) return;
         const s = step as Step;
-        if (s.if_changed === undefined) return;
-        const globs = normalizeGlobs(ctx, s.if_changed, ["jobs", jobId, "steps", i, "if_changed"]);
+        if (s["if-changed"] === undefined) return;
+        const globs = normalizeGlobs(ctx, s["if-changed"], [
+          "jobs",
+          jobId,
+          "steps",
+          i,
+          "if-changed",
+        ]);
         if (globs) usages.push({ node: s, job: j, jobId, globs });
-        else delete s.if_changed;
+        else delete s["if-changed"];
       });
     }
   }
@@ -91,11 +97,11 @@ export function ifChangedPass(ctx: ParseContext): void {
     pushDiagnostic(
       ctx,
       "error",
-      `if_changed must synthesize a setup job "${SETUP_ID}", but a job with that id already exists; rename that job`,
+      `if-changed must synthesize a setup job "${SETUP_ID}", but a job with that id already exists; rename that job`,
       ["jobs", SETUP_ID],
     );
-    // Strip the macro keys so we never emit an invalid `if_changed` we couldn't wire up.
-    for (const u of usages) delete (u.node as Record<string, unknown>).if_changed;
+    // Strip the macro keys so we never emit an invalid `if-changed` we couldn't wire up.
+    for (const u of usages) delete (u.node as Record<string, unknown>)["if-changed"];
     return;
   }
 
@@ -118,7 +124,7 @@ export function ifChangedPass(ctx: ParseContext): void {
     const guard = `needs.${SETUP_ID}.outputs.${flag} == 'true'`;
     u.node.if = combineIf(guard, u.node.if);
     u.job.needs = mergeNeeds(u.job.needs, [SETUP_ID]);
-    delete (u.node as Record<string, unknown>).if_changed;
+    delete (u.node as Record<string, unknown>)["if-changed"];
   }
 
   const setup = buildSetupJob(ctx, anchor, filters);
@@ -171,7 +177,7 @@ function buildSetupJob(
 
 /** Gate steps/jobs on changed files via one shared paths-filter setup job. */
 export const ifChanged: Pass = {
-  name: "if_changed",
-  runsAfter: ["fragments", "retry", "fallback", "dynamic_matrix", "lifecycle"],
+  name: "if-changed",
+  runsAfter: ["fragments", "retry", "fallback", "dynamic-matrix", "lifecycle"],
   apply: ifChangedPass,
 };

@@ -47,8 +47,8 @@ const MACRO_KEYS = new Set([
   "inject",
   "retry",
   "fallback",
-  "dynamic_matrix",
-  "for_each",
+  "dynamic-matrix",
+  "for-each",
   "executor",
 ]);
 
@@ -171,7 +171,7 @@ function isReusableCallJob(job: Job): boolean {
 }
 
 function preserveRawTemplates(ctx: ParseContext): void {
-  const rawJobDefaults = asMap(ctx.data.job_defaults);
+  const rawJobDefaults = asMap(ctx.data["job-defaults"]);
   const rawExecutors = asMap(ctx.data.executors);
   ctx.internal.jobDefaults = {
     jobDefaults: rawJobDefaults ? clone(rawJobDefaults) : undefined,
@@ -198,17 +198,17 @@ function validateTemplateKey(
 }
 
 function validateJobDefaults(ctx: ParseContext): Record<string, unknown> | undefined {
-  const raw = ctx.data.job_defaults;
+  const raw = ctx.data["job-defaults"];
   if (raw === undefined) return undefined;
   if (!isObject(raw)) {
-    pushDiagnostic(ctx, "error", '"job_defaults" must be a mapping', ["job_defaults"]);
+    pushDiagnostic(ctx, "error", '"job-defaults" must be a mapping', ["job-defaults"]);
     return undefined;
   }
   const allowed = new Set<string>(JOB_DEFAULT_KEYS);
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (
-      !validateTemplateKey(ctx, key, ["job_defaults", key], allowed, "job-defaults-rejected-key")
+      !validateTemplateKey(ctx, key, ["job-defaults", key], allowed, "job-defaults-rejected-key")
     ) {
       continue;
     }
@@ -306,7 +306,7 @@ function collectInlineKeys(job: Job): InlinePresence {
 }
 
 /**
- * Apply top-level `job_defaults` and `executors` to jobs.
+ * Apply top-level `job-defaults` and `executors` to jobs.
  *
  * Locked semantics:
  * - partition first: `uses` jobs only get call-compatible defaults
@@ -346,7 +346,7 @@ export function jobDefaultsPass(ctx: ParseContext): void {
         pushDiagnostic(
           ctx,
           "info",
-          `[job-defaults-uses-skipped] Job "${jobId}" skipped non-call-compatible job_defaults keys: ${skipped.join(", ")}`,
+          `[job-defaults-uses-skipped] Job "${jobId}" skipped non-call-compatible job-defaults keys: ${skipped.join(", ")}`,
           ["jobs", jobId, "uses"],
         );
       }
@@ -393,12 +393,12 @@ export function jobDefaultsPass(ctx: ParseContext): void {
     applyExecutor(job, composed, inlineKeys);
   });
 
-  delete ctx.data.job_defaults;
+  delete ctx.data["job-defaults"];
   delete ctx.data.executors;
 }
 
 export const jobDefaults: Pass = {
-  name: "job_defaults",
-  runsAfter: ["params", "call_templates"],
+  name: "job-defaults",
+  runsAfter: ["params", "call-templates"],
   apply: jobDefaultsPass,
 };

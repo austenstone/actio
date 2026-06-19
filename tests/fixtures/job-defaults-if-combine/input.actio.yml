@@ -1,7 +1,7 @@
 name: Job defaults if combine
 on: [push]
 
-job_defaults:
+job-defaults:
   if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
 
 jobs:

@@ -53,12 +53,12 @@ jobs:
     expect(validate(doc)).toBe(false);
   });
 
-  it("rejects dynamic_matrix without script", () => {
+  it("rejects dynamic-matrix without script", () => {
     const doc = load(`on: [push]
 jobs:
   a:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       alias: service
     steps:
       - run: echo hi`);
@@ -156,7 +156,7 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
-  it("accepts static_if directives on jobs and steps, including form B merge keys", () => {
+  it("accepts static-if directives on jobs and steps, including form B merge keys", () => {
     const doc = load(`on: [push]
 params:
   deploy:
@@ -164,12 +164,12 @@ params:
     default: true
 jobs:
   build:
-    static_if: params.deploy
+    static-if: params.deploy
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        static_if: params.deploy
-        static_if(params.deploy):
+        static-if: params.deploy
+        static-if(params.deploy):
           timeout-minutes: 5
 `);
     expect(validate(doc)).toBe(true);
@@ -323,7 +323,7 @@ jobs:
 
   it("accepts a call job that extends a template without inline uses", () => {
     const doc = load(`on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./.github/workflows/reuse.yml
 jobs:
@@ -336,7 +336,7 @@ jobs:
 
   it("accepts extends as a list of template names", () => {
     const doc = load(`on: [push]
-call_templates:
+call-templates:
   base:
     uses: ./.github/workflows/reuse.yml
 jobs:
@@ -347,7 +347,7 @@ jobs:
 
   it("rejects extends combined with steps", () => {
     const doc = load(`on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./.github/workflows/reuse.yml
 jobs:
@@ -360,7 +360,7 @@ jobs:
 
   it("rejects unknown keys in a call template definition", () => {
     const doc = load(`on: [push]
-call_templates:
+call-templates:
   test:
     uses: ./.github/workflows/reuse.yml
     runs-on: ubuntu-latest
@@ -386,9 +386,9 @@ jobs:
     }
   });
 
-  it("accepts job_defaults strategy for reusable-workflow caller jobs", () => {
+  it("accepts job-defaults strategy for reusable-workflow caller jobs", () => {
     const doc = load(`on: [push]
-job_defaults:
+job-defaults:
   strategy:
     fail-fast: false
     matrix:
@@ -399,9 +399,9 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
-  it("accepts continue-on-error and environment in job_defaults", () => {
+  it("accepts continue-on-error and environment in job-defaults", () => {
     const doc = load(`on: [push]
-job_defaults:
+job-defaults:
   continue-on-error: true
   environment: staging
 jobs:
@@ -412,9 +412,9 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
-  it("rejects non-allowlisted keys in job_defaults", () => {
+  it("rejects non-allowlisted keys in job-defaults", () => {
     const doc = load(`on: [push]
-job_defaults:
+job-defaults:
   steps:
     - run: echo nope
 jobs:
@@ -432,28 +432,28 @@ jobs:
 
   it("accepts injection-hoist macro keys on root, job, and step", () => {
     const doc = load(`on: [push]
-injectionHoist: warn
+injection-hoist: warn
 jobs:
   a:
     runs-on: ubuntu-latest
-    injectionHoist: error
+    injection-hoist: error
     steps:
       - run: echo hi
-        injectionHoist: "off"
+        injection-hoist: "off"
         unsafe: true
         trust: [github.event.pull_request.title]
         force: [github.sha]`);
     expect(validate(doc)).toBe(true);
   });
 
-  it("rejects an invalid injectionHoist mode", () => {
+  it("rejects an invalid injection-hoist mode", () => {
     const doc = load(`on: [push]
 jobs:
   a:
     runs-on: ubuntu-latest
     steps:
       - run: echo hi
-        injectionHoist: defuse`);
+        injection-hoist: defuse`);
     expect(validate(doc)).toBe(false);
   });
 
@@ -480,13 +480,13 @@ jobs:
     steps:
       - run: ./deploy.sh
 finally:
-  on_failure:
+  on-failure:
     rollback:
       runs-on: ubuntu-latest
       when: deploy.failed
       steps:
         - run: ./rollback.sh
-  on_abort: []`);
+  on-abort: []`);
     expect(validate(doc)).toBe(true);
   });
 
@@ -501,14 +501,14 @@ finally: ./teardown.sh`);
     expect(validate(doc)).toBe(false);
   });
 
-  it("accepts step-scoped ensure and on_failure hooks", () => {
+  it("accepts step-scoped ensure and on-failure hooks", () => {
     const doc = load(`on: [push]
 jobs:
   a:
     runs-on: ubuntu-latest
     steps:
       - run: ./deploy.sh
-        on_failure:
+        on-failure:
           - run: ./rollback.sh
         ensure:
           - run: ./cleanup.sh`);
@@ -522,7 +522,7 @@ jobs:
     runs-on: ubuntu-latest
     ensure:
       - run: ./teardown.sh
-    on_success:
+    on-success:
       - run: ./notify.sh
     steps:
       - run: ./build.sh`);
@@ -542,7 +542,7 @@ jobs:
     };
     expect(ext.rootProperties).toHaveProperty("finally");
     expect(ext.patchDefinitions.step.properties).toHaveProperty("ensure");
-    expect(ext.patchDefinitions.step.properties).toHaveProperty("on_failure");
+    expect(ext.patchDefinitions.step.properties).toHaveProperty("on-failure");
     expect(ext.addDefinitions).toHaveProperty("finallyBlock");
     expect(ext.addDefinitions).toHaveProperty("lifecycleHook");
   });

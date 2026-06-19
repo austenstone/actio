@@ -50,58 +50,58 @@ describe("sortPasses", () => {
   it("declares explicit dependencies for fragments", () => {
     const fragmentsPass = builtinPasses.find((pass) => pass.name === "fragments");
     expect(fragmentsPass?.runsAfter ?? []).toContain("params");
-    expect(fragmentsPass?.runsAfter ?? []).toContain("when_compile");
+    expect(fragmentsPass?.runsAfter ?? []).toContain("when-compile");
   });
 
-  it("enforces when_compile before fragments from metadata even with shuffled input", () => {
+  it("enforces when-compile before fragments from metadata even with shuffled input", () => {
     const byName = new Map(builtinPasses.map((pass) => [pass.name, pass]));
     const shuffled = [
       byName.get("fragments"),
       byName.get("share"),
-      byName.get("dynamic_matrix"),
+      byName.get("dynamic-matrix"),
       byName.get("fallback"),
       byName.get("retry"),
-      byName.get("when_compile"),
-      byName.get("for_each"),
+      byName.get("when-compile"),
+      byName.get("for-each"),
       byName.get("params"),
-      byName.get("job_defaults"),
+      byName.get("job-defaults"),
     ].filter((pass): pass is Pass => pass !== undefined);
     const ordered = sortPasses(shuffled).map((pass) => pass.name);
-    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("job_defaults"));
-    expect(ordered.indexOf("job_defaults")).toBeLessThan(ordered.indexOf("for_each"));
-    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("when_compile"));
-    expect(ordered.indexOf("for_each")).toBeLessThan(ordered.indexOf("when_compile"));
-    expect(ordered.indexOf("when_compile")).toBeLessThan(ordered.indexOf("fragments"));
+    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("job-defaults"));
+    expect(ordered.indexOf("job-defaults")).toBeLessThan(ordered.indexOf("for-each"));
+    expect(ordered.indexOf("params")).toBeLessThan(ordered.indexOf("when-compile"));
+    expect(ordered.indexOf("for-each")).toBeLessThan(ordered.indexOf("when-compile"));
+    expect(ordered.indexOf("when-compile")).toBeLessThan(ordered.indexOf("fragments"));
     expect(ordered.indexOf("fragments")).toBeLessThan(ordered.indexOf("share"));
     expect(ordered.indexOf("share")).toBeLessThan(ordered.indexOf("retry"));
     expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
-    expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("dynamic_matrix"));
+    expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("dynamic-matrix"));
   });
 
   it("ignores forward dependency references to not-yet-registered passes", () => {
     const log: string[] = [];
     const passes = [
-      recorder("when_compile", ["params", "for_each"], log),
+      recorder("when-compile", ["params", "for-each"], log),
       recorder("params", [], log),
     ];
     expect(() => sortPasses(passes)).not.toThrow();
-    expect(sortPasses(passes).map((pass) => pass.name)).toEqual(["params", "when_compile"]);
+    expect(sortPasses(passes).map((pass) => pass.name)).toEqual(["params", "when-compile"]);
   });
 
   it("resolves the built-in pipeline to the documented order", () => {
     expect(sortPasses(builtinPasses).map((p) => p.name)).toEqual([
       "params",
-      "call_templates",
-      "job_defaults",
-      "for_each",
-      "when_compile",
+      "call-templates",
+      "job-defaults",
+      "for-each",
+      "when-compile",
       "fragments",
       "share",
       "retry",
       "fallback",
-      "dynamic_matrix",
+      "dynamic-matrix",
       "lifecycle",
-      "if_changed",
+      "if-changed",
       "injection-hoist",
     ]);
   });
@@ -119,20 +119,20 @@ describe("PassRegistry", () => {
   it("lets you add a pass and runs it in dependency order", () => {
     const log: string[] = [];
     const registry = new PassRegistry(builtinPasses);
-    registry.register(recorder("post", ["dynamic_matrix"], log));
+    registry.register(recorder("post", ["dynamic-matrix"], log));
     expect(registry.list().map((p) => p.name)).toEqual([
       "params",
-      "call_templates",
-      "job_defaults",
-      "for_each",
-      "when_compile",
+      "call-templates",
+      "job-defaults",
+      "for-each",
+      "when-compile",
       "fragments",
       "share",
       "retry",
       "fallback",
-      "dynamic_matrix",
+      "dynamic-matrix",
       "lifecycle",
-      "if_changed",
+      "if-changed",
       "injection-hoist",
       "post",
     ]);
@@ -161,27 +161,27 @@ describe("createRegistry", () => {
         .map((p) => p.name),
     ).toEqual([
       "params",
-      "call_templates",
-      "job_defaults",
-      "for_each",
-      "when_compile",
+      "call-templates",
+      "job-defaults",
+      "for-each",
+      "when-compile",
       "fragments",
       "share",
       "retry",
       "fallback",
-      "dynamic_matrix",
+      "dynamic-matrix",
       "lifecycle",
-      "if_changed",
+      "if-changed",
       "injection-hoist",
     ]);
   });
 
   it("lets a caller-supplied pass override a same-named built-in", () => {
     const log: string[] = [];
-    const override = recorder("for_each", ["params"], log);
+    const override = recorder("for-each", ["params"], log);
     const baseline = createRegistry().list().length;
     const registry = createRegistry([override]);
-    expect(registry.list().filter((p) => p.name === "for_each")).toEqual([override]);
+    expect(registry.list().filter((p) => p.name === "for-each")).toEqual([override]);
     expect(registry.list().length).toBe(baseline);
   });
 });

@@ -20,8 +20,8 @@ expanded; none survive into the output.
 standard key, event, and value works exactly as it does in a normal workflow, so a
 macro-free `.actio.yml` file *is* a normal workflow.
 
-**Macro** — A keyword Actio adds (`params`, `fragments`, `job_defaults`,
-`executors`, `dynamic_matrix`, `static_if`, `inject`, `retry`, `fallback`) that
+**Macro** — A keyword Actio adds (`params`, `fragments`, `job-defaults`,
+`executors`, `dynamic-matrix`, `static-if`, `inject`, `retry`, `fallback`) that
 expands into the boilerplate GitHub requires.
 
 **Pass** — A single transform step in the compiler pipeline. Built-in passes
@@ -47,18 +47,18 @@ and stripped from the emitted YAML. See [params](/docs/macros/params).
 **fragments / inject** — A `fragment` is a reusable, named list of steps; `inject`
 splices it into a job at a call site. See [fragments](/docs/macros/fragments).
 
-**job_defaults** — Default job-level settings merged into every job at compile time.
-See [job_defaults](/docs/macros/job-defaults).
+**job-defaults** — Default job-level settings merged into every job at compile time.
+See [job-defaults](/docs/macros/job-defaults).
 
 **executors / executor** — `executors` defines named runner/container/service
 presets; a job references one (or an ordered list) via `executor`.
 
-**dynamic_matrix** — Generates a job's `strategy.matrix` at runtime from a script,
+**dynamic-matrix** — Generates a job's `strategy.matrix` at runtime from a script,
 splitting into a setup job that prints JSON to `$GITHUB_OUTPUT` and a matrix job
-wired with `needs` + `fromJSON()`. See [dynamic_matrix](/docs/macros/dynamic-matrix).
+wired with `needs` + `fromJSON()`. See [dynamic-matrix](/docs/macros/dynamic-matrix).
 
-**static_if** — A compile-time structural condition. If the expression is false, the
-whole job, step, or keyed object is omitted from the output. See [static_if](/docs/macros/static-if).
+**static-if** — A compile-time structural condition. If the expression is false, the
+whole job, step, or keyed object is omitted from the output. See [static-if](/docs/macros/static-if).
 
 **retry** — Expands a flaky step into a chain of conditional attempts with optional
 backoff `delay`. See [retry](/docs/macros/retry).
@@ -66,9 +66,9 @@ backoff `delay`. See [retry](/docs/macros/retry).
 **fallback** — A native try/catch for steps and jobs: *notify* on failure by
 default, or set `recover: true` to let the job pass. See [fallback](/docs/macros/fallback).
 
-**injectionHoist** — A security transform that defuses script injection by hoisting
+**injection-hoist** — A security transform that defuses script injection by hoisting
 untrusted `${{ }}` interpolation out of `run:` bodies into `env:`. See
-[injectionHoist](/docs/macros/injection-hoist).
+[injection-hoist](/docs/macros/injection-hoist).
 
 ## Output
 

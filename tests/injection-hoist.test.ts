@@ -257,18 +257,18 @@ describe("injection-hoist", () => {
 
   it("mode off skips hoisting entirely", () => {
     const { doc } = build(
-      wf(`      - injectionHoist: off
+      wf(`      - injection-hoist: off
         run: echo \${{ github.event.pull_request.title }}`),
     );
     const step = step0(doc);
     expect(step.env).toBeUndefined();
-    expect(step.injectionHoist).toBeUndefined();
+    expect(step["injection-hoist"]).toBeUndefined();
     expect(step.run).toBe("echo ${{ github.event.pull_request.title }}");
   });
 
   it("mode warn diagnoses without mutating", () => {
     const { doc, warnings } = build(
-      wf(`      - injectionHoist: warn
+      wf(`      - injection-hoist: warn
         run: echo \${{ github.event.pull_request.title }}`),
     );
     const step = step0(doc);
@@ -279,7 +279,7 @@ describe("injection-hoist", () => {
 
   it("mode error raises a diagnostic without mutating", () => {
     const { doc, errors } = build(
-      wf(`      - injectionHoist: error
+      wf(`      - injection-hoist: error
         run: echo \${{ github.event.pull_request.title }}`),
     );
     expect(errors.some((e) => e.code === "injection-hoist-untrusted")).toBe(true);
@@ -289,7 +289,7 @@ describe("injection-hoist", () => {
 
   it("warns and falls back to fix on an invalid mode value", () => {
     const { doc, warnings } = build(
-      wf(`      - injectionHoist: loud
+      wf(`      - injection-hoist: loud
         run: echo \${{ github.event.pull_request.title }}`),
     );
     expect(warnings.some((w) => w.code === "injection-hoist-mode-invalid")).toBe(true);
@@ -310,19 +310,19 @@ describe("injection-hoist", () => {
     expect(step0(doc).env).toBeUndefined();
   });
 
-  it("a job-level injectionHoist overrides the global default", () => {
+  it("a job-level injection-hoist overrides the global default", () => {
     const { doc } = build(`name: x
 on: [pull_request]
 jobs:
   a:
     runs-on: ubuntu-latest
-    injectionHoist: off
+    injection-hoist: off
     steps:
       - run: echo \${{ github.event.pull_request.title }}
 `);
     expect(step0(doc).env).toBeUndefined();
     // job knob stripped from emitted YAML
     // biome-ignore lint/suspicious/noExplicitAny: parsed YAML
-    expect((step0(doc) as any).injectionHoist).toBeUndefined();
+    expect((step0(doc) as any)["injection-hoist"]).toBeUndefined();
   });
 });

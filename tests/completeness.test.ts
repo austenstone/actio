@@ -7,12 +7,12 @@ import { describe, expect, it } from "vitest";
 const fixturesDir = fileURLToPath(new URL("fixtures", import.meta.url));
 
 const fixtureDirsByPassName: Record<string, string[]> = {
-  dynamic_matrix: ["dynamic-matrix"],
-  if_changed: ["if-changed-step", "if-changed-job", "if-changed-dedup", "if-changed-pr-base"],
+  "dynamic-matrix": ["dynamic-matrix"],
+  "if-changed": ["if-changed-step", "if-changed-job", "if-changed-dedup", "if-changed-pr-base"],
   "injection-hoist": ["injection-hoist"],
   fallback: ["fallback-job", "fallback-notify", "fallback-recover"],
   fragments: ["fragments"],
-  call_templates: [
+  "call-templates": [
     "call-templates-extends",
     "call-templates-compose",
     "call-templates-job-defaults",
@@ -28,7 +28,7 @@ const fixtureDirsByPassName: Record<string, string[]> = {
     "finally-when-sugar",
   ],
   params: ["params-scalar", "params-list", "params-step-list", "params-enum"],
-  job_defaults: [
+  "job-defaults": [
     "job-defaults-normal-merge",
     "job-defaults-uses-partition",
     "job-defaults-if-combine",

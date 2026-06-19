@@ -44,7 +44,7 @@ interface Token {
   pos: number;
 }
 
-const FORM_B_KEY_RE = /^static_if\((.*)\)$/;
+const FORM_B_KEY_RE = /^static-if\((.*)\)$/;
 
 const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
 
@@ -85,7 +85,7 @@ const isStepPath = (path: Path): boolean =>
   typeof path[3] === "number";
 
 const hintForRuntimeContext =
-  "static_if only supports compile-time roots (params.*, for_each.*, define.*). Use if: for runtime contexts.";
+  "static-if only supports compile-time roots (params.*, for-each.*, define.*). Use if: for runtime contexts.";
 
 class Tokenizer {
   readonly source: string;
@@ -594,7 +594,7 @@ const evaluateWhenCompile = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage("static-if-empty", "static_if requires a non-empty boolean expression"),
+      diagnosticMessage("static-if-empty", "static-if requires a non-empty boolean expression"),
       path,
     );
     return undefined;
@@ -625,8 +625,8 @@ const evaluateWhenCompile = (
       diagnosticMessage(
         "static-if-runtime-context",
         runtimeRoot
-          ? `static_if cannot reference runtime context "${runtimeRoot}.*"`
-          : "static_if takes a bare compile-time expression; `${{ }}` is runtime-only",
+          ? `static-if cannot reference runtime context "${runtimeRoot}.*"`
+          : "static-if takes a bare compile-time expression; `${{ }}` is runtime-only",
       ),
       path,
       { hint: "Drop `${{ }}` and use a bare expression such as `params.deploy`." },
@@ -639,7 +639,7 @@ const evaluateWhenCompile = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage("static-if-empty", `Cannot parse static_if expression "${trimmed}"`),
+      diagnosticMessage("static-if-empty", `Cannot parse static-if expression "${trimmed}"`),
       path,
     );
     return undefined;
@@ -658,7 +658,7 @@ const evaluateWhenCompile = (
       "error",
       diagnosticMessage(
         "static-if-runtime-context",
-        `static_if cannot reference runtime context "${runtimeRoot}.*"`,
+        `static-if cannot reference runtime context "${runtimeRoot}.*"`,
       ),
       path,
       { hint: hintForRuntimeContext },
@@ -686,13 +686,13 @@ const evaluateWhenCompile = (
         "error",
         diagnosticMessage(
           "static-if-undefined-ref",
-          `static_if references unknown value "${refKey}"`,
+          `static-if references unknown value "${refKey}"`,
         ),
         path,
         {
           hint: maybeSuggestion
             ? `Did you mean "params.${maybeSuggestion}"?`
-            : "Declare the value in params or seed it as a compile-time symbol before static_if.",
+            : "Declare the value in params or seed it as a compile-time symbol before static-if.",
         },
       );
       continue;
@@ -709,7 +709,7 @@ const evaluateWhenCompile = (
     pushDiagnostic(
       ctx,
       "error",
-      diagnosticMessage("static-if-non-boolean", `static_if evaluation failed: ${message}`),
+      diagnosticMessage("static-if-non-boolean", `static-if evaluation failed: ${message}`),
       path,
     );
     return undefined;
@@ -721,7 +721,7 @@ const evaluateWhenCompile = (
       "error",
       diagnosticMessage(
         "static-if-non-boolean",
-        `static_if expression must resolve to boolean, got ${value === null ? "null" : typeof value}`,
+        `static-if expression must resolve to boolean, got ${value === null ? "null" : typeof value}`,
       ),
       path,
     );
@@ -740,13 +740,13 @@ const evaluateWhenCompileValue = (
   pushDiagnostic(
     ctx,
     "error",
-    diagnosticMessage("static-if-non-boolean", "static_if must resolve to a boolean expression"),
+    diagnosticMessage("static-if-non-boolean", "static-if must resolve to a boolean expression"),
     path,
   );
   return undefined;
 };
 
-const OMIT = Symbol("actio.static_if.omit");
+const OMIT = Symbol("actio.static-if.omit");
 
 type TransformedValue = unknown | typeof OMIT;
 
@@ -763,17 +763,17 @@ const transformNode = (ctx: ParseContext, value: unknown, path: Path): Transform
   if (!isObject(value)) return value;
 
   const allowFormA = isJobPath(path) || isStepPath(path);
-  const formAExpression = value.static_if;
+  const formAExpression = value["static-if"];
   if (allowFormA && formAExpression !== undefined) {
-    const keep = evaluateWhenCompileValue(ctx, formAExpression, [...path, "static_if"]);
+    const keep = evaluateWhenCompileValue(ctx, formAExpression, [...path, "static-if"]);
     if (keep === false) return OMIT;
-    delete value.static_if;
+    delete value["static-if"];
   }
 
   const keys = Object.keys(value);
   const formBKeys: string[] = [];
   for (const key of keys) {
-    if (key === "static_if") continue;
+    if (key === "static-if") continue;
     const expression = key.match(FORM_B_KEY_RE)?.[1];
     if (expression !== undefined) {
       formBKeys.push(key);
@@ -798,7 +798,7 @@ const transformNode = (ctx: ParseContext, value: unknown, path: Path): Transform
         "error",
         diagnosticMessage(
           "static-if-merge-non-map",
-          `static_if(${expression}) must map to an object value for conditional merge`,
+          `static-if(${expression}) must map to an object value for conditional merge`,
         ),
         [...path, key],
       );
@@ -814,7 +814,7 @@ const transformNode = (ctx: ParseContext, value: unknown, path: Path): Transform
           "warning",
           diagnosticMessage(
             "static-if-merge-collision",
-            `static_if merge key "${mergeKey}" overrides an existing value`,
+            `static-if merge key "${mergeKey}" overrides an existing value`,
           ),
           [...path, key, mergeKey],
         );
@@ -830,8 +830,8 @@ const transformNode = (ctx: ParseContext, value: unknown, path: Path): Transform
 };
 
 /**
- * Evaluate a `static_if` boolean expression against the live compile-time
- * symbol table. Exported so `for_each` can fold loop-var-dependent conditions
+ * Evaluate a `static-if` boolean expression against the live compile-time
+ * symbol table. Exported so `for-each` can fold loop-var-dependent conditions
  * per iteration while the loop binding is in scope. Returns `undefined` (after
  * pushing a diagnostic) when the expression does not resolve to a boolean.
  */
@@ -841,7 +841,7 @@ export const evaluateStaticIfExpression = (
   path: Path,
 ): boolean | undefined => evaluateWhenCompile(ctx, expression, path);
 
-const STATIC_IF_BINDING_ROOTS = new Set(["for_each", "key", "index"]);
+const STATIC_IF_BINDING_ROOTS = new Set(["for-each", "key", "index"]);
 
 const referencesLoopBinding = (expression: string, varName: string): boolean => {
   const roots = collectExpressionRoots(expression);
@@ -853,9 +853,9 @@ const referencesLoopBinding = (expression: string, varName: string): boolean => 
 };
 
 /**
- * Freeze a loop-var-dependent Form B key (`static_if(<expr>):`) to its literal
- * verdict (`static_if(true):` / `static_if(false):`), leaving the structural
- * merge/drop to `when_compile`. When two frozen keys collapse onto the same
+ * Freeze a loop-var-dependent Form B key (`static-if(<expr>):`) to its literal
+ * verdict (`static-if(true):` / `static-if(false):`), leaving the structural
+ * merge/drop to `when-compile`. When two frozen keys collapse onto the same
  * verdict their object payloads are combined so nothing is silently dropped.
  */
 const freezeFormBKey = (
@@ -866,7 +866,7 @@ const freezeFormBKey = (
   path: Path,
 ): void => {
   const keep = evaluateStaticIfExpression(ctx, expression, [...path, key]) ?? false;
-  const frozenKey = `static_if(${keep})`;
+  const frozenKey = `static-if(${keep})`;
   const payload = node[key];
   delete node[key];
   const existing = node[frozenKey];
@@ -894,15 +894,15 @@ const freezeStaticIfNode = (
 
   if (
     isStaticIfHost &&
-    typeof node.static_if === "string" &&
-    referencesLoopBinding(node.static_if, varName)
+    typeof node["static-if"] === "string" &&
+    referencesLoopBinding(node["static-if"], varName)
   ) {
-    const keep = evaluateStaticIfExpression(ctx, node.static_if, [...path, "static_if"]);
-    node.static_if = keep ?? false;
+    const keep = evaluateStaticIfExpression(ctx, node["static-if"], [...path, "static-if"]);
+    node["static-if"] = keep ?? false;
   }
 
   for (const key of Object.keys(node)) {
-    if (key === "static_if") continue;
+    if (key === "static-if") continue;
     const expression = key.match(FORM_B_KEY_RE)?.[1];
     if (expression !== undefined && referencesLoopBinding(expression, varName)) {
       freezeFormBKey(ctx, node, key, expression, path);
@@ -910,22 +910,22 @@ const freezeStaticIfNode = (
   }
 
   for (const key of Object.keys(node)) {
-    if (key === "static_if") continue;
+    if (key === "static-if") continue;
     freezeStaticIfNode(ctx, node[key], [...path, key], varName, isStaticIfHost && key === "steps");
   }
 };
 
 /**
- * Per-iteration static_if folding for compile-time-known for_each loops.
+ * Per-iteration static-if folding for compile-time-known for-each loops.
  *
- * `for_each` calls this inside its serial-expansion scope, while the loop's
- * binding symbols (`<var>`, `for_each.<var>`, `key`, `index`) are live, so a
- * `static_if` that depends on the loop binding is resolved per iteration. Form A
- * (`static_if: <expr>`) is frozen to the resulting boolean and left for
- * `when_compile` to apply structurally (so `static-if-empty-job` and dangling
- * `needs` diagnostics stay intact); Form B (`static_if(<expr>):`) is merged or
- * dropped in place. static_if expressions that do not reference the loop binding
- * are left untouched for `when_compile`, so runtime-bound loops still fail loud.
+ * `for-each` calls this inside its serial-expansion scope, while the loop's
+ * binding symbols (`<var>`, `for-each.<var>`, `key`, `index`) are live, so a
+ * `static-if` that depends on the loop binding is resolved per iteration. Form A
+ * (`static-if: <expr>`) is frozen to the resulting boolean and left for
+ * `when-compile` to apply structurally (so `static-if-empty-job` and dangling
+ * `needs` diagnostics stay intact); Form B (`static-if(<expr>):`) is merged or
+ * dropped in place. static-if expressions that do not reference the loop binding
+ * are left untouched for `when-compile`, so runtime-bound loops still fail loud.
  */
 export const freezeLoopStaticIf = (
   ctx: ParseContext,
@@ -969,7 +969,7 @@ export const whenCompilePass = (ctx: ParseContext): void => {
         "error",
         diagnosticMessage(
           "static-if-empty-job",
-          `Job "${jobId}" has no steps after static_if filtering; gate the job instead`,
+          `Job "${jobId}" has no steps after static-if filtering; gate the job instead`,
         ),
         ["jobs", jobId, "steps"],
       );
@@ -994,7 +994,7 @@ export const whenCompilePass = (ctx: ParseContext): void => {
 };
 
 export const whenCompile: Pass = {
-  name: "when_compile",
-  runsAfter: ["params", "for_each"],
+  name: "when-compile",
+  runsAfter: ["params", "for-each"],
   apply: whenCompilePass,
 };

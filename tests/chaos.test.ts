@@ -53,11 +53,11 @@ jobs:
   });
 });
 
-// Bug F: dynamic_matrix drops a boolean job-level `if`.
+// Bug F: dynamic-matrix drops a boolean job-level `if`.
 // `combineIf` keeps only string conditions, so a job's `if: false` (schema allows job `if` to be
 // boolean/number) is discarded when the empty-matrix guard is combined in. The generated job `if`
 // becomes just the matrix guard, so a job the user gated off now runs whenever the matrix is non-empty.
-describe("Bug F: dynamic_matrix drops a boolean job `if` gate", () => {
+describe("Bug F: dynamic-matrix drops a boolean job `if` gate", () => {
   it("preserves the original `if: false` gate on the matrix-consuming job", () => {
     const { doc } = build(`name: x
 on: [push]
@@ -65,7 +65,7 @@ jobs:
   a:
     runs-on: ubuntu-latest
     if: false
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["x"]'
     steps:
       - run: echo \${{ matrix }}

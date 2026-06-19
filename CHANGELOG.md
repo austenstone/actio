@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release of `actio-core` and `actio-cli`.
 - Transpiler engine (`actio-core`): parse, transform passes, emit, schema
   validation, and diagnostics for `.actio.yml` (a GitHub Actions YAML superset).
-- Macro keywords: `fragments` + `inject`, `retry`, `dynamic_matrix`, and
+- Macro keywords: `fragments` + `inject`, `retry`, `dynamic-matrix`, and
   `fallback`, expanding into standard GitHub Actions workflow YAML.
 - Command-line tool (`actio-cli`): `init`, `build`, `check`, and `watch`.
 - Vendored GitHub Actions workflow JSON schema with Actio macro extensions,

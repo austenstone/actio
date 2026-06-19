@@ -3,7 +3,7 @@ on: [push]
 jobs:
   test:
     runs-on: ${{ matrix.runs-on }}
-    dynamic_matrix:
+    dynamic-matrix:
       mode: include
       script: ./scripts/plan-shards.sh
     steps:

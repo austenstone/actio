@@ -86,11 +86,11 @@ Interpolation: `{{ ... }}` is **compile-time** (resolved by `actio build`);
 | --- | --- | --- |
 | `params` | workflow | Typed compile-time inputs; reference with `{{ params.* }}` |
 | `fragments` + `inject` | workflow / step | Reusable named step lists, spliced in with `- inject: <name>` |
-| `job_defaults` | workflow | Job-level defaults merged into every job |
+| `job-defaults` | workflow | Job-level defaults merged into every job |
 | `executors` + `executor` | workflow / job | Named runner/container/service presets |
-| `call_templates` + `extends` | workflow / job | Named reusable-workflow call presets (`uses`/`with`/`needs`/`secrets`/`if`); jobs `extends:` and override deltas |
-| `dynamic_matrix` | job | Generate `strategy.matrix` at runtime from a script |
-| `static_if` | job, step | Compile-time conditional; drops the node when false |
+| `call-templates` + `extends` | workflow / job | Named reusable-workflow call presets (`uses`/`with`/`needs`/`secrets`/`if`); jobs `extends:` and override deltas |
+| `dynamic-matrix` | job | Generate `strategy.matrix` at runtime from a script |
+| `static-if` | job, step | Compile-time conditional; drops the node when false |
 | `retry` | step | Retry a flaky step with optional backoff |
 | `fallback` | job, step | Native try/catch (notify, or `recover: true`) |
 

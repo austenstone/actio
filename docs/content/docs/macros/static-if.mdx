@@ -1,20 +1,20 @@
 ---
-title: static_if
+title: static-if
 description: Compile-time conditionals that keep or drop jobs, steps, and keys before any YAML is emitted.
 ---
 
-`static_if` is a **compile-time** conditional. Its expression is evaluated by the
+`static-if` is a **compile-time** conditional. Its expression is evaluated by the
 transpiler, not by GitHub Actions. When it is false the guarded job, step, or map
-is removed from the generated workflow entirely; when it is true the `static_if`
+is removed from the generated workflow entirely; when it is true the `static-if`
 key is stripped and everything else is emitted verbatim.
 
-Use `static_if` to shape the workflow at build time. Use the native `if:` for
+Use `static-if` to shape the workflow at build time. Use the native `if:` for
 runtime conditions that depend on `github.*`, `needs.*`, `steps.*`, and other
 runtime contexts.
 
 ## Form A — keep or drop a job or step
 
-Place `static_if` directly on a job or step. A false expression deletes the whole
+Place `static-if` directly on a job or step. A false expression deletes the whole
 map from the output.
 
 With `params.deploy` false, the `release` job never appears:
@@ -34,7 +34,7 @@ jobs:
     steps:
       - run: echo build
   release:
-    static_if: params.deploy
+    static-if: params.deploy
     runs-on: ubuntu-latest
     steps:
       - run: ./release.sh
@@ -50,11 +50,11 @@ jobs:
 
 </CodeCompare>
 
-Flip `default: true` and the job is emitted with the `static_if` key removed.
+Flip `default: true` and the job is emitted with the `static-if` key removed.
 
 ## Form B — conditional merge
 
-`static_if(<expr>):` is a merge key. When the expression is true, its mapping is
+`static-if(<expr>):` is a merge key. When the expression is true, its mapping is
 merged into the parent map; when false, the whole block is dropped. This works on
 jobs, steps, and `env:` maps.
 
@@ -74,7 +74,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: dist
-          static_if(params.debug):
+          static-if(params.debug):
             retention-days: "1"
 ```
 
@@ -91,9 +91,9 @@ jobs:
 
 </CodeCompare>
 
-## `static_if` vs `if`
+## `static-if` vs `if`
 
-- `static_if` runs at **compile time**. False branches produce no YAML, so they
+- `static-if` runs at **compile time**. False branches produce no YAML, so they
   cost nothing at runtime and never show up in the Actions UI.
 - `if` runs at **runtime** on GitHub's servers. The step or job is always present
   in the workflow; GitHub decides whether to run it.
@@ -102,7 +102,7 @@ They compose cleanly — a step can have both:
 
 ```yaml title=".actio.yml"
 - name: Publish preview
-  static_if: params.deploy
+  static-if: params.deploy
   if: github.ref == 'refs/heads/main'
   run: ./publish-preview.sh
 ```
@@ -112,7 +112,7 @@ step is emitted with its `if:` intact for GitHub to evaluate at runtime.
 
 ## Expression rules
 
-- Operates only on compile-time roots: `params.*`, `for_each.*`, and `define.*`.
+- Operates only on compile-time roots: `params.*`, `for-each.*`, and `define.*`.
 - Takes a **bare** expression — `${{ ... }}` is runtime-only and rejected.
 - Must resolve to a boolean. Unknown references and non-boolean results are errors.
 - Referencing a runtime context (`github`, `needs`, `steps`, …) is an error; use

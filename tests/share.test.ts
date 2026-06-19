@@ -504,7 +504,7 @@ jobs:
 });
 
 // ---------------------------------------------------------------------------
-// buildOutputWriter primitive — the for_each integration seam.
+// buildOutputWriter primitive — the for-each integration seam.
 // It must write whatever name it is handed (no global state).
 // ---------------------------------------------------------------------------
 

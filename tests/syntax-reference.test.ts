@@ -41,14 +41,14 @@ function tagged(node: unknown): boolean {
 
 /**
  * A property is an Actio macro if it is tagged inline OR its `$ref` target is tagged.
- * Both checks matter: some macros tag the property node (e.g. `job_defaults`), others
- * only tag the shared definition the property `$ref`s into (e.g. `dynamic_matrix`).
+ * Both checks matter: some macros tag the property node (e.g. `job-defaults`), others
+ * only tag the shared definition the property `$ref`s into (e.g. `dynamic-matrix`).
  */
 function isMacro(node: unknown): boolean {
   return tagged(node) || tagged(resolveRef(node));
 }
 
-/** Collect Actio macro keys from a container's `properties` + `static_if(<expr>)` pattern. */
+/** Collect Actio macro keys from a container's `properties` + `static-if(<expr>)` pattern. */
 function collectMacros(container: unknown): Set<string> {
   const out = new Set<string>();
   const c = (container ?? {}) as Node;
@@ -56,7 +56,7 @@ function collectMacros(container: unknown): Set<string> {
     if (isMacro(value)) out.add(key);
   }
   for (const key of Object.keys((c.patternProperties ?? {}) as Node)) {
-    if (/static_if/.test(key)) out.add("static_if()");
+    if (/static-if/.test(key)) out.add("static-if()");
   }
   return out;
 }
@@ -70,12 +70,12 @@ const schemaMacros = new Set<string>([
 ]);
 
 /**
- * Macros that ship as compiler passes but are not (yet) in the JSON Schema. `for_each`
+ * Macros that ship as compiler passes but are not (yet) in the JSON Schema. `for-each`
  * runs before validation and `step` is `additionalProperties: false`, so it cannot be
  * schema-tagged today. Documented deliberately; allow-listed here so parity still holds.
  * If one of these ever lands in the schema, the guard test below flags it for removal.
  */
-const KNOWN_SCHEMA_GAPS = new Set<string>(["for_each"]);
+const KNOWN_SCHEMA_GAPS = new Set<string>(["for-each"]);
 
 const canonicalMacros = new Set<string>([...schemaMacros, ...KNOWN_SCHEMA_GAPS]);
 
@@ -111,11 +111,11 @@ describe("syntax reference ↔ schema drift", () => {
 /** Option-bearing macros → the schema definition whose property keys they expose. */
 const OPTION_DEFS: Record<string, string> = {
   params: "actioParam",
-  job_defaults: "jobDefaults",
+  "job-defaults": "jobDefaults",
   executors: "executorDefinition",
-  call_templates: "callTemplateDefinition",
+  "call-templates": "callTemplateDefinition",
   finally: "finallyBlock",
-  dynamic_matrix: "dynamicMatrix",
+  "dynamic-matrix": "dynamicMatrix",
   retry: "retry",
   fallback: "fallback",
   share: "sharedOutput",

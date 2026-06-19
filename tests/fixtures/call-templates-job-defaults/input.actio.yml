@@ -1,12 +1,12 @@
 name: Precedence
 on: [push]
 
-job_defaults:
+job-defaults:
   if: ${{ github.ref == 'refs/heads/main' }}
   permissions:
     contents: read
 
-call_templates:
+call-templates:
   test:
     uses: ./.github/workflows/reuse.yml
     if: ${{ github.event_name == 'push' }}

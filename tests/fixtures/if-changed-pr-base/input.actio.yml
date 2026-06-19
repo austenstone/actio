@@ -10,4 +10,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Lint workflows
         run: ./lint.sh
-        if_changed: ".github/workflows/**"
+        if-changed: ".github/workflows/**"

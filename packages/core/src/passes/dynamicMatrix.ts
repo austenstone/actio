@@ -23,11 +23,8 @@ const DM_KEYS = new Set([
   "mode",
   "id",
   "runs-on",
-  "runs_on",
   "before",
-  "setup_steps",
   "fail-fast",
-  "fail_fast",
 ]);
 
 function opt<T>(dm: DM, ...keys: string[]): T | undefined {
@@ -47,7 +44,7 @@ function runsOnUsesMatrix(runsOn: unknown): boolean {
 }
 
 function resolveRunsOn(dm: DM, job: Job): unknown {
-  const fromDm = opt<unknown>(dm, "runs-on", "runs_on");
+  const fromDm = opt<unknown>(dm, "runs-on");
   if (fromDm !== undefined) return fromDm;
   // Heterogeneous/include fan-out commonly sets `runs-on: ${{ matrix.runs-on }}`
   // on the consuming job. Don't hand that to the (matrix-less) setup job.
@@ -75,8 +72,8 @@ function resolveMatrixMode(
     pushDiagnostic(
       ctx,
       "error",
-      `Job "${jobId}": dynamic_matrix mode "${mode}" is invalid; use "include" or "alias"`,
-      ["jobs", jobId, "dynamic_matrix", "mode"],
+      `Job "${jobId}": dynamic-matrix mode "${mode}" is invalid; use "include" or "alias"`,
+      ["jobs", jobId, "dynamic-matrix", "mode"],
     );
     return alias !== undefined ? "alias" : "include";
   }
@@ -84,8 +81,8 @@ function resolveMatrixMode(
     pushDiagnostic(
       ctx,
       "error",
-      `Job "${jobId}": dynamic_matrix mode "alias" requires an "alias" key`,
-      ["jobs", jobId, "dynamic_matrix", "mode"],
+      `Job "${jobId}": dynamic-matrix mode "alias" requires an "alias" key`,
+      ["jobs", jobId, "dynamic-matrix", "mode"],
     );
     return "include";
   }
@@ -93,8 +90,8 @@ function resolveMatrixMode(
     pushDiagnostic(
       ctx,
       "warning",
-      `Job "${jobId}": dynamic_matrix mode "include" ignores the "alias" key; the script's array (or {include:[...]}) passes straight into strategy.matrix`,
-      ["jobs", jobId, "dynamic_matrix", "alias"],
+      `Job "${jobId}": dynamic-matrix mode "include" ignores the "alias" key; the script's array (or {include:[...]}) passes straight into strategy.matrix`,
+      ["jobs", jobId, "dynamic-matrix", "alias"],
     );
   }
   return mode;
@@ -188,23 +185,23 @@ function buildEvalRun(script: string, compact: boolean, family: ShellFamily): st
 }
 
 function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefined {
-  const dm = job.dynamic_matrix as DM;
+  const dm = job["dynamic-matrix"] as DM;
   for (const key of Object.keys(dm)) {
     if (!DM_KEYS.has(key)) {
-      pushDiagnostic(ctx, "warning", `Job "${jobId}": dynamic_matrix has unknown key "${key}"`, [
+      pushDiagnostic(ctx, "warning", `Job "${jobId}": dynamic-matrix has unknown key "${key}"`, [
         "jobs",
         jobId,
-        "dynamic_matrix",
+        "dynamic-matrix",
         key,
       ]);
     }
   }
   const script = opt<string>(dm, "script", "run");
   if (typeof script !== "string" || script.trim() === "") {
-    pushDiagnostic(ctx, "error", `Job "${jobId}": dynamic_matrix requires a "script" string`, [
+    pushDiagnostic(ctx, "error", `Job "${jobId}": dynamic-matrix requires a "script" string`, [
       "jobs",
       jobId,
-      "dynamic_matrix",
+      "dynamic-matrix",
     ]);
     return undefined;
   }
@@ -216,8 +213,8 @@ function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefi
     pushDiagnostic(
       ctx,
       "error",
-      `Job "${jobId}": dynamic_matrix shell "${shell}" is not supported; use bash, sh, pwsh, powershell, or python`,
-      ["jobs", jobId, "dynamic_matrix", "shell"],
+      `Job "${jobId}": dynamic-matrix shell "${shell}" is not supported; use bash, sh, pwsh, powershell, or python`,
+      ["jobs", jobId, "dynamic-matrix", "shell"],
     );
     return undefined;
   }
@@ -229,14 +226,14 @@ function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefi
     pushDiagnostic(
       ctx,
       "warning",
-      `Job "${jobId}": dynamic_matrix "compact" only applies to bash/sh; "${shell}" emits the script's raw output instead`,
-      ["jobs", jobId, "dynamic_matrix", "compact"],
+      `Job "${jobId}": dynamic-matrix "compact" only applies to bash/sh; "${shell}" emits the script's raw output instead`,
+      ["jobs", jobId, "dynamic-matrix", "compact"],
     );
   }
 
   const steps: Step[] = [];
   if (checkout) steps.push(deriveNode(ctx, job, { uses: "actions/checkout@v4" }));
-  for (const s of asArray<Step>(opt<Step | Step[]>(dm, "before", "setup_steps"))) {
+  for (const s of asArray<Step>(opt<Step | Step[]>(dm, "before"))) {
     steps.push(isObject(s) ? deriveNode(ctx, job, s) : s);
   }
   const evalStep: Step = deriveNode(ctx, job, {
@@ -261,7 +258,7 @@ function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefi
 }
 
 function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId: string): void {
-  const dm = job.dynamic_matrix as DM;
+  const dm = job["dynamic-matrix"] as DM;
   const alias = opt<string>(dm, "alias", "as");
   const matrixExpr = `\${{ fromJSON(needs.${setupId}.outputs.matrix) }}`;
   const mode = resolveMatrixMode(ctx, jobId, dm, alias);
@@ -278,14 +275,14 @@ function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId:
       pushDiagnostic(
         ctx,
         "warning",
-        `Job "${jobId}": inline strategy.matrix is preserved; dynamic_matrix skips only the inherited/default strategy.matrix override while setup/needs/guard transforms still apply`,
+        `Job "${jobId}": inline strategy.matrix is preserved; dynamic-matrix skips only the inherited/default strategy.matrix override while setup/needs/guard transforms still apply`,
         ["jobs", jobId, "strategy", "matrix"],
       );
     } else {
       pushDiagnostic(
         ctx,
         "warning",
-        `Job "${jobId}": existing strategy.matrix is overwritten by dynamic_matrix`,
+        `Job "${jobId}": existing strategy.matrix is overwritten by dynamic-matrix`,
         ["jobs", jobId, "strategy", "matrix"],
       );
       strategy.matrix = matrixValue;
@@ -294,13 +291,13 @@ function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId:
     strategy.matrix = matrixValue;
   }
 
-  const failFast = opt<boolean>(dm, "fail-fast", "fail_fast");
+  const failFast = opt<boolean>(dm, "fail-fast");
   if (inlineSetFailFast) {
     if (failFast !== undefined) {
       pushDiagnostic(
         ctx,
         "warning",
-        `Job "${jobId}": inline strategy.fail-fast is preserved; dynamic_matrix fail-fast is ignored`,
+        `Job "${jobId}": inline strategy.fail-fast is preserved; dynamic-matrix fail-fast is ignored`,
         ["jobs", jobId, "strategy", "fail-fast"],
       );
     }
@@ -314,11 +311,11 @@ function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId:
   const guard = `needs.${setupId}.outputs.matrix != '[]' && needs.${setupId}.outputs.matrix != ''`;
   job.if = combineIf(guard, job.if);
 
-  delete job.dynamic_matrix;
+  delete job["dynamic-matrix"];
 }
 
 /**
- * dynamic_matrix pass: each job with a `dynamic_matrix` block is split into a
+ * dynamic-matrix pass: each job with a `dynamic-matrix` block is split into a
  * generated `actio_setup_<jobId>` job (runs the script, publishes compact JSON
  * as an output) and the original job (consumes it via `fromJSON`, with a
  * fail-fast:false default and an empty-matrix guard). The setup job is emitted
@@ -335,7 +332,7 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
     : Object.keys(jobs);
 
   const allJobIds = new Set(order);
-  // Track setup ids we have already generated so two different dynamic_matrix
+  // Track setup ids we have already generated so two different dynamic-matrix
   // jobs that resolve to the same setupId can't overwrite each other in the
   // rebuild (the same silent-drop/dangling-needs failure mode as an original-id
   // collision, just between two generated jobs).
@@ -344,30 +341,30 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
   const rebuiltOrder: string[] = [];
   for (const jobId of order) {
     const job = (jobs as Record<string, unknown>)[jobId];
-    if (!isObject(job) || (job as Job).dynamic_matrix == null) {
+    if (!isObject(job) || (job as Job)["dynamic-matrix"] == null) {
       rebuilt[jobId] = job;
       rebuiltOrder.push(jobId);
       continue;
     }
-    if (!isObject((job as Job).dynamic_matrix)) {
-      const dmVal = (job as Job).dynamic_matrix;
+    if (!isObject((job as Job)["dynamic-matrix"])) {
+      const dmVal = (job as Job)["dynamic-matrix"];
       pushDiagnostic(
         ctx,
         "error",
-        `Job "${jobId}": dynamic_matrix must be a mapping with a "script" (got ${
+        `Job "${jobId}": dynamic-matrix must be a mapping with a "script" (got ${
           dmVal === null ? "null" : Array.isArray(dmVal) ? "array" : typeof dmVal
         })`,
-        ["jobs", jobId, "dynamic_matrix"],
+        ["jobs", jobId, "dynamic-matrix"],
       );
-      delete (job as Job).dynamic_matrix;
+      delete (job as Job)["dynamic-matrix"];
       rebuilt[jobId] = job;
       rebuiltOrder.push(jobId);
       continue;
     }
-    const setupId = opt<string>(job.dynamic_matrix as DM, "id") ?? `actio_setup_${jobId}`;
+    const setupId = opt<string>(job["dynamic-matrix"] as DM, "id") ?? `actio_setup_${jobId}`;
     // The generated setup job is stored as `rebuilt[setupId]`; if that id equals
     // the consuming job's own id, another existing job id, or a setup id already
-    // generated for an earlier dynamic_matrix job, the plain-object rebuild would
+    // generated for an earlier dynamic-matrix job, the plain-object rebuild would
     // overwrite one with the other and silently drop a job, leaving
     // `needs.<setupId>` dangling. Refuse rather than corrupt.
     if (allJobIds.has(setupId) || generatedSetupIds.has(setupId)) {
@@ -380,8 +377,8 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
       pushDiagnostic(
         ctx,
         "error",
-        `Job "${jobId}": dynamic_matrix.id "${setupId}" ${reason}; choose a unique dynamic_matrix.id for the generated setup job`,
-        ["jobs", jobId, "dynamic_matrix", "id"],
+        `Job "${jobId}": dynamic-matrix.id "${setupId}" ${reason}; choose a unique dynamic-matrix.id for the generated setup job`,
+        ["jobs", jobId, "dynamic-matrix", "id"],
       );
       // Leave the input job untouched so we never emit a workflow that
       // references a setup job we couldn't safely create.
@@ -392,7 +389,7 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
     const setup = buildSetupJob(ctx, jobId, job as Job);
     if (!setup) {
       // Leave the job intact (minus the macro key) so other passes/validation proceed.
-      delete (job as Job).dynamic_matrix;
+      delete (job as Job)["dynamic-matrix"];
       rebuilt[jobId] = job;
       rebuiltOrder.push(jobId);
       continue;
@@ -410,7 +407,7 @@ export function dynamicMatrixPass(ctx: ParseContext): void {
 
 /** Split jobs and move the (already finalized) steps. Runs last. */
 export const dynamicMatrix: Pass = {
-  name: "dynamic_matrix",
+  name: "dynamic-matrix",
   runsAfter: ["fragments", "retry", "fallback"],
   apply: dynamicMatrixPass,
 };

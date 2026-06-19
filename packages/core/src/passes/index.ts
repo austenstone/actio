@@ -26,9 +26,9 @@ import { whenCompile } from "./whenCompile.js";
 /**
  * The transforms Actio ships with. Order is derived from each pass's `runsAfter`
  * (see registry.ts), not this array, so the effective pipeline is:
- *   params → call_templates → job_defaults → for_each → when_compile → fragments → share → retry → fallback → dynamic_matrix → lifecycle → if_changed → injection-hoist
+ *   params → call-templates → job-defaults → for-each → when-compile → fragments → share → retry → fallback → dynamic-matrix → lifecycle → if-changed → injection-hoist
  *
- * `call_templates` slots in immediately after `params` (and before `job_defaults`)
+ * `call-templates` slots in immediately after `params` (and before `job-defaults`)
  * so `extends:` materializes `uses` before the call/normal job partition.
  */
 export const builtinPasses: Pass[] = [

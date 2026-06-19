@@ -29,7 +29,7 @@ npx actio-cli check
 ```
 
 See the [full documentation](https://github.com/austenstone/actio#readme) for
-macros (`fragments`, `retry`, `dynamic_matrix`, `fallback`), config, and the
+macros (`fragments`, `retry`, `dynamic-matrix`, `fallback`), config, and the
 custom-pass API.
 
 ## License

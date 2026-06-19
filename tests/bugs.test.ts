@@ -109,20 +109,20 @@ jobs:
   });
 });
 
-describe("BUG: dynamic_matrix id override is ignored", () => {
+describe("BUG: dynamic-matrix id override is ignored", () => {
   it("names the generated setup job using the provided id", () => {
     const { doc } = build(`on: [push]
 jobs:
   j:
     runs-on: ubuntu-latest
-    dynamic_matrix:
+    dynamic-matrix:
       script: echo '["a"]'
       alias: x
       id: gen
     steps:
       - run: echo "\${{ matrix.x }}"
 `);
-    // The schema documents dynamic_matrix.id as "Override the generated setup
+    // The schema documents dynamic-matrix.id as "Override the generated setup
     // job id", but the pass hardcodes actio_setup_<jobId> for the job name,
     // needs, matrix expression, and guard.
     expect(Object.keys(doc.jobs)).toContain("gen");
