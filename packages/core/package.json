@@ -31,7 +31,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./schema/actio.schema.json": "./schema/actio.schema.json"
   },
   "files": [
     "dist",

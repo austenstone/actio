@@ -1,10 +1,46 @@
 'use client';
 
-import { yaml } from '@codemirror/lang-yaml';
-import CodeMirror, { EditorView, type Extension } from '@uiw/react-codemirror';
-import { useEffect, useState } from 'react';
+import MonacoEditor, { loader } from '@monaco-editor/react';
+// biome-ignore lint/style/useImportType: JSON value imported at runtime, not a type.
+import actioSchema from 'actio-core/schema/actio.schema.json';
+import * as monaco from 'monaco-editor';
+import { configureMonacoYaml } from 'monaco-yaml';
+import { useEffect, useMemo, useState } from 'react';
+import { findActioKeywordRanges } from '@/lib/actio-keywords';
+import { basePath } from '@/lib/shared';
+import { GITHUB_DARK, GITHUB_LIGHT, registerGithubThemes } from './github-themes';
 
-const yamlExtension: Extension[] = [yaml(), EditorView.lineWrapping];
+// Model paths. monaco-yaml scopes schemas via `fileMatch` against the model URI,
+// so the editable source matches the schema while the generated output stays plain.
+const SOURCE_PATH = 'source.actio.yml';
+const OUTPUT_PATH = 'output.workflow.yml';
+
+// Use the locally bundled Monaco (not the CDN AMD loader) so monaco-yaml's worker
+// matches the editor's version. Workers are prebuilt as standalone IIFE files in
+// `public/monaco/` (see scripts/build-monaco-workers.mjs) and loaded by URL: this
+// sidesteps Turbopack's nondeterministic worker-chunk eval order, which otherwise
+// leaves the yaml worker without its language host. This module only ever loads in
+// the browser (the playground mounts via dynamic ssr:false).
+if (typeof window !== 'undefined') {
+  window.MonacoEnvironment = {
+    getWorker(_workerId, label) {
+      const file = label === 'yaml' ? 'yaml.worker.js' : 'editor.worker.js';
+      return new Worker(`${basePath}/monaco/${file}`);
+    },
+  };
+  loader.config({ monaco });
+  registerGithubThemes(monaco);
+  configureMonacoYaml(monaco, {
+    enableSchemaRequest: false,
+    schemas: [
+      {
+        uri: 'https://austenstone.github.io/actio/schema/actio.schema.json',
+        fileMatch: [SOURCE_PATH],
+        schema: actioSchema as object,
+      },
+    ],
+  });
+}
 
 /** Track the site's dark/light mode via the `dark` class fumadocs toggles on <html>. */
 function useIsDark(): boolean {
@@ -20,6 +56,27 @@ function useIsDark(): boolean {
   return isDark;
 }
 
+// Paint Actio macro keywords in the editable source with the same accent the
+// static docs use (.actio-keyword in global.css). Monaco runs a different
+// highlighter than Shiki, so we reuse the shared keyword list as inline
+// decorations rather than the Shiki transformer. Source model only — generated
+// output has no Actio keywords left to highlight.
+function highlightActioKeywords(editor: monaco.editor.IStandaloneCodeEditor): monaco.IDisposable {
+  const collection = editor.createDecorationsCollection();
+  const apply = () => {
+    const model = editor.getModel();
+    if (!model) return;
+    collection.set(
+      findActioKeywordRanges(model.getValue()).map((r) => ({
+        range: new monaco.Range(r.line, r.startColumn, r.line, r.endColumn),
+        options: { inlineClassName: 'actio-keyword' },
+      })),
+    );
+  };
+  apply();
+  return editor.onDidChangeModelContent(apply);
+}
+
 interface EditorProps {
   value: string;
   onChange?: (value: string) => void;
@@ -29,23 +86,49 @@ interface EditorProps {
 
 export function Editor({ value, onChange, readOnly, ariaLabel }: EditorProps) {
   const isDark = useIsDark();
+  const options = useMemo<monaco.editor.IStandaloneEditorConstructionOptions>(
+    () => ({
+      readOnly,
+      domReadOnly: readOnly,
+      ariaLabel,
+      minimap: { enabled: false },
+      fontSize: 13,
+      lineNumbers: 'on',
+      wordWrap: 'on',
+      tabSize: 2,
+      folding: false,
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      padding: { top: 8, bottom: 8 },
+      renderLineHighlight: readOnly ? 'none' : 'line',
+      scrollbar: { alwaysConsumeMouseWheel: false },
+      // Render hover/suggest/context widgets in a fixed-position layer so they
+      // escape the editor panel's rounded `overflow:hidden` clip instead of
+      // getting cut off at its edges.
+      fixedOverflowWidgets: true,
+      // Surface completions as you type, including inside string values.
+      quickSuggestions: { other: true, comments: false, strings: true },
+      suggestOnTriggerCharacters: true,
+    }),
+    [readOnly, ariaLabel],
+  );
+
   return (
-    <CodeMirror
+    <MonacoEditor
+      language="yaml"
+      path={readOnly ? OUTPUT_PATH : SOURCE_PATH}
       value={value}
-      onChange={onChange}
-      readOnly={readOnly}
-      editable={!readOnly}
-      theme={isDark ? 'dark' : 'light'}
-      extensions={yamlExtension}
-      height="100%"
-      style={{ height: '100%', fontSize: 13 }}
-      aria-label={ariaLabel}
-      basicSetup={{
-        lineNumbers: true,
-        foldGutter: false,
-        highlightActiveLine: !readOnly,
-        highlightActiveLineGutter: !readOnly,
+      onChange={(next) => onChange?.(next ?? '')}
+      onMount={(editor) => {
+        if (readOnly) return;
+        const sub = highlightActioKeywords(editor);
+        editor.onDidDispose(() => sub.dispose());
       }}
+      theme={isDark ? GITHUB_DARK : GITHUB_LIGHT}
+      options={options}
+      loading={
+        <div className="px-4 py-3 text-sm text-fd-muted-foreground">Loading editor…</div>
+      }
     />
   );
 }
