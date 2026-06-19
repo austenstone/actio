@@ -1,0 +1,26 @@
+name: Precedence
+on: [push]
+
+job_defaults:
+  if: ${{ github.ref == 'refs/heads/main' }}
+  permissions:
+    contents: read
+
+call_templates:
+  test:
+    uses: ./.github/workflows/reuse.yml
+    permissions:
+      contents: write
+    if: ${{ github.event_name == 'push' }}
+
+jobs:
+  from-template:
+    extends: test
+    with:
+      x: "1"
+  inline-wins:
+    extends: test
+    permissions:
+      actions: write
+    with:
+      x: "2"
