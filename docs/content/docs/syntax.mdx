@@ -586,16 +586,18 @@ jobs:
 
 A native try/catch. Default (**notify**): the fallback runs on failure via `if: failure()`
 but the job still fails. With `recover: true` the guarded step gets `continue-on-error:
-true` and the fallback keys off `outcome`, so the job can pass.
+true` and the fallback keys off `outcome`, so the job can pass. With `retry` the guarded
+step is re-run in a sibling `<job>_retry` job on a different runner when it fails.
 
 - **Valid in:** `jobs.<job_id>.steps[*]` and `jobs.<job_id>` (job-level)
-- **Type:** list of steps (notify mode), or map with `recover` + `steps`
-- **Compiles to:** the guarded step plus outcome-gated fallback steps
+- **Type:** list of steps (notify mode), or map with `recover`/`steps` and/or `retry`
+- **Compiles to:** the guarded step plus outcome-gated fallback steps; `retry` also synthesizes a `<job>_retry` job (`needs: [<job>]`, `if: failure()`) that re-runs the step on the fallback runner
 
 <TypeTable
   type={{
     steps: { type: 'step[]', description: 'Steps to run when the guarded step fails.', required: true },
     recover: { type: 'boolean', description: 'Let the job pass: guarded step gets continue-on-error and the fallback keys off outcome.', default: 'false' },
+    retry: { type: 'map', description: 'Re-run the guarded step in a sibling job on a different runner when it fails. Keys: runs-on (required), when_exit_code (run-only, POSIX shell only).' },
   }}
 />
 
@@ -606,6 +608,15 @@ steps:
       recover: true
       steps:
         - run: ./rollback.sh
+```
+
+```yaml title=".actio.yml"
+steps:
+  - run: ./flaky-build.sh
+    fallback:
+      retry:
+        runs-on: ubuntu-latest-8-cores
+        when_exit_code: 137
 ```
 
 Full guide: [fallback](/docs/macros/fallback).

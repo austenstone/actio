@@ -1,0 +1,13 @@
+name: Fallback Retry
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build
+        run: ./build.sh
+        fallback:
+          retry:
+            runs-on: ubuntu-latest-8-cores

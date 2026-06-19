@@ -42,3 +42,101 @@ and the fallback uses `steps.<id>.outcome == 'failure'`, so the job can continue
   With `continue-on-error`, a failed step's `conclusion` becomes `success`, so
   recovery must key off `outcome`. Actio gets this right for you.
 </Callout>
+
+## retry: different runner
+
+Some failures aren't your code — they're the runner (OOM kills, flaky hosted
+infra, a job that needs more cores). `retry:` re-runs the *same step* in a brand
+new job on a different `runs-on`, gated on the original job failing.
+
+```yaml title=".actio.yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build
+        run: ./build.sh
+        fallback:
+          retry:
+            runs-on: ubuntu-latest-8-cores
+```
+
+The guarded step is lifted into a sibling `<job>_retry` job with
+`needs: [<job>]` and `if: failure()`, running on the fallback runner:
+
+```yaml title="generated .yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build
+        run: ./build.sh
+  build_retry:
+    name: Retry "Build" on ubuntu-latest-8-cores
+    needs:
+      - build
+    if: failure()
+    runs-on: ubuntu-latest-8-cores
+    steps:
+      - name: Build
+        run: ./build.sh
+```
+
+### when_exit_code
+
+Only retry on *specific* exit codes (e.g. `137` = SIGKILL/OOM) instead of any
+failure. Actio captures the original step's real exit code via an `EXIT` trap,
+exposes it as a job output, and gates the retry job on it.
+
+```yaml title=".actio.yml"
+- name: Run tests
+  run: ./run-tests.sh
+  fallback:
+    retry:
+      runs-on: ubuntu-latest-16-cores
+      when_exit_code: [137]
+```
+
+```yaml title="generated .yml"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run tests
+        run: |-
+          trap 'echo "exit_code=$?" >> "$GITHUB_OUTPUT"' EXIT
+          ./run-tests.sh
+        id: step_run_tests
+    outputs:
+      step_run_tests_exit_code: ${{ steps.step_run_tests.outputs.exit_code }}
+  test_retry:
+    name: Retry "Run tests" on ubuntu-latest-16-cores
+    needs:
+      - test
+    if: failure() && needs.test.outputs.step_run_tests_exit_code == '137'
+    runs-on: ubuntu-latest-16-cores
+    steps:
+      - name: Run tests
+        run: ./run-tests.sh
+```
+
+`when_exit_code` accepts a single number or a list (`[137, 143]`, OR-joined).
+
+<Callout type="warn" title="Limitations (v1)">
+  - **`when_exit_code` is `run`-only and POSIX-shell-only.** It relies on a shell
+    `EXIT` trap, so it's skipped (with a warning) on `uses:` steps or non-POSIX
+    shells; the retry then falls back to a plain `if: failure()` gate.
+  - **The guarded step must be self-contained.** Preceding in-job setup steps
+    (checkout, tool installs, etc.) are *not* copied into the retry job. Put any
+    setup the step needs inside the step, or this mode isn't a fit.
+  - **The workflow still goes red.** The retry job is an independent recovery
+    lane — a green sibling cannot un-fail the original job. Downstream jobs that
+    `needs:` the original are unaffected and will not see the retry's result.
+  - **One retry, no loop.** Exactly one `_retry` job is emitted; there's no
+    retry-of-the-retry.
+  - **Step-level only.** `retry:` on a job-level `fallback` is ignored (warning).
+</Callout>
