@@ -112,7 +112,7 @@ export default function Playground() {
       <div className="grid min-h-0 flex-1 grid-rows-2 md:grid-cols-2 md:grid-rows-1">
         <section className="flex min-h-0 flex-col border-b md:border-b-0 md:border-r">
           <header className="border-b px-4 py-1.5 text-xs font-medium uppercase tracking-wide text-fd-muted-foreground">
-            Source · .actio.yml
+            .actio.yml
           </header>
           <div className="min-h-0 flex-1 overflow-auto">
             <Editor value={source} onChange={onChange} ariaLabel="Actio source editor" />
@@ -121,7 +121,7 @@ export default function Playground() {
 
         <section className="flex min-h-0 flex-col">
           <header className="border-b px-4 py-1.5 text-xs font-medium uppercase tracking-wide text-fd-muted-foreground">
-            Output · GitHub Actions workflow
+            GitHub Actions workflow
           </header>
           <div className="min-h-0 flex-1 overflow-auto">
             {result.yaml ? (
