@@ -264,9 +264,6 @@ near-identical call jobs collapse to one base template plus per-job deltas (usua
     needs: { type: 'string | string[]', description: 'Order-preserving union of template and inline needs.' },
     secrets: { type: "map | 'inherit'", description: "A string on either side (e.g. inherit) replaces; two maps shallow-merge per key." },
     if: { type: 'string', description: 'AND-combined with the inline if condition.' },
-    permissions: { type: 'map', description: 'Replaces on presence; inline wins.' },
-    concurrency: { type: 'map', description: 'Replaces on presence; inline wins.' },
-    strategy: { type: 'map', description: 'Replaces on presence; inline wins.' },
   }}
 />
 

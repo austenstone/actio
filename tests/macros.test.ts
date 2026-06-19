@@ -980,24 +980,40 @@ jobs:
     expect(doc.jobs.unit.if).toBe("github.event_name == 'push' && success()");
   });
 
-  it("lets inline keys win over the template (replace keys)", () => {
+  it("lets an inline key win over the template (uses replace)", () => {
     const { errors, doc } = build(`name: x
 on: [push]
 call_templates:
   test:
     uses: ./base.yml
-    permissions:
-      contents: write
 jobs:
   unit:
     extends: test
     uses: ./inline.yml
-    permissions:
-      actions: write
 `);
     expect(errors).toEqual([]);
     expect(doc.jobs.unit.uses).toBe("./inline.yml");
-    expect(doc.jobs.unit.permissions).toEqual({ actions: "write" });
+  });
+
+  it("rejects strategy/permissions/concurrency in a v1 template (quad only)", () => {
+    for (const key of ["permissions", "concurrency", "strategy"]) {
+      const { result, errors } = build(`name: x
+on: [push]
+call_templates:
+  test:
+    uses: ./reuse.yml
+    ${key}:
+      contents: write
+jobs:
+  unit:
+    extends: test
+`);
+      expect(result.ok, key).toBe(false);
+      expect(
+        errors.some((d) => d.message.includes("call-template-rejected-key")),
+        key,
+      ).toBe(true);
+    }
   });
 
   it("composes a chain of templates left-to-right, later winning", () => {

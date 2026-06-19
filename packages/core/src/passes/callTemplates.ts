@@ -8,16 +8,7 @@ import type { Pass } from "./registry.js";
  * reusable-workflow call job. Order here is the canonical fallback emit order;
  * a template's own authored order still wins (see `composeCallTemplate`).
  */
-export const CALL_TEMPLATE_KEYS = [
-  "uses",
-  "with",
-  "needs",
-  "secrets",
-  "if",
-  "permissions",
-  "concurrency",
-  "strategy",
-] as const;
+export const CALL_TEMPLATE_KEYS = ["uses", "with", "needs", "secrets", "if"] as const;
 
 export type CallTemplateKey = (typeof CALL_TEMPLATE_KEYS)[number];
 
@@ -48,7 +39,7 @@ function shallowMerge(base: unknown, over: unknown): unknown {
  * - `secrets`        string on either side replaces; two maps shallow-merge
  * - `needs`          order-preserving union (array)
  * - `if`             combine with `&&`
- * - everything else  replace (uses/permissions/concurrency/strategy)
+ * - everything else  replace (`uses`)
  */
 function mergeCallValue(key: string, base: unknown, over: unknown): unknown {
   if (over === undefined) return base === undefined ? undefined : clone(base);
