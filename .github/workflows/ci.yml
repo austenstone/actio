@@ -46,12 +46,21 @@ jobs:
       - run: npm run build
       - name: Verify generated workflows are up to date
         run: npm run check:workflows
+      - name: Verify e2e fixture workflows are up to date
+        run: npm run check:e2e-fixtures
+  lint-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint (GitHub's own workflow parser)
+        run: npm run test:lint:workflows
   actio-annotate:
     name: Actio annotate
     runs-on: ubuntu-latest
     needs:
       - build
       - workflows
+      - lint-workflows
     if: failure()
     permissions:
       contents: read
