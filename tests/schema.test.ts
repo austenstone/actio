@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { actioSchema, EXECUTOR_KEYS, transpile } from "actio-core";
+import { actioSchema, CALL_TEMPLATE_KEYS, EXECUTOR_KEYS, transpile } from "actio-core";
 import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
@@ -16,6 +16,9 @@ const extensionsSchema = JSON.parse(
 ) as {
   addDefinitions: {
     executorDefinition: {
+      properties: Record<string, unknown>;
+    };
+    callTemplateDefinition: {
       properties: Record<string, unknown>;
     };
   };
@@ -299,6 +302,72 @@ jobs:
 
     expect(mergedKeys).toEqual(runtimeKeys);
     expect(sourceKeys).toEqual(runtimeKeys);
+  });
+
+  it("keeps callTemplateDefinition in lockstep with runtime CALL_TEMPLATE_KEYS", () => {
+    const runtimeKeys = [...CALL_TEMPLATE_KEYS].sort();
+    const mergedKeys = Object.keys(
+      (
+        actioSchema() as {
+          definitions: { callTemplateDefinition: { properties: Record<string, unknown> } };
+        }
+      ).definitions.callTemplateDefinition.properties,
+    ).sort();
+    const sourceKeys = Object.keys(
+      extensionsSchema.addDefinitions.callTemplateDefinition.properties,
+    ).sort();
+
+    expect(mergedKeys).toEqual(runtimeKeys);
+    expect(sourceKeys).toEqual(runtimeKeys);
+  });
+
+  it("accepts a call job that extends a template without inline uses", () => {
+    const doc = load(`on: [push]
+call_templates:
+  test:
+    uses: ./.github/workflows/reuse.yml
+jobs:
+  unit:
+    extends: test
+    with:
+      afterBuild: pnpm test`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts extends as a list of template names", () => {
+    const doc = load(`on: [push]
+call_templates:
+  base:
+    uses: ./.github/workflows/reuse.yml
+jobs:
+  unit:
+    extends: [base]`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects extends combined with steps", () => {
+    const doc = load(`on: [push]
+call_templates:
+  test:
+    uses: ./.github/workflows/reuse.yml
+jobs:
+  unit:
+    extends: test
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("rejects unknown keys in a call template definition", () => {
+    const doc = load(`on: [push]
+call_templates:
+  test:
+    uses: ./.github/workflows/reuse.yml
+    runs-on: ubuntu-latest
+jobs:
+  unit:
+    extends: test`);
+    expect(validate(doc)).toBe(false);
   });
 
   it("rejects job-only keys in executor definitions", () => {

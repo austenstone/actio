@@ -1,0 +1,40 @@
+name: Compose
+on: [push]
+
+call_templates:
+  base:
+    uses: ./.github/workflows/reuse.yml
+    needs: build
+    with:
+      shared: base-shared
+      kept: base-kept
+    secrets:
+      TOKEN: ${{ secrets.BASE }}
+    if: ${{ github.event_name == 'push' }}
+  extra:
+    needs: lint
+    with:
+      shared: extra-shared
+    secrets:
+      EXTRA: ${{ secrets.EXTRA }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo lint
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo deploy
+  composed:
+    extends: [base, extra]
+    needs: deploy
+    with:
+      shared: inline-shared
+      added: inline-added
+    if: ${{ success() }}

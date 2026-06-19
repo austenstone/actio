@@ -849,3 +849,293 @@ jobs:
     expect(errors.some((d) => d.message.includes('Key "steps" is not allowed here'))).toBe(true);
   });
 });
+
+describe("call_templates + extends", () => {
+  it("materializes a call job from a template before job_defaults partitions it", () => {
+    const { errors, doc } = build(`name: x
+on: [push]
+call_templates:
+  test:
+    uses: ./.github/workflows/reuse.yml
+    needs: build
+    with:
+      testTimingsArtifact: timings
+    secrets: inherit
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+  unit:
+    extends: test
+    with:
+      afterBuild: pnpm test:unit
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.unit.uses).toBe("./.github/workflows/reuse.yml");
+    expect(doc.jobs.unit.needs).toBe("build");
+    expect(doc.jobs.unit.with).toEqual({
+      testTimingsArtifact: "timings",
+      afterBuild: "pnpm test:unit",
+    });
+    expect(doc.jobs.unit.secrets).toBe("inherit");
+    expect(doc.jobs.unit.extends).toBeUndefined();
+  });
+
+  it("merges with shallow per-key, inline winning", () => {
+    const { errors, doc } = build(`name: x
+on: [push]
+call_templates:
+  test:
+    uses: ./reuse.yml
+    with:
+      shared: base
+      kept: base-kept
+jobs:
+  unit:
+    extends: test
+    with:
+      shared: inline
+      added: inline-added
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.unit.with).toEqual({
+      shared: "inline",
+      kept: "base-kept",
+      added: "inline-added",
+    });
+  });
+
+  it("unions needs across templates and inline, order-preserving", () => {
+    const { errors, doc } = build(`name: x
+on: [push]
+call_templates:
+  base:
+    uses: ./reuse.yml
+    needs: build
+  extra:
+    needs: lint
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo lint
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo deploy
+  unit:
+    extends: [base, extra]
+    needs: deploy
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.unit.needs).toEqual(["build", "lint", "deploy"]);
+  });
+
+  it("merges secrets maps but lets a string replace", () => {
+    const { errors, doc } = build(`name: x
+on: [push]
+call_templates:
+  mapsecrets:
+    uses: ./reuse.yml
+    secrets:
+      A: \${{ secrets.A }}
+  stringsecrets:
+    uses: ./reuse.yml
+    secrets: inherit
+jobs:
+  merged:
+    extends: mapsecrets
+    secrets:
+      B: \${{ secrets.B }}
+  replaced:
+    extends: mapsecrets
+    secrets: inherit
+  fromstring:
+    extends: stringsecrets
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.merged.secrets).toEqual({ A: "${{ secrets.A }}", B: "${{ secrets.B }}" });
+    expect(doc.jobs.replaced.secrets).toBe("inherit");
+    expect(doc.jobs.fromstring.secrets).toBe("inherit");
+  });
+
+  it("combines template and inline if with &&", () => {
+    const { errors, doc } = build(`name: x
+on: [push]
+call_templates:
+  test:
+    uses: ./reuse.yml
+    if: \${{ github.event_name == 'push' }}
+jobs:
+  unit:
+    extends: test
+    if: \${{ success() }}
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.unit.if).toBe("github.event_name == 'push' && success()");
+  });
+
+  it("lets inline keys win over the template (replace keys)", () => {
+    const { errors, doc } = build(`name: x
+on: [push]
+call_templates:
+  test:
+    uses: ./base.yml
+    permissions:
+      contents: write
+jobs:
+  unit:
+    extends: test
+    uses: ./inline.yml
+    permissions:
+      actions: write
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.unit.uses).toBe("./inline.yml");
+    expect(doc.jobs.unit.permissions).toEqual({ actions: "write" });
+  });
+
+  it("composes a chain of templates left-to-right, later winning", () => {
+    const { errors, doc } = build(`name: x
+on: [push]
+call_templates:
+  a:
+    uses: ./a.yml
+    with:
+      v: from-a
+  b:
+    with:
+      v: from-b
+jobs:
+  unit:
+    extends: [a, b]
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.unit.uses).toBe("./a.yml");
+    expect(doc.jobs.unit.with).toEqual({ v: "from-b" });
+  });
+
+  it("resolves {{ params.* }} inside a call template", () => {
+    const { errors, doc } = build(`name: x
+on: [push]
+params:
+  flow:
+    type: string
+    default: reuse
+call_templates:
+  test:
+    uses: ./.github/workflows/{{ params.flow }}.yml
+jobs:
+  unit:
+    extends: test
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.unit.uses).toBe("./.github/workflows/reuse.yml");
+  });
+
+  it("errors when call_templates is not a mapping", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+call_templates: nope
+jobs:
+  unit:
+    uses: ./reuse.yml
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes('"call_templates" must be a mapping'))).toBe(true);
+  });
+
+  it("errors when a template definition is not a mapping", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+call_templates:
+  test: ./reuse.yml
+jobs:
+  unit:
+    extends: test
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes('Call template "test" must be a mapping'))).toBe(
+      true,
+    );
+  });
+
+  it("rejects unsupported keys in a template definition", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+call_templates:
+  test:
+    uses: ./reuse.yml
+    runs-on: ubuntu-latest
+jobs:
+  unit:
+    extends: test
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes("call-template-rejected-key"))).toBe(true);
+  });
+
+  it("errors on an unknown template name", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+call_templates:
+  test:
+    uses: ./reuse.yml
+jobs:
+  unit:
+    extends: missing
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes("call-template-unknown"))).toBe(true);
+  });
+
+  it("rejects extends on a job that defines steps", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+call_templates:
+  test:
+    uses: ./reuse.yml
+jobs:
+  unit:
+    extends: test
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes("extends-on-noncall-job"))).toBe(true);
+  });
+
+  it("rejects extends when no template in the chain provides uses", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+call_templates:
+  partial:
+    with:
+      x: "1"
+jobs:
+  unit:
+    extends: partial
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes("extends-on-noncall-job"))).toBe(true);
+  });
+
+  it("errors when extends is the wrong type", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+call_templates:
+  test:
+    uses: ./reuse.yml
+jobs:
+  unit:
+    extends: 5
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => d.message.includes("extends must be a string or list"))).toBe(true);
+  });
+});
