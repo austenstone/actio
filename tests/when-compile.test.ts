@@ -656,6 +656,144 @@ jobs:
     ).toBe(true);
   });
 
+  // Issue #72: the POSITIVE static composition of for_each x static_if. When a
+  // for_each iterates a compile-time-known list, each iteration's loop binding
+  // (item, for_each.item, index, key) is knowable at transpile time, so a
+  // static_if referencing the loop var is frozen per iteration inside for_each's
+  // static expansion while the binding symbol is in scope. when_compile then
+  // owns the structural keep/omit/merge, so its diagnostics stay intact.
+  it("evaluates static_if against a compile-time loop binding per iteration (#72)", () => {
+    const result = transpileResult(`name: x
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - for_each: { var: item, in: [a, b] }
+        steps:
+          - run: echo {{ item }}-always
+          - run: echo {{ item }}-only-a
+            static_if: item == 'a'
+`);
+    expect(result.ok).toBe(true);
+    expect(
+      result.diagnostics.every(
+        (diagnostic) => !diagnostic.message.includes("[static-if-undefined-ref]"),
+      ),
+    ).toBe(true);
+    const doc = parse(result.yaml) as {
+      jobs: { build: { steps: Array<{ run: string }> } };
+    };
+    expect(doc.jobs.build.steps.map((step) => step.run)).toEqual([
+      "echo a-always",
+      "echo a-only-a",
+      "echo b-always",
+    ]);
+  });
+
+  it("merges a loop-binding static_if(...) block per iteration (#72)", () => {
+    const result = transpileResult(`name: x
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - for_each: { var: item, in: [a, b] }
+        steps:
+          - run: echo {{ item }}
+            env:
+              static_if(item == 'a'):
+                ONLY_A: "yes"
+`);
+    expect(result.ok).toBe(true);
+    const doc = parse(result.yaml) as {
+      jobs: { build: { steps: Array<{ run: string; env?: { ONLY_A?: string } }> } };
+    };
+    expect(doc.jobs.build.steps[0]?.env?.ONLY_A).toBe("yes");
+    expect(doc.jobs.build.steps[1]?.env?.ONLY_A).toBeUndefined();
+  });
+
+  it("resolves the index binding in static_if per iteration (#72)", () => {
+    const result = transpileResult(`name: x
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - for_each: { var: item, in: [a, b, c] }
+        steps:
+          - run: echo {{ item }}
+            static_if: index == 0
+`);
+    expect(result.ok).toBe(true);
+    const doc = parse(result.yaml) as {
+      jobs: { build: { steps: Array<{ run: string }> } };
+    };
+    expect(doc.jobs.build.steps.map((step) => step.run)).toEqual(["echo a"]);
+  });
+
+  it("evaluates static_if per sibling job in a serial static fan-out (#72)", () => {
+    const result = transpileResult(`name: x
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    for_each: { var: item, in: [a, b], parallel: false }
+    steps:
+      - run: echo {{ item }}-always
+      - run: echo {{ item }}-only-a
+        static_if: item == 'a'
+`);
+    expect(result.ok).toBe(true);
+    const doc = parse(result.yaml) as {
+      jobs: Record<string, { steps: Array<{ run: string }> }>;
+    };
+    expect(doc.jobs["build-a"]?.steps.map((step) => step.run)).toEqual([
+      "echo a-always",
+      "echo a-only-a",
+    ]);
+    expect(doc.jobs["build-b"]?.steps.map((step) => step.run)).toEqual(["echo b-always"]);
+  });
+
+  // The runtime/dynamic case must keep failing loud (the #50 invariant): a
+  // parallel matrix renders ONE shared body whose loop var lowers to
+  // `${{ matrix.<as> }}`, so the binding is genuinely runtime and static_if on
+  // it stays unresolved.
+  it("still fails loud for static_if on a parallel-matrix loop binding (#72)", () => {
+    const errors = transpileErrors(`name: x
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    for_each: { var: item, in: [a, b], parallel: true }
+    steps:
+      - run: echo hi
+        static_if: item == 'a'
+`);
+    expect(
+      errors.some((diagnostic) => diagnostic.message.includes("[static-if-undefined-ref]")),
+    ).toBe(true);
+  });
+
+  // for_each only freezes the condition; when_compile still owns structure, so a
+  // sibling job whose every step is dropped by a per-iteration static_if still
+  // raises the empty-job diagnostic.
+  it("preserves the empty-job check when a loop static_if drops every step (#72)", () => {
+    const errors = transpileErrors(`name: x
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    for_each: { var: item, in: [a, b], parallel: false }
+    steps:
+      - run: echo {{ item }}
+        static_if: item == 'a'
+`);
+    expect(errors.some((diagnostic) => diagnostic.message.includes("[static-if-empty-job]"))).toBe(
+      true,
+    );
+  });
+
   it("supports parser precedence, literals, and stdlib calls", () => {
     const result = transpileResult(`name: x
 on: [push]
