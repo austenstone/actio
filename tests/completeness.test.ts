@@ -11,6 +11,16 @@ const fixtureDirsByPassName: Record<string, string[]> = {
   "injection-hoist": ["injection-hoist"],
   fallback: ["fallback-job", "fallback-notify", "fallback-recover"],
   fragments: ["fragments"],
+  lifecycle: [
+    "bare-finally",
+    "ensure-job",
+    "ensure-step",
+    "finally-auto-needs-all-real-jobs",
+    "finally-on-abort-empty",
+    "finally-on-abort-replace",
+    "finally-outcome-branches",
+    "finally-when-sugar",
+  ],
   params: ["params-scalar", "params-list", "params-step-list", "params-enum"],
   job_defaults: [
     "job-defaults-normal-merge",

@@ -1,0 +1,25 @@
+name: CI
+on: [push]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+
+finally:
+  on_success:
+    notify-success:
+      runs-on: ubuntu-latest
+      steps:
+        - run: ./notify-ok.sh
+  on_failure:
+    notify-failure:
+      runs-on: ubuntu-latest
+      steps:
+        - run: ./page-oncall.sh
+  on_abort:
+    notify-abort:
+      runs-on: ubuntu-latest
+      steps:
+        - run: ./notify-cancelled.sh

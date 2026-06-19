@@ -11,6 +11,7 @@ import {
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,
 } from "./jobDefaults.js";
+import { lifecycle } from "./lifecycle.js";
 import { params } from "./params.js";
 import { applyPasses, type Pass, PassRegistry } from "./registry.js";
 import { retry } from "./retry.js";
@@ -20,7 +21,7 @@ import { whenCompile } from "./whenCompile.js";
 /**
  * The transforms Actio ships with. Order is derived from each pass's `runsAfter`
  * (see registry.ts), not this array, so the effective pipeline is:
- *   params → job_defaults → for_each → when_compile → fragments → share → retry → fallback → dynamic_matrix → injection-hoist
+ *   params → job_defaults → for_each → when_compile → fragments → share → retry → fallback → dynamic_matrix → lifecycle → injection-hoist
  */
 export const builtinPasses: Pass[] = [
   params,
@@ -32,6 +33,7 @@ export const builtinPasses: Pass[] = [
   retry,
   fallback,
   dynamicMatrix,
+  lifecycle,
   injectionHoist,
 ];
 
@@ -71,6 +73,7 @@ export {
   injectionHoist,
   JOB_DEFAULTS_SAFE_SUBSET,
   jobDefaults,
+  lifecycle,
   params,
   retry,
   share,

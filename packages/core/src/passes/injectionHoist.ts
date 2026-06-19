@@ -385,6 +385,6 @@ export const injectionHoist: Pass = {
   name: "injection-hoist",
   // TODO(injection-hoist-share-ordering): add "share" once #18 merges so we run
   // after the share macro's sanctioned `share.*` rewrites.
-  runsAfter: ["fragments", "retry", "fallback", "dynamic_matrix"],
+  runsAfter: ["fragments", "retry", "fallback", "dynamic_matrix", "lifecycle"],
   apply: injectionHoistPass,
 };

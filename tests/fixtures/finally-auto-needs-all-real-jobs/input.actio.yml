@@ -1,0 +1,19 @@
+name: CI
+on: [push]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./lint.sh
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - run: ./build.sh
+
+finally:
+  teardown:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./cleanup.sh

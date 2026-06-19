@@ -16,9 +16,9 @@ npx actio-cli check
 
 ## Recommended layout
 
-Keep sources in `.github/actio/` and compile them into `.github/workflows/` — the
-directory GitHub actually reads. Sources nested outside `.github/workflows/` won't
-be mistaken for real workflows. Think of `.github/workflows/` as your `dist`:
+Keep sources in `.github/actio/` and compile them into `.github/workflows/`, the
+directory GitHub actually reads. Sources can live anywhere and still get picked up,
+so this is just a convention. Think of `.github/workflows/` as your `dist`:
 
 ```text
 .github/
