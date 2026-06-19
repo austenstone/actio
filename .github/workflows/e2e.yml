@@ -126,6 +126,10 @@ jobs:
     needs: check
     if: false
     uses: ./.github/workflows/e2e-fixture-fragments.yml
+  e2e-fixture-injection-hoist:
+    needs: check
+    if: false
+    uses: ./.github/workflows/e2e-fixture-injection-hoist.yml
   e2e-fixture-job-defaults-if-combine:
     needs: check
     if: false
