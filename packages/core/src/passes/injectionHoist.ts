@@ -93,9 +93,29 @@ function shellFamily(shell: unknown): ShellFamily {
   return "posix";
 }
 
-/** Strip array indexing and normalize a context path for classification/lookup. */
+/**
+ * Canonicalize a context path for classification/lookup. Bracket-quoted and
+ * numeric index access is rewritten to its dotted equivalent
+ * (`github['event']['issue']['title']` → `github.event.issue.title`,
+ * `github.event.pages[0]` → `github.event.pages.0`) so taint classification sees
+ * the same canonical path regardless of access syntax. A dynamic index that
+ * cannot be statically resolved (`github[foo]`) is left intact so callers can
+ * detect it via `isUnanalyzablePath` and warn instead of silently failing open.
+ */
 function normalizePath(path: string): string {
-  return path.replace(/\[[^\]]*\]/g, "").toLowerCase();
+  return path
+    .replace(/\[\s*'([^']*)'\s*\]/g, ".$1")
+    .replace(/\[\s*"([^"]*)"\s*\]/g, ".$1")
+    .replace(/\[\s*(\d+)\s*\]/g, ".$1")
+    .toLowerCase();
+}
+
+/**
+ * True when a canonicalized path still carries an unresolved dynamic index
+ * (e.g. `github[foo]`), meaning taint cannot be statically classified.
+ */
+function isUnanalyzablePath(normalized: string): boolean {
+  return normalized.includes("[");
 }
 
 function classifyPath(path: string): Classification {
@@ -258,6 +278,26 @@ function processStep(
       { code: "injection-hoist-nested" },
     );
     return;
+  }
+
+  // A dynamic bracket index (`github[foo]`) can't be statically classified for
+  // taint. Warn loudly rather than letting the path normalize to a trusted root
+  // and silently pass an untrusted value through to the shell.
+  const unanalyzable = occurrences.filter((occ) =>
+    extractContextPaths(occ.inner).map(normalizePath).some(isUnanalyzablePath),
+  );
+  if (unanalyzable.length > 0) {
+    pushDiagnostic(
+      ctx,
+      "warning",
+      `Dynamic bracket indexing can't be statically analyzed for taint (${
+        unanalyzable.length
+      } occurrence${
+        unanalyzable.length === 1 ? "" : "s"
+      }); rewrite to dotted access (e.g. github.event.issue.title) or hoist manually`,
+      [...path, "run"],
+      { code: "injection-hoist-unanalyzable-path" },
+    );
   }
 
   // Decide, per occurrence, whether it carries an untrusted (or forced) value.

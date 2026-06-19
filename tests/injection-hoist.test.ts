@@ -127,6 +127,43 @@ describe("injection-hoist", () => {
     expect(step.run).toBe("echo ${{ github.event.pull_request.number }}");
   });
 
+  it("hoists a bracket-notation untrusted path (canonicalized to dotted)", () => {
+    const { doc, errors } = build(
+      wf("      - run: echo ${{ github['event']['pull_request']['title'] }}"),
+    );
+    expect(errors).toEqual([]);
+    const step = step0(doc);
+    expect(step.env).toEqual({
+      PR_TITLE: "${{ github['event']['pull_request']['title'] }}",
+    });
+    expect(step.run).toBe('echo "$PR_TITLE"');
+  });
+
+  it("hoists a mixed dotted/bracket untrusted path", () => {
+    const { doc, errors } = build(wf("      - run: echo ${{ github.event['issue'].title }}"));
+    expect(errors).toEqual([]);
+    const step = step0(doc);
+    expect(step.env).toEqual({ ISSUE_TITLE: "${{ github.event['issue'].title }}" });
+    expect(step.run).toBe('echo "$ISSUE_TITLE"');
+  });
+
+  it("does NOT hoist a structural leaf reached via bracket notation", () => {
+    const { doc } = build(wf("      - run: echo ${{ github['event']['pull_request']['number'] }}"));
+    const step = step0(doc);
+    expect(step.env).toBeUndefined();
+    expect(step.run).toBe("echo ${{ github['event']['pull_request']['number'] }}");
+  });
+
+  it("warns (and does not hoist) on a dynamic bracket index it can't resolve", () => {
+    const { doc, warnings } = build(
+      wf("      - run: echo ${{ github['event'][github.event.action] }}"),
+    );
+    expect(warnings.some((w) => w.code === "injection-hoist-unanalyzable-path")).toBe(true);
+    const step = step0(doc);
+    expect(step.env).toBeUndefined();
+    expect(step.run).toBe("echo ${{ github['event'][github.event.action] }}");
+  });
+
   it("skips a step marked unsafe: true and strips the knob", () => {
     const { doc } = build(
       wf(`      - unsafe: true
