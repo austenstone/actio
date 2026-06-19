@@ -13,4 +13,7 @@ export const gitConfig = {
   user: 'austenstone',
   repo: 'actio',
   branch: 'main',
+  // The Next docs app lives in the repo's `docs/` subfolder, so MDX sources are
+  // at `docs/content/docs/...`. This prefix maps a page path back to its file.
+  contentRoot: 'docs/content/docs',
 };
