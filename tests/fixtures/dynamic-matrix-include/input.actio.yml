@@ -1,0 +1,10 @@
+name: Heterogeneous Dynamic Matrix
+on: [push]
+jobs:
+  test:
+    runs-on: ${{ matrix.runs-on }}
+    dynamic_matrix:
+      mode: include
+      script: ./scripts/plan-shards.sh
+    steps:
+      - run: ./run.sh ${{ matrix.shard }}

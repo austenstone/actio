@@ -356,6 +356,7 @@ that prints JSON to `$GITHUB_OUTPUT` and a matrix job wired with `needs` + `from
   type={{
     script: { type: 'string', description: 'Path or inline command that prints matrix JSON to GITHUB_OUTPUT.', required: true },
     alias: { type: 'string', description: 'Rename the matrix entry key (default is matrix).' },
+    mode: { type: 'string', description: 'Fan-out shape: include (raw {include:[...]} for per-item attributes) or alias. Inferred from alias when omitted.' },
     'runs-on': { type: 'string | string[]', description: 'Runner for the generated setup job.', default: 'ubuntu-latest' },
     shell: { type: 'string', description: 'Shell for the script: bash, sh, pwsh, powershell, or python.', default: 'bash' },
     compact: { type: 'boolean', description: 'Collapse the setup job into a compact form.', default: 'true' },
@@ -364,6 +365,9 @@ that prints JSON to `$GITHUB_OUTPUT` and a matrix job wired with `needs` + `from
     id: { type: 'string', description: 'Explicit id for the generated setup job.' },
   }}
 />
+
+For heterogeneous fan-out (per-item `runs-on`/`env`), have `script` print
+`{include:[...]}` (include mode); each entry's keys are read as `${{ matrix.<key> }}`.
 
 ```yaml title=".actio.yml"
 jobs:

@@ -20,6 +20,7 @@ const DM_KEYS = new Set([
   "compact",
   "alias",
   "as",
+  "mode",
   "id",
   "runs-on",
   "runs_on",
@@ -36,11 +37,67 @@ function opt<T>(dm: DM, ...keys: string[]): T | undefined {
   return undefined;
 }
 
+/**
+ * Whether a `runs-on` value is a `${{ matrix.* }}` expression. Such a value is
+ * meaningful on the consuming matrix job, but the generated setup job has no
+ * matrix context, so inheriting it would resolve empty and break the runner.
+ */
+function runsOnUsesMatrix(runsOn: unknown): boolean {
+  return typeof runsOn === "string" && /\$\{\{[^}]*\bmatrix\.[^}]*\}\}/.test(runsOn);
+}
+
 function resolveRunsOn(dm: DM, job: Job): unknown {
   const fromDm = opt<unknown>(dm, "runs-on", "runs_on");
   if (fromDm !== undefined) return fromDm;
-  if (typeof job["runs-on"] === "string") return job["runs-on"];
+  // Heterogeneous/include fan-out commonly sets `runs-on: ${{ matrix.runs-on }}`
+  // on the consuming job. Don't hand that to the (matrix-less) setup job.
+  if (typeof job["runs-on"] === "string" && !runsOnUsesMatrix(job["runs-on"])) {
+    return job["runs-on"];
+  }
   return "ubuntu-latest";
+}
+
+type MatrixMode = "include" | "alias";
+
+/**
+ * Resolve include vs alias mode. An explicit `mode: include|alias` wins;
+ * otherwise the mode is inferred from the presence of `alias` (back-compat).
+ */
+function resolveMatrixMode(
+  ctx: ParseContext,
+  jobId: string,
+  dm: DM,
+  alias: string | undefined,
+): MatrixMode {
+  const mode = opt<string>(dm, "mode");
+  if (mode === undefined) return alias !== undefined ? "alias" : "include";
+  if (mode !== "include" && mode !== "alias") {
+    pushDiagnostic(
+      ctx,
+      "error",
+      `Job "${jobId}": dynamic_matrix mode "${mode}" is invalid; use "include" or "alias"`,
+      ["jobs", jobId, "dynamic_matrix", "mode"],
+    );
+    return alias !== undefined ? "alias" : "include";
+  }
+  if (mode === "alias" && alias === undefined) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      `Job "${jobId}": dynamic_matrix mode "alias" requires an "alias" key`,
+      ["jobs", jobId, "dynamic_matrix", "mode"],
+    );
+    return "include";
+  }
+  if (mode === "include" && alias !== undefined) {
+    pushDiagnostic(
+      ctx,
+      "warning",
+      `Job "${jobId}": dynamic_matrix mode "include" ignores the "alias" key; the script's array (or {include:[...]}) passes straight into strategy.matrix`,
+      ["jobs", jobId, "dynamic_matrix", "alias"],
+    );
+  }
+  return mode;
 }
 
 type ShellFamily = "posix" | "pwsh" | "python" | "unsupported";
@@ -207,6 +264,9 @@ function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId:
   const dm = job.dynamic_matrix as DM;
   const alias = opt<string>(dm, "alias", "as");
   const matrixExpr = `\${{ fromJSON(needs.${setupId}.outputs.matrix) }}`;
+  const mode = resolveMatrixMode(ctx, jobId, dm, alias);
+  const useAlias = mode === "alias" && alias !== undefined;
+  const matrixValue: unknown = useAlias ? { [alias as string]: matrixExpr } : matrixExpr;
   const inlineStrategy = ctx.internal.jobDefaults?.inlineStrategyJobs?.[jobId] === true;
   const inlineSetFailFast = ctx.internal.jobDefaults?.inlineStrategyFailFastJobs?.[jobId] === true;
 
@@ -228,10 +288,10 @@ function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId:
         `Job "${jobId}": existing strategy.matrix is overwritten by dynamic_matrix`,
         ["jobs", jobId, "strategy", "matrix"],
       );
-      strategy.matrix = alias ? { [alias]: matrixExpr } : matrixExpr;
+      strategy.matrix = matrixValue;
     }
   } else {
-    strategy.matrix = alias ? { [alias]: matrixExpr } : matrixExpr;
+    strategy.matrix = matrixValue;
   }
 
   const failFast = opt<boolean>(dm, "fail-fast", "fail_fast");

@@ -51,9 +51,76 @@ jobs:
 ## Options
 
 `script` (required), `alias` (wrap a scalar array under `matrix.<alias>`; omit for
-raw `{include:[...]}` mode), `checkout` (default `true` when `script` is a local
-path), `runs-on`, `shell`, `compact` (default `true`), `fail-fast` (default
-`false`), `id`.
+raw `{include:[...]}` mode), `mode` (`include` or `alias`; explicit override of the
+alias inference), `checkout` (default `true` when `script` is a local path),
+`runs-on`, `shell`, `compact` (default `true`), `fail-fast` (default `false`), `id`.
+
+## Heterogeneous fan-out (`include` mode)
+
+By default a GitHub Actions matrix fans out **one job template**, so every shard is
+identical. To make each generated entry carry its own attributes — its own
+`runs-on`, `env`, `container`, etc. — have your `script` print a
+[`{include:[...]}`](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow#using-a-matrix-strategy)
+object instead of a scalar array. Each object in `include` becomes one job, and its
+keys are readable as `${{ matrix.<key> }}`. This is the **include mode** (the
+default when no `alias` is set; set `mode: include` to make it explicit).
+
+```yaml title=".actio.yml"
+jobs:
+  test:
+    runs-on: ${{ matrix.runs-on }}
+    dynamic_matrix:
+      mode: include
+      script: ./scripts/plan-shards.sh
+    steps:
+      - run: ./run.sh ${{ matrix.shard }}
+```
+
+If `plan-shards.sh` prints:
+
+```json
+{"include":[{"shard":"gpu","runs-on":"gpu-runner"},{"shard":"unit","runs-on":"ubuntu-latest"}]}
+```
+
+then the `gpu` shard runs on `gpu-runner` and the `unit` shard on `ubuntu-latest` —
+one job definition, heterogeneous runners. The `include` array passes straight into
+`strategy.matrix`:
+
+```yaml title="generated .yml"
+  test:
+    runs-on: ${{ matrix.runs-on }}
+    needs: [actio_setup_test]
+    strategy:
+      matrix: ${{ fromJSON(needs.actio_setup_test.outputs.matrix) }}
+      fail-fast: false
+    if: needs.actio_setup_test.outputs.matrix != '[]' && needs.actio_setup_test.outputs.matrix != ''
+    steps:
+      - run: ./run.sh ${{ matrix.shard }}
+```
+
+Reference per-item attributes ergonomically with `runs-on: ${{ matrix.runs-on }}` on
+the job. Actio notices the job's own `runs-on` is a matrix expression and keeps the
+generated **setup** job on a real runner (`runs-on` from `dynamic_matrix.runs-on`,
+else `ubuntu-latest`) so it doesn't inherit the empty expression.
+
+<Callout type="warn">
+  Every entry that omits a key you reference resolves to empty. If you write
+  `runs-on: ${{ matrix.runs-on }}`, make sure **every** `include` entry sets
+  `runs-on`.
+</Callout>
+
+### Limits vs Buildkite
+
+[Buildkite's dynamic pipelines](https://buildkite.com/docs/pipelines/configure/dynamic-pipelines)
+let the generator print a completely different step list per item. GitHub Actions
+cannot: it's still **one job definition with a shared `steps:`**. Heterogeneity is
+limited to per-item *attributes* (`runs-on`, `env`, `container`, inputs) — not a
+different step graph per entry. Use [`for_each`](/docs/macros/for-each) or separate
+jobs if you need structurally different work.
+
+Matrix is also capped at
+[256 jobs per run](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow#using-a-matrix-strategy);
+Buildkite allows far more.
 
 ## Inline scripts
 

@@ -440,6 +440,11 @@
           "type": "string",
           "description": "Wrap a scalar JSON array under `matrix.<alias>` (referenced as `${{ matrix.<alias> }}`). Omit for raw `{include:[...]}` mode."
         },
+        "mode": {
+          "type": "string",
+          "enum": ["include", "alias"],
+          "description": "Select fan-out shape explicitly instead of inferring from `alias`. `include`: the script's array (or `{include:[...]}`) passes straight into `strategy.matrix` for heterogeneous per-item `runs-on`/`env`/etc. `alias`: wrap a scalar array under `matrix.<alias>` (requires `alias`)."
+        },
         "runs-on": {
           "description": "Runner for the generated setup job. Defaults to the job's `runs-on`, else `ubuntu-latest`.",
           "anyOf": [{ "type": "string" }, { "type": "array" }, { "type": "object" }]
