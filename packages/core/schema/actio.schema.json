@@ -1199,19 +1199,7 @@
           "type": "object",
           "description": "Actio macro. Conditional merge map. When expression is true, merge this mapping into the parent map."
         }
-      },
-      "anyOf": [
-        {
-          "required": [
-            "runs-on"
-          ]
-        },
-        {
-          "required": [
-            "executor"
-          ]
-        }
-      ]
+      }
     },
     "workflowDispatchInput": {
       "$comment": "https://help.github.com/en/github/automating-your-workflow-with-github-actions/metadata-syntax-for-github-actions#inputsinput_id",
@@ -1734,6 +1722,48 @@
           }
         }
       }
+    },
+    "jobExecutionShape": {
+      "description": "Normal jobs need `runs-on` or Actio `executor`; call jobs need `uses` or Actio `extends`. Top-level `job-defaults.runs-on` can satisfy normal jobs globally.",
+      "anyOf": [
+        {
+          "required": [
+            "runs-on"
+          ]
+        },
+        {
+          "required": [
+            "executor"
+          ]
+        },
+        {
+          "required": [
+            "uses"
+          ]
+        },
+        {
+          "required": [
+            "extends"
+          ]
+        }
+      ]
+    },
+    "jobsWithExplicitExecutionShape": {
+      "type": "object",
+      "patternProperties": {
+        "^[_a-zA-Z][a-zA-Z0-9_-]*$": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/jobExecutionShape"
+            },
+            {
+              "$ref": "#/properties/jobs/patternProperties/^[_a-zA-Z][a-zA-Z0-9_-]*$"
+            }
+          ]
+        }
+      },
+      "minProperties": 1,
+      "additionalProperties": false
     },
     "jobDefaults": {
       "type": "object",
@@ -3340,5 +3370,30 @@
   ],
   "type": "object",
   "title": "Actio workflow (.actio.yml)",
-  "description": "Source language for the Actio transpiler: the official GitHub Actions workflow schema (inherited wholesale from SchemaStore) plus Actio macro keywords (fragments/inject, retry, dynamic-matrix, fallback, for-each) that compile into standard workflow YAML. Every standard GitHub Actions key, event, and value is validated and autocompleted from the upstream schema; the macro keys are additive. See https://github.com/austenstone/actio."
+  "description": "Source language for the Actio transpiler: the official GitHub Actions workflow schema (inherited wholesale from SchemaStore) plus Actio macro keywords (fragments/inject, retry, dynamic-matrix, fallback, for-each) that compile into standard workflow YAML. Every standard GitHub Actions key, event, and value is validated and autocompleted from the upstream schema; the macro keys are additive. See https://github.com/austenstone/actio.",
+  "allOf": [
+    {
+      "if": {
+        "not": {
+          "required": [
+            "job-defaults"
+          ],
+          "properties": {
+            "job-defaults": {
+              "required": [
+                "runs-on"
+              ]
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "jobs": {
+            "$ref": "#/definitions/jobsWithExplicitExecutionShape"
+          }
+        }
+      }
+    }
+  ]
 }
