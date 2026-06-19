@@ -12,6 +12,11 @@ const fixtureDirsByPassName: Record<string, string[]> = {
   "injection-hoist": ["injection-hoist"],
   fallback: ["fallback-job", "fallback-notify", "fallback-recover"],
   fragments: ["fragments"],
+  call_templates: [
+    "call-templates-extends",
+    "call-templates-compose",
+    "call-templates-job-defaults",
+  ],
   lifecycle: [
     "bare-finally",
     "ensure-job",
