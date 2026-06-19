@@ -37,7 +37,13 @@ jobs:
     // instead of being emitted with no condition (which makes it run unconditionally).
     expect(first).toHaveProperty("if");
   });
+});
 
+// Bug I (numeric variant): retry drops a falsy *numeric* `if` on the first attempt.
+// The schema allows `if` to be a number (step def: ["string","boolean","number"]). The boolean
+// `if: false` case is covered in expressions.test.ts; this asserts the same defect for `if: 0`,
+// which retry likewise discards, emitting the first attempt with no condition so it runs anyway.
+describe("Bug I (numeric variant): retry drops a falsy `if: 0` gate", () => {
   it("keeps the falsy `if: 0` gate on the first retry attempt", () => {
     const { doc } = build(`name: x
 on: [push]
