@@ -80,38 +80,33 @@ Typed compile-time parameters. References resolve with `{{ params.<name> }}` (or
   }}
 />
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  params:
-    env:
-      type: enum
-      values: [dev, staging, prod]
-      default: staging
-    retries:
-      type: number
-      default: 3
-  jobs:
-    deploy:
-      runs-on: ubuntu-latest
-      steps:
-        - run: echo "env={{ params.env }} retries={{ params.retries }}"
-  ```
+```yaml title=".actio.yml"
+params:
+  env:
+    type: enum
+    values: [dev, staging, prod]
+    default: staging
+  retries:
+    type: number
+    default: 3
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "env={{ params.env }} retries={{ params.retries }}"
+```
 
-  </Tab>
-  <Tab value="generated .yml">
+```yaml title="generated .yml"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "env=staging retries=3"
+```
 
-  ```yaml
-  jobs:
-    deploy:
-      runs-on: ubuntu-latest
-      steps:
-        - run: echo "env=staging retries=3"
-  ```
-
-  </Tab>
-</Tabs>
+</CodeCompare>
 
 Full guide: [params](/docs/macros/params).
 
@@ -172,33 +167,28 @@ Merge semantics vary by key: `if` is **AND-combined** (`default && inline`);
 `timeout-minutes`, `continue-on-error`, `environment` are **inline-wins**; `env`,
 `container`, `services`, `defaults` are **deep-merged**.
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  job_defaults:
+```yaml title=".actio.yml"
+job_defaults:
+  runs-on: ubuntu-latest
+  timeout-minutes: 30
+jobs:
+  test:
+    steps:
+      - run: npm test
+```
+
+```yaml title="generated .yml"
+jobs:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-  jobs:
-    test:
-      steps:
-        - run: npm test
-  ```
+    steps:
+      - run: npm test
+```
 
-  </Tab>
-  <Tab value="generated .yml">
-
-  ```yaml
-  jobs:
-    test:
-      runs-on: ubuntu-latest
-      timeout-minutes: 30
-      steps:
-        - run: npm test
-  ```
-
-  </Tab>
-</Tabs>
+</CodeCompare>
 
 <Callout title="Reusable-workflow call jobs">
   Jobs with `uses:` only receive the call-compatible subset: `if`, `permissions`,
@@ -272,45 +262,40 @@ a job written as just `{ extends, with }` already carries a real `uses` before `
 partitions jobs — and any key the template (or inline job) supplied is already present, so
 `job_defaults` won't overwrite it.
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  call_templates:
-    reusable-test:
-      uses: ./.github/workflows/test.yml
-      with:
-        testTimingsArtifact: test-timings
-  jobs:
-    test-unit:
-      extends: reusable-test
-      with:
-        afterBuild: pnpm test-unit
-    test-integration:
-      extends: reusable-test
-      with:
-        afterBuild: pnpm test-integration
-  ```
+```yaml title=".actio.yml"
+call_templates:
+  reusable-test:
+    uses: ./.github/workflows/test.yml
+    with:
+      testTimingsArtifact: test-timings
+jobs:
+  test-unit:
+    extends: reusable-test
+    with:
+      afterBuild: pnpm test-unit
+  test-integration:
+    extends: reusable-test
+    with:
+      afterBuild: pnpm test-integration
+```
 
-  </Tab>
-  <Tab value="generated .yml">
+```yaml title="generated .yml"
+jobs:
+  test-unit:
+    uses: ./.github/workflows/test.yml
+    with:
+      testTimingsArtifact: test-timings
+      afterBuild: pnpm test-unit
+  test-integration:
+    uses: ./.github/workflows/test.yml
+    with:
+      testTimingsArtifact: test-timings
+      afterBuild: pnpm test-integration
+```
 
-  ```yaml
-  jobs:
-    test-unit:
-      uses: ./.github/workflows/test.yml
-      with:
-        testTimingsArtifact: test-timings
-        afterBuild: pnpm test-unit
-    test-integration:
-      uses: ./.github/workflows/test.yml
-      with:
-        testTimingsArtifact: test-timings
-        afterBuild: pnpm test-integration
-  ```
-
-  </Tab>
-</Tabs>
+</CodeCompare>
 
 <Callout title="Call jobs only">
   `extends:` is valid only on reusable-workflow call jobs. A job with inline `steps:`, or one
@@ -491,39 +476,34 @@ is false, the entire job (or step) map is omitted from the emitted YAML.
   (`==`, `!=`, `<`, `<=`, `>`, `>=`), boolean operators (`&&`, `||`, `!`), literals, and
   function calls.
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  params:
-    deploy:
-      type: boolean
-      default: false
-  jobs:
-    build:
-      runs-on: ubuntu-latest
-      steps:
-        - run: ./build.sh
-    publish:
-      static_if: params.deploy
-      runs-on: ubuntu-latest
-      steps:
-        - run: ./publish.sh
-  ```
+```yaml title=".actio.yml"
+params:
+  deploy:
+    type: boolean
+    default: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build.sh
+  publish:
+    static_if: params.deploy
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./publish.sh
+```
 
-  </Tab>
-  <Tab value="generated .yml">
+```yaml title="generated .yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build.sh
+```
 
-  ```yaml
-  jobs:
-    build:
-      runs-on: ubuntu-latest
-      steps:
-        - run: ./build.sh
-  ```
-
-  </Tab>
-</Tabs>
+</CodeCompare>
 
 <Callout title="Compile-time only">
   `static_if` cannot reference runtime contexts like `github.*`, `env.*`, or

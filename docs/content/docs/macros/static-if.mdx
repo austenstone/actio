@@ -19,41 +19,36 @@ map from the output.
 
 With `params.deploy` false, the `release` job never appears:
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  name: Deploy
-  on: [push]
-  params:
-    deploy:
-      type: boolean
-      default: false
-  jobs:
-    build:
-      runs-on: ubuntu-latest
-      steps:
-        - run: echo build
-    release:
-      static_if: params.deploy
-      runs-on: ubuntu-latest
-      steps:
-        - run: ./release.sh
-  ```
+```yaml title=".actio.yml"
+name: Deploy
+on: [push]
+params:
+  deploy:
+    type: boolean
+    default: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+  release:
+    static_if: params.deploy
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./release.sh
+```
 
-  </Tab>
-  <Tab value="generated .yml">
+```yaml title="generated .yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+```
 
-  ```yaml
-  jobs:
-    build:
-      runs-on: ubuntu-latest
-      steps:
-        - run: echo build
-  ```
-
-  </Tab>
-</Tabs>
+</CodeCompare>
 
 Flip `default: true` and the job is emitted with the `static_if` key removed.
 
@@ -63,43 +58,38 @@ Flip `default: true` and the job is emitted with the `static_if` key removed.
 merged into the parent map; when false, the whole block is dropped. This works on
 jobs, steps, and `env:` maps.
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  name: Build
-  on: [push]
-  params:
-    debug:
-      type: boolean
-      default: true
-  jobs:
-    build:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/upload-artifact@v4
-          with:
-            name: dist
-            static_if(params.debug):
-              retention-days: "1"
-  ```
-
-  </Tab>
-  <Tab value="generated .yml">
-
-  ```yaml
-  jobs:
-    build:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/upload-artifact@v4
-          with:
-            name: dist
+```yaml title=".actio.yml"
+name: Build
+on: [push]
+params:
+  debug:
+    type: boolean
+    default: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          static_if(params.debug):
             retention-days: "1"
-  ```
+```
 
-  </Tab>
-</Tabs>
+```yaml title="generated .yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          retention-days: "1"
+```
+
+</CodeCompare>
 
 ## `static_if` vs `if`
 
