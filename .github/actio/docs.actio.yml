@@ -36,6 +36,9 @@ jobs:
       - name: Install root deps for TypeDoc type resolution
         working-directory: .
         run: npm ci
+      - name: Build actio-core (playground imports it)
+        working-directory: .
+        run: npm run build -w actio-core
       - run: npm ci
       - name: Build static site
         run: npm run build

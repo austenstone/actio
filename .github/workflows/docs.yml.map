@@ -255,9 +255,9 @@
       "source": 0,
       "original": {
         "line": 39,
-        "col": 14
+        "col": 15
       },
-      "path": "jobs.build.steps.3.run"
+      "path": "jobs.build.steps.3.name"
     },
     {
       "generated": {
@@ -266,9 +266,9 @@
       "source": 0,
       "original": {
         "line": 40,
-        "col": 15
+        "col": 28
       },
-      "path": "jobs.build.steps.4.name"
+      "path": "jobs.build.steps.3.working-directory"
     },
     {
       "generated": {
@@ -277,6 +277,17 @@
       "source": 0,
       "original": {
         "line": 41,
+        "col": 14
+      },
+      "path": "jobs.build.steps.3.run"
+    },
+    {
+      "generated": {
+        "line": 39
+      },
+      "source": 0,
+      "original": {
+        "line": 42,
         "col": 14
       },
       "path": "jobs.build.steps.4.run"
@@ -288,9 +299,9 @@
       "source": 0,
       "original": {
         "line": 43,
-        "col": 28
+        "col": 15
       },
-      "path": "jobs.build.steps.4.env.PAGES_BASE_PATH"
+      "path": "jobs.build.steps.5.name"
     },
     {
       "generated": {
@@ -299,9 +310,9 @@
       "source": 0,
       "original": {
         "line": 44,
-        "col": 15
+        "col": 14
       },
-      "path": "jobs.build.steps.5.uses"
+      "path": "jobs.build.steps.5.run"
     },
     {
       "generated": {
@@ -310,20 +321,20 @@
       "source": 0,
       "original": {
         "line": 46,
-        "col": 17
+        "col": 28
       },
-      "path": "jobs.build.steps.5.with.path"
+      "path": "jobs.build.steps.5.env.PAGES_BASE_PATH"
     },
     {
       "generated": {
-        "line": 45
+        "line": 44
       },
       "source": 0,
       "original": {
-        "line": 49,
-        "col": 12
+        "line": 47,
+        "col": 15
       },
-      "path": "jobs.deploy.needs"
+      "path": "jobs.build.steps.6.uses"
     },
     {
       "generated": {
@@ -331,10 +342,10 @@
       },
       "source": 0,
       "original": {
-        "line": 50,
-        "col": 14
+        "line": 49,
+        "col": 17
       },
-      "path": "jobs.deploy.runs-on"
+      "path": "jobs.build.steps.6.with.path"
     },
     {
       "generated": {
@@ -343,9 +354,9 @@
       "source": 0,
       "original": {
         "line": 52,
-        "col": 14
+        "col": 12
       },
-      "path": "jobs.deploy.permissions.pages"
+      "path": "jobs.deploy.needs"
     },
     {
       "generated": {
@@ -354,9 +365,9 @@
       "source": 0,
       "original": {
         "line": 53,
-        "col": 17
+        "col": 14
       },
-      "path": "jobs.deploy.permissions.id-token"
+      "path": "jobs.deploy.runs-on"
     },
     {
       "generated": {
@@ -365,9 +376,9 @@
       "source": 0,
       "original": {
         "line": 55,
-        "col": 13
+        "col": 14
       },
-      "path": "jobs.deploy.environment.name"
+      "path": "jobs.deploy.permissions.pages"
     },
     {
       "generated": {
@@ -376,9 +387,9 @@
       "source": 0,
       "original": {
         "line": 56,
-        "col": 12
+        "col": 17
       },
-      "path": "jobs.deploy.environment.url"
+      "path": "jobs.deploy.permissions.id-token"
     },
     {
       "generated": {
@@ -389,7 +400,7 @@
         "line": 58,
         "col": 13
       },
-      "path": "jobs.deploy.steps.0.id"
+      "path": "jobs.deploy.environment.name"
     },
     {
       "generated": {
@@ -398,6 +409,28 @@
       "source": 0,
       "original": {
         "line": 59,
+        "col": 12
+      },
+      "path": "jobs.deploy.environment.url"
+    },
+    {
+      "generated": {
+        "line": 57
+      },
+      "source": 0,
+      "original": {
+        "line": 61,
+        "col": 13
+      },
+      "path": "jobs.deploy.steps.0.id"
+    },
+    {
+      "generated": {
+        "line": 58
+      },
+      "source": 0,
+      "original": {
+        "line": 62,
         "col": 15
       },
       "path": "jobs.deploy.steps.0.uses"
