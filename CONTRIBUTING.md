@@ -53,48 +53,6 @@ npm run build
 npm test
 npm run test:coverage
 npm run check:workflows
-npm run test:lint:workflows   # needs Docker; runs actionlint over emitted workflows
 ```
 
 If you edit `.github/actio/*.actio.yml`, do not hand-edit `.github/workflows/*.yml`. Run `npm run build:workflows`, commit the generated workflow and map, then run `npm run check:workflows`.
-
-## End-to-end tests on real GitHub Actions
-
-The golden tests only prove transpile-time correctness (byte-match + schema). The
-e2e harness proves the emitted YAML is **accepted and executed correctly by
-GitHub Actions** — including the behavioral runtime sugar (`retry`, `fallback`,
-`dynamic_matrix`) that a static diff can't verify.
-
-It's fully dogfooded: the fixtures **and** the driver are authored as `.actio.yml`
-and compiled by Actio's own CLI. If the emitter breaks, the harness fails to build.
-
-- **Fixtures** — [`.github/actio/e2e/*.actio.yml`](.github/actio/e2e) compile to
-  reusable workflows (`on: [workflow_call, workflow_dispatch]`). Each one is
-  self-contained (bash + jq only, no `npm`/repo scripts) and **self-asserting**:
-  it ends green only when the feature behaved correctly, even the failure-path
-  ones (e.g. `e2e-retry` fails attempt 1 via a marker file, then passes attempt 2).
-- **Driver** — [`.github/actio/e2e.actio.yml`](.github/actio/e2e.actio.yml)
-  compiles to `e2e.yml`. It runs a `check` job (build + `check:workflows`), one
-  caller job per fixture via `uses: ./.github/workflows/e2e-<name>.yml`, and a
-  `result` gate job (`if: always()`) that fails unless every fixture succeeded.
-- **Triggers** — `workflow_dispatch` (manual), nightly `schedule`, and
-  path-filtered `pull_request` (only when emit-relevant paths change), so
-  everyday PRs stay cheap.
-- **actionlint tier** — `npm run test:lint:workflows` runs GitHub's own workflow
-  parser (pinned `rhysd/actionlint:1.7.12`, via Docker) over every emitted
-  `.github/workflows/*.yml`, catching `if:`/`needs:`/matrix mistakes the JSON
-  schema is too loose to flag. Wired into CI as the `lint-workflows` job.
-
-### Running it
-
-```sh
-gh workflow run e2e.yml --ref <your-branch>   # whole suite
-gh workflow run e2e-retry.yml --ref <branch>  # a single fixture
-gh run watch --exit-status                     # follow to green/red
-```
-
-> **Expected wart:** the `e2e-fallback-notify` run surfaces one red error
-> annotation while still concluding green. The deploy job fails on purpose
-> (job-level `continue-on-error`), so the auto-injected `actio-annotate` job runs
-> and annotates that intentional failure. The workflow result is success — that
-> annotation is honest dogfooding, not a real failure.
