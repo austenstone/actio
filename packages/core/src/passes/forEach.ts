@@ -497,12 +497,19 @@ const expandLoopInSteps = (
     const source = resolveLoopSource(ctx, config.in, [...path, index, "for_each", "in"]);
     if (!source) continue;
     if (source.kind === "runtime-expr" || source.kind === "generator") {
+      // A whole-job runtime loop (the job's only step) is auto-rewritten upstream
+      // in `tryRewriteWholeJobRuntimeLoop`. Anything reaching here is genuinely
+      // partial/multi/nested: a runtime loop sharing the job with other steps, or
+      // nested inside another loop's body. GHA has no step-level matrix, so a
+      // partial hoist onto a fresh matrix runner can't be proven to preserve
+      // shared workspace state, cross-step outputs, or run-once side effects —
+      // stay fail-loud rather than silently miscompile.
       pushDiagnostic(
         ctx,
         "error",
         diagnosticMessage(
-          "for-each-step-runtime",
-          "for_each over a runtime list requires a parallel job (matrix); a serial step loop needs a compile-time list",
+          "for-each-step-runtime-partial",
+          "for_each over a runtime list can auto-expand only when it is the job's sole step (it becomes a native matrix job). This job has a non-looped neighbor (e.g. checkout/install) or a nested loop — move the non-looped steps to their own job, or make the whole job the loop, or use a compile-time list",
         ),
         [...path, index, "for_each", "in"],
       );
@@ -892,8 +899,110 @@ const processJobLoop = (
   return { [jobId]: job };
 };
 
+/**
+ * Case A (issue #50): a job whose entire body is exactly one runtime/generator
+ * `for_each` step has a safe native target — a matrix job that is semantically
+ * identical to a job-level runtime loop (one job, every iteration a full job
+ * run). Detect that shape and reuse the proven job-level dynamic-delegation path
+ * (`applyDynamicDelegation` -> the `dynamic_matrix` pass) instead of failing
+ * loud. Returns `true` when this owns the job (rewrote it OR raised a fail-loud
+ * diagnostic); `false` to let the normal serial step-loop expansion proceed.
+ *
+ * Everything other than this single-block whole-job shape — partial loops,
+ * multiple loops, nested runtime loops, a pre-existing matrix, or `share:` in
+ * the body — stays fail-loud. GHA has no step-level matrix, so a partial hoist
+ * onto a fresh matrix runner cannot be proven to preserve shared workspace/
+ * runner state, cross-step outputs, or run-once side effects. Bounding the safe
+ * subset (and failing loud everywhere else) is what preserves the no-silent-
+ * miscompile invariant. See the PR for #50 for the full rationale.
+ */
+const tryRewriteWholeJobRuntimeLoop = (ctx: ParseContext, jobId: string, job: Job): boolean => {
+  const steps = job.steps;
+  if (!Array.isArray(steps) || steps.length !== 1) return false;
+  const step = steps[0];
+  if (!isObject(step) || !Object.hasOwn(step, "for_each")) return false;
+
+  const config = normalizedConfig(step.for_each);
+  if (!config) return false; // shape error: let expandLoopInSteps own the diagnostic.
+
+  const inValue = config.in;
+  const cheapIsRuntime =
+    (typeof inValue === "string" && isRuntimeExpr(inValue)) ||
+    (isObject(inValue) && (typeof inValue.run === "string" || typeof inValue.script === "string"));
+  if (!cheapIsRuntime) return false; // static/invalid: expandLoopInSteps is the authority.
+
+  // From here we OWN the job: every path either rewrites it or fails loud.
+  const forEachPath: Path = ["jobs", jobId, "steps", 0, "for_each"];
+  if (!checkRequiredConfig(ctx, forEachPath, config)) return true;
+  const varName = String(config.var).trim();
+
+  const hasMatrix =
+    isObject(job.strategy) && (job.strategy as Record<string, unknown>).matrix != null;
+  if (hasMatrix || job.dynamic_matrix != null) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "for-each-dynamic-matrix-collision",
+        "job already defines a matrix; a runtime step loop can't add a second one — remove the existing strategy.matrix/dynamic_matrix or lift the loop to its own job",
+      ),
+      forEachPath,
+    );
+    job.steps = []; // drop the un-expandable loop step so it doesn't cascade downstream.
+    return true;
+  }
+
+  if (!normalizeParallel(config.parallel)) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "for-each-step-runtime",
+        "for_each over a runtime list must run as a parallel matrix; a serial (parallel: false) step loop needs a compile-time list",
+      ),
+      [...forEachPath, "parallel"],
+    );
+    job.steps = []; // drop the un-expandable loop step so it doesn't cascade downstream.
+    return true;
+  }
+
+  const source = resolveLoopSource(ctx, inValue, [...forEachPath, "in"]);
+  if (!source) return true;
+  if (source.kind !== "runtime-expr" && source.kind !== "generator") return false;
+
+  // Hoist the loop body up to the job and rewrite the step-loop `{{ var }}` UX
+  // into the matrix reference the delegated job exposes. The job-level runtime
+  // path skips this step because its UX already authors `${{ matrix.<as> }}`
+  // directly; the step-loop path uses `{{ var }}`, so we bridge it here.
+  const asName = normalizeAs(config.as, varName);
+  const matrixRef = `\${{ matrix.${asName} }}`;
+  job.steps = collectBodySteps(step).filter(isStepRecord) as Step[];
+  const symbols = [
+    matrixSymbol(varName, matrixRef),
+    matrixSymbol(`for_each.${varName}`, matrixRef),
+    matrixSymbol("index", matrixRef),
+    matrixSymbol("key", matrixRef),
+  ];
+  withScopedSymbols(ctx, symbols, () => {
+    applyCompileSubstitution(ctx, job.steps, ["jobs", jobId, "steps"]);
+  });
+  // Expand nested *static* loops in the hoisted body now: the job-level path
+  // relies on the later `processStepLoopsForJob` call for this, but we return
+  // early. A nested *runtime* loop here fails loud via `for-each-step-runtime-partial`.
+  if (Array.isArray(job.steps)) {
+    job.steps = expandLoopInSteps(ctx, jobId, job.steps, ["jobs", jobId, "steps"], [varName]);
+  }
+  // Reuse the job-level delegation verbatim: it sets `job.dynamic_matrix` and
+  // guards `share:` producers (Case E -> `E-share-in-dynamic-loop`). The later
+  // `dynamic_matrix` pass builds the setup job, `fromJSON` matrix, empty-list
+  // guard, and fail-fast default.
+  applyDynamicDelegation(ctx, jobId, job, config, source, varName, forEachPath);
+  return true;
+};
+
 const processStepLoopsForJob = (ctx: ParseContext, jobId: string, job: Job): void => {
   if (!Array.isArray(job.steps)) return;
+  if (tryRewriteWholeJobRuntimeLoop(ctx, jobId, job)) return;
   job.steps = expandLoopInSteps(ctx, jobId, job.steps, ["jobs", jobId, "steps"], []);
 };
 
