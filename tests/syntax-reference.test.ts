@@ -69,13 +69,8 @@ const schemaMacros = new Set<string>([
   ...collectMacros(defs.step),
 ]);
 
-/**
- * Macros that ship as compiler passes but are not (yet) in the JSON Schema. `for-each`
- * runs before validation and `step` is `additionalProperties: false`, so it cannot be
- * schema-tagged today. Documented deliberately; allow-listed here so parity still holds.
- * If one of these ever lands in the schema, the guard test below flags it for removal.
- */
-const KNOWN_SCHEMA_GAPS = new Set<string>(["for-each"]);
+/** Macros that ship as compiler passes but are not (yet) in the JSON Schema. */
+const KNOWN_SCHEMA_GAPS = new Set<string>();
 
 const canonicalMacros = new Set<string>([...schemaMacros, ...KNOWN_SCHEMA_GAPS]);
 
