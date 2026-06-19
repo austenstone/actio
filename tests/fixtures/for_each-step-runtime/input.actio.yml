@@ -1,0 +1,15 @@
+# Issue #50: a whole-job runtime step loop (Case A) auto-rewrites into a native
+# dynamic matrix instead of failing loud. The single for_each step is the job's
+# entire body, its `in:` is a runtime expression, and the job has no existing
+# matrix — the one shape where matrix semantics match the original loop exactly.
+name: ci
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: shard
+          in: "${{ fromJSON(needs.plan.outputs.shards) }}"
+        steps:
+          - run: ./run-shard.sh {{ shard }}

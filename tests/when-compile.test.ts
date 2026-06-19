@@ -628,14 +628,33 @@ jobs:
     expect(doc.jobs.build.steps[0]?.env?.SHARED).toBe("second");
   });
 
-  // TODO(for-each-integration): the for_each x static_if seam is not built yet.
-  // for_each does not publish loop bindings (e.g. `for_each.item`) as compile-time
-  // symbols, so static_if cannot read them. Verified production behavior today:
-  // the real combo fails loud with [static-if-undefined-ref] — NOT a silent
-  // miscompile. Re-enable (seed via the real for_each, drop the stub) once for_each
-  // exposes loop-binding symbols static_if can resolve, alongside the #18
-  // shared-output integration seam.
-  it.todo("evaluates against a seeded loop binding symbol (for_each x static_if seam)");
+  // Issue #50 re-points the old for_each×static_if seam to the RUNTIME side.
+  // When a whole-job runtime for_each auto-rewrites (Case A), its loop var binds
+  // to `${{ matrix.<as> }}` — a runtime value not knowable at compile time. A
+  // static_if reading that binding therefore fails loud with
+  // [static-if-undefined-ref], never a silent miscompile. The POSITIVE static
+  // composition (static_if evaluating a compile-time loop binding) is its own
+  // seam, tracked as a separate follow-up issue.
+  it("fails loud when static_if reads a runtime for_each loop binding (#50)", () => {
+    const errors = transpileErrors(`name: x
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: item
+          in: "\${{ fromJSON(needs.s.outputs.a) }}"
+        steps:
+          - run: echo hi
+            env:
+              static_if(item == 'a'):
+                K: v
+`);
+    expect(
+      errors.some((diagnostic) => diagnostic.message.includes("[static-if-undefined-ref]")),
+    ).toBe(true);
+  });
 
   it("supports parser precedence, literals, and stdlib calls", () => {
     const result = transpileResult(`name: x

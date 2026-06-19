@@ -189,8 +189,11 @@ jobs:
     expect(hasCode(result, "for-each-step-parallel")).toBe(true);
   });
 
-  it("errors when a step-level loop iterates a runtime expression", () => {
-    const { result } = build(`
+  // Issue #50: a whole-job runtime step loop used to fail loud. It now
+  // auto-rewrites (Case A) by reusing the job-level dynamic-delegation path.
+  // See the "runtime step loops (#50)" block below for the full case matrix.
+  it("auto-rewrites a whole-job runtime step loop into a dynamic matrix", () => {
+    const { result, doc } = build(`
 name: ci
 on: [push]
 jobs:
@@ -203,8 +206,20 @@ jobs:
         steps:
           - run: echo {{ x }}
 `);
-    expect(result.ok).toBe(false);
-    expect(hasCode(result, "for-each-step-runtime")).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(result.yaml).not.toContain("for_each");
+    const jobs = jobsOf(doc);
+    expect(jobs.actio_setup_build).toBeDefined();
+    const build_ = jobs.build as {
+      needs?: string[];
+      strategy?: { matrix?: Record<string, string> };
+      steps?: { run?: string }[];
+    };
+    expect(build_.needs).toEqual(["actio_setup_build"]);
+    expect(build_.strategy?.matrix?.x).toBe(
+      "${{ fromJSON(needs.actio_setup_build.outputs.matrix) }}",
+    );
+    expect(String(build_.steps?.[0]?.run)).toBe("echo ${{ matrix.x }}");
   });
 
   it("warns that serial-only knobs are ignored on a step loop", () => {
@@ -763,5 +778,191 @@ jobs:
       - run: echo "\${{ matrix.target }}"
 `);
     expect(result.yaml).not.toContain("for_each");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Runtime step loops (issue #50): only a whole-job single runtime loop (Case A)
+// auto-rewrites into a native matrix. Every other shape stays fail-loud — GHA
+// has no step-level matrix, so a partial hoist onto a fresh matrix runner can't
+// be proven to preserve shared workspace state, cross-step outputs, or run-once
+// side effects. Failing loud everywhere else is what keeps the no-silent-
+// miscompile invariant.
+// ---------------------------------------------------------------------------
+describe("for_each: runtime step loops (#50)", () => {
+  it("rewrites a generator-sourced whole-job loop and honours the as: alias", () => {
+    const { result, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: shard
+          as: shard
+          in:
+            run: ./list-shards.sh
+        steps:
+          - run: ./run-shard.sh {{ shard }}
+`);
+    expect(result.ok).toBe(true);
+    expect(result.yaml).not.toContain("for_each");
+    const jobs = jobsOf(doc);
+    expect(jobs.actio_setup_test).toBeDefined();
+    const test_ = jobs.test as {
+      strategy?: { matrix?: Record<string, string> };
+      steps?: { run?: string }[];
+    };
+    expect(test_.strategy?.matrix?.shard).toBe(
+      "${{ fromJSON(needs.actio_setup_test.outputs.matrix) }}",
+    );
+    expect(String(test_.steps?.[0]?.run)).toBe("./run-shard.sh ${{ matrix.shard }}");
+  });
+
+  it("fails loud when a non-looped step sits beside the runtime loop (B)", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.s.outputs.a) }}"
+        steps:
+          - run: echo {{ x }}
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "for-each-step-runtime-partial")).toBe(true);
+  });
+
+  it("fails loud on multiple runtime loops in one job (C)", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.s.outputs.a) }}"
+        steps:
+          - run: echo {{ x }}
+      - for_each:
+          var: y
+          in: "\${{ fromJSON(needs.s.outputs.b) }}"
+        steps:
+          - run: echo {{ y }}
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "for-each-step-runtime-partial")).toBe(true);
+  });
+
+  it("fails loud on a runtime loop nested inside the hoisted body (D)", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.s.outputs.a) }}"
+        steps:
+          - for_each:
+              var: y
+              in: "\${{ fromJSON(needs.s.outputs.b) }}"
+            steps:
+              - run: echo {{ x }} {{ y }}
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "for-each-step-runtime-partial")).toBe(true);
+  });
+
+  it("fails loud on a share: producer inside the hoisted body (E)", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.s.outputs.a) }}"
+        steps:
+          - run: echo {{ x }}
+            share:
+              val: "\$X"
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "E-share-in-dynamic-loop")).toBe(true);
+  });
+
+  it("fails loud when the job already defines a matrix (F)", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.s.outputs.a) }}"
+        steps:
+          - run: echo {{ x }}
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "for-each-dynamic-matrix-collision")).toBe(true);
+    expect(codesOf(result)).toEqual(["for-each-dynamic-matrix-collision"]);
+  });
+
+  it("fails loud on a serial (parallel: false) runtime loop", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.s.outputs.a) }}"
+          parallel: false
+        steps:
+          - run: echo {{ x }}
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "for-each-step-runtime")).toBe(true);
+    expect(codesOf(result)).toEqual(["for-each-step-runtime"]);
+  });
+
+  it("still rewrites when the job carries a strategy without a matrix key", () => {
+    const { result, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+    steps:
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.s.outputs.a) }}"
+        steps:
+          - run: echo {{ x }}
+`);
+    expect(result.ok).toBe(true);
+    expect(jobsOf(doc).actio_setup_build).toBeDefined();
   });
 });
