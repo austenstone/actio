@@ -1700,6 +1700,56 @@
               "description": "When true, swallow the guarded failure (continue-on-error) so the job can continue. Step-level only; ignored on job-level fallback."
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "retry"
+          ],
+          "properties": {
+            "retry": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "runs-on"
+              ],
+              "description": "Re-run the guarded step in a sibling job on a different runner when it fails. Step-level only.",
+              "properties": {
+                "runs-on": {
+                  "description": "Runner for the retry job (label, list of labels, or runner mapping).",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                },
+                "when_exit_code": {
+                  "description": "Only retry when the original step exits with one of these codes. Run-only and requires a POSIX shell (bash/sh).",
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
         }
       ]
     },
