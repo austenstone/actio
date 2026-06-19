@@ -13,9 +13,10 @@ jobs:
         id: step_notes
         run: |-
           {
-            echo 'notes<<ACTIO_EOF_notes_79f4fb'
+            __ACTIO_EOF="ACTIO_EOF_notes_$(openssl rand -hex 8 2>/dev/null || echo ${RANDOM}${RANDOM})"
+            echo "notes<<${__ACTIO_EOF}"
             git log --oneline -n 20
-            echo ACTIO_EOF_notes_79f4fb
+            echo "${__ACTIO_EOF}"
           } >> "$GITHUB_OUTPUT"
     outputs:
       notes: ${{ steps.step_notes.outputs.notes }}

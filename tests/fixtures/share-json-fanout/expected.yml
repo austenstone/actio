@@ -13,9 +13,10 @@ jobs:
         id: step_plan
         run: |-
           {
-            echo 'cfg<<ACTIO_EOF_cfg_b7cac5'
+            __ACTIO_EOF="ACTIO_EOF_cfg_$(openssl rand -hex 8 2>/dev/null || echo ${RANDOM}${RANDOM})"
+            echo "cfg<<${__ACTIO_EOF}"
             ./scripts/plan.sh
-            echo ACTIO_EOF_cfg_b7cac5
+            echo "${__ACTIO_EOF}"
           } >> "$GITHUB_OUTPUT"
     outputs:
       cfg: ${{ steps.step_plan.outputs.cfg }}
