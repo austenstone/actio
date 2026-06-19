@@ -23,11 +23,8 @@ const DM_KEYS = new Set([
   "mode",
   "id",
   "runs-on",
-  "runs_on",
   "before",
-  "setup_steps",
   "fail-fast",
-  "fail_fast",
 ]);
 
 function opt<T>(dm: DM, ...keys: string[]): T | undefined {
@@ -47,7 +44,7 @@ function runsOnUsesMatrix(runsOn: unknown): boolean {
 }
 
 function resolveRunsOn(dm: DM, job: Job): unknown {
-  const fromDm = opt<unknown>(dm, "runs-on", "runs_on");
+  const fromDm = opt<unknown>(dm, "runs-on");
   if (fromDm !== undefined) return fromDm;
   // Heterogeneous/include fan-out commonly sets `runs-on: ${{ matrix.runs-on }}`
   // on the consuming job. Don't hand that to the (matrix-less) setup job.
@@ -236,7 +233,7 @@ function buildSetupJob(ctx: ParseContext, jobId: string, job: Job): Job | undefi
 
   const steps: Step[] = [];
   if (checkout) steps.push(deriveNode(ctx, job, { uses: "actions/checkout@v4" }));
-  for (const s of asArray<Step>(opt<Step | Step[]>(dm, "before", "setup_steps"))) {
+  for (const s of asArray<Step>(opt<Step | Step[]>(dm, "before"))) {
     steps.push(isObject(s) ? deriveNode(ctx, job, s) : s);
   }
   const evalStep: Step = deriveNode(ctx, job, {
@@ -294,7 +291,7 @@ function transformTargetJob(ctx: ParseContext, jobId: string, job: Job, setupId:
     strategy.matrix = matrixValue;
   }
 
-  const failFast = opt<boolean>(dm, "fail-fast", "fail_fast");
+  const failFast = opt<boolean>(dm, "fail-fast");
   if (inlineSetFailFast) {
     if (failFast !== undefined) {
       pushDiagnostic(

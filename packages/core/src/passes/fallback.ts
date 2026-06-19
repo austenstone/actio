@@ -46,7 +46,7 @@ function normalizeRetry(ctx: ParseContext, raw: unknown, path?: Path): RetrySpec
     );
     return null;
   }
-  const runsOn = raw["runs-on"] ?? raw.runs_on;
+  const runsOn = raw["runs-on"];
   if (
     runsOn === undefined ||
     runsOn === null ||

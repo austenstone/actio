@@ -101,13 +101,13 @@ const normalizeAs = (raw: unknown, fallback: string): string => {
 };
 
 const normalizeMaxParallel = (config: LoopConfig): number | undefined => {
-  const raw = config["max-parallel"] ?? config.max_in_flight;
+  const raw = config["max-parallel"];
   if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 1) return undefined;
   return Math.floor(raw);
 };
 
 const normalizeFailFast = (config: LoopConfig): boolean | undefined => {
-  const raw = config["fail-fast"] ?? config.fail_fast;
+  const raw = config["fail-fast"];
   return normalizeBoolean(raw);
 };
 
@@ -400,9 +400,7 @@ const applyCompileSubstitution = (ctx: ParseContext, value: unknown, path: Path)
 const maybeWarnSerialOnlyKnob = (ctx: ParseContext, config: LoopConfig, path: Path): void => {
   const keys: Array<[string, unknown]> = [
     ["fail-fast", config["fail-fast"]],
-    ["fail_fast", config.fail_fast],
     ["max-parallel", config["max-parallel"]],
-    ["max_in_flight", config.max_in_flight],
     ["as", config.as],
   ];
   for (const [key, value] of keys) {
@@ -771,9 +769,7 @@ const deriveVariantSlug = (
 const warnCoexistKnobsIgnored = (ctx: ParseContext, config: LoopConfig, path: Path): void => {
   const keys: Array<[string, unknown]> = [
     ["fail-fast", config["fail-fast"]],
-    ["fail_fast", config.fail_fast],
     ["max-parallel", config["max-parallel"]],
-    ["max_in_flight", config.max_in_flight],
     ["as", config.as],
   ];
   for (const [key, value] of keys) {
