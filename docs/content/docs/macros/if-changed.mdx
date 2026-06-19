@@ -1,0 +1,146 @@
+---
+title: if_changed
+description: Gate a step or job on file changes with one shared paths-filter setup job.
+---
+
+A step- or job-level macro that runs a node only when files changed in the pull
+request or push match a glob pattern. Actio synthesizes **one** shared
+[`dorny/paths-filter`](https://github.com/dorny/paths-filter) setup job, computes
+every flag once, and folds the guard into each node's `if:`.
+
+```yaml title=".actio.yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build docs
+        run: ./build-docs.sh
+        if_changed:
+          - "docs/**"
+          - "*.md"
+      - name: Always run
+        run: ./test.sh
+```
+
+Compiles to a shared setup job plus an `if:` guard and `needs:` on the consuming
+job:
+
+```yaml title="generated .yml"
+jobs:
+  actio_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      filter_1: ${{ steps.actio_filter.outputs.filter_1 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: actio_filter
+        with:
+          filters: |-
+            filter_1:
+              - 'docs/**'
+              - '*.md'
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build docs
+        run: ./build-docs.sh
+        if: needs.actio_changes.outputs.filter_1 == 'true'
+      - name: Always run
+        run: ./test.sh
+    needs:
+      - actio_changes
+```
+
+## Value
+
+`if_changed` takes a single glob string or an array of globs:
+
+```yaml title=".actio.yml"
+if_changed: "services/api/**"        # one pattern
+if_changed: ["docs/**", "*.md"]      # multiple (matches if ANY hit)
+```
+
+Globs use the standard [paths-filter pattern
+syntax](https://github.com/dorny/paths-filter#filters-file) (`*`, `**`, negation
+with `!`).
+
+## Job-level gating
+
+Put `if_changed` directly on a job to skip the whole job when nothing relevant
+changed:
+
+```yaml title=".actio.yml"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if_changed: "services/api/**"
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./deploy.sh
+```
+
+## Shared setup, deduped flags
+
+Every `if_changed` in the workflow feeds the **same** `actio_changes` setup job.
+Identical glob groups collapse to a single filter flag, so two nodes watching
+`services/api/**` share one output instead of running paths-filter twice:
+
+```yaml title=".actio.yml"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if_changed: "services/api/**"
+    steps:
+      - run: ./deploy.sh
+  smoke:
+    runs-on: ubuntu-latest
+    if_changed: "services/api/**"
+    steps:
+      - run: ./smoke.sh
+```
+
+Both jobs reference `needs.actio_changes.outputs.filter_1`; the setup job runs
+paths-filter once.
+
+## Combining with `if:`
+
+An existing `if:` is preserved and AND-combined with the change guard, so both
+conditions must hold:
+
+```yaml title=".actio.yml"
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    if_changed: "services/api/**"
+    steps:
+      - run: ./smoke.sh
+```
+
+```yaml title="generated .yml"
+  smoke:
+    runs-on: ubuntu-latest
+    if: needs.actio_changes.outputs.filter_1 == 'true' && github.ref == 'refs/heads/main'
+```
+
+## Diff base
+
+`dorny/paths-filter` auto-detects the comparison base from the event, so the same
+source works for both triggers with no extra config:
+
+- **`pull_request`** — diffs against the PR base branch
+  (`github.event.pull_request.base.sha`).
+- **`push`** — diffs against the previous commit (`github.event.before`), with a
+  first-push / force-push fallback to the default branch.
+
+## Notes
+
+- The setup job is named `actio_changes` and the filter step `actio_filter`. If a
+  job named `actio_changes` already exists, Actio emits an error and leaves the
+  workflow unchanged.
+- The `if_changed` key is stripped from the generated workflow.
+- A raw `git diff` mode (no marketplace action) is a possible future option; today
+  the macro standardizes on `dorny/paths-filter` for robust base detection.

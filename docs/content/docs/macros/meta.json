@@ -8,6 +8,7 @@
     "retry",
     "dynamic-matrix",
     "fallback",
+    "if-changed",
     "injection-hoist"
   ]
 }
