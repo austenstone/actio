@@ -829,6 +829,113 @@ const transformNode = (ctx: ParseContext, value: unknown, path: Path): Transform
   return value;
 };
 
+/**
+ * Evaluate a `static_if` boolean expression against the live compile-time
+ * symbol table. Exported so `for_each` can fold loop-var-dependent conditions
+ * per iteration while the loop binding is in scope. Returns `undefined` (after
+ * pushing a diagnostic) when the expression does not resolve to a boolean.
+ */
+export const evaluateStaticIfExpression = (
+  ctx: ParseContext,
+  expression: string,
+  path: Path,
+): boolean | undefined => evaluateWhenCompile(ctx, expression, path);
+
+const STATIC_IF_BINDING_ROOTS = new Set(["for_each", "key", "index"]);
+
+const referencesLoopBinding = (expression: string, varName: string): boolean => {
+  const roots = collectExpressionRoots(expression);
+  if (roots.has(varName)) return true;
+  for (const root of roots) {
+    if (STATIC_IF_BINDING_ROOTS.has(root)) return true;
+  }
+  return false;
+};
+
+/**
+ * Freeze a loop-var-dependent Form B key (`static_if(<expr>):`) to its literal
+ * verdict (`static_if(true):` / `static_if(false):`), leaving the structural
+ * merge/drop to `when_compile`. When two frozen keys collapse onto the same
+ * verdict their object payloads are combined so nothing is silently dropped.
+ */
+const freezeFormBKey = (
+  ctx: ParseContext,
+  node: Record<string, unknown>,
+  key: string,
+  expression: string,
+  path: Path,
+): void => {
+  const keep = evaluateStaticIfExpression(ctx, expression, [...path, key]) ?? false;
+  const frozenKey = `static_if(${keep})`;
+  const payload = node[key];
+  delete node[key];
+  const existing = node[frozenKey];
+  if (existing !== undefined && isObject(existing) && isObject(payload)) {
+    node[frozenKey] = { ...existing, ...payload };
+  } else {
+    node[frozenKey] = payload;
+  }
+};
+
+const freezeStaticIfNode = (
+  ctx: ParseContext,
+  node: unknown,
+  path: Path,
+  varName: string,
+  isStaticIfHost: boolean,
+): void => {
+  if (Array.isArray(node)) {
+    node.forEach((item, index) => {
+      freezeStaticIfNode(ctx, item, [...path, index], varName, isStaticIfHost);
+    });
+    return;
+  }
+  if (!isObject(node)) return;
+
+  if (
+    isStaticIfHost &&
+    typeof node.static_if === "string" &&
+    referencesLoopBinding(node.static_if, varName)
+  ) {
+    const keep = evaluateStaticIfExpression(ctx, node.static_if, [...path, "static_if"]);
+    node.static_if = keep ?? false;
+  }
+
+  for (const key of Object.keys(node)) {
+    if (key === "static_if") continue;
+    const expression = key.match(FORM_B_KEY_RE)?.[1];
+    if (expression !== undefined && referencesLoopBinding(expression, varName)) {
+      freezeFormBKey(ctx, node, key, expression, path);
+    }
+  }
+
+  for (const key of Object.keys(node)) {
+    if (key === "static_if") continue;
+    freezeStaticIfNode(ctx, node[key], [...path, key], varName, isStaticIfHost && key === "steps");
+  }
+};
+
+/**
+ * Per-iteration static_if folding for compile-time-known for_each loops.
+ *
+ * `for_each` calls this inside its serial-expansion scope, while the loop's
+ * binding symbols (`<var>`, `for_each.<var>`, `key`, `index`) are live, so a
+ * `static_if` that depends on the loop binding is resolved per iteration. Form A
+ * (`static_if: <expr>`) is frozen to the resulting boolean and left for
+ * `when_compile` to apply structurally (so `static-if-empty-job` and dangling
+ * `needs` diagnostics stay intact); Form B (`static_if(<expr>):`) is merged or
+ * dropped in place. static_if expressions that do not reference the loop binding
+ * are left untouched for `when_compile`, so runtime-bound loops still fail loud.
+ */
+export const freezeLoopStaticIf = (
+  ctx: ParseContext,
+  node: unknown,
+  path: Path,
+  varName: string,
+): void => {
+  freezeStaticIfNode(ctx, node, path, varName, true);
+};
+
 const normalizeNeeds = (needs: unknown): string[] => {
   if (typeof needs === "string") return [needs];
   return Array.isArray(needs)
