@@ -1,8 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { cac } from "cac";
 import pc from "picocolors";
 import { type BuildOptions, runBuild } from "./commands/build.js";
+import { runInit } from "./commands/init.js";
 import {
   type PinsExitCode,
   runPinsApplyConstrained,
@@ -12,7 +12,6 @@ import {
 import { runSchema } from "./commands/schema.js";
 import { runWatch } from "./commands/watch.js";
 import { type LoadedConfig, loadActioConfig, resolveBuildOptions } from "./config.js";
-import { STARTER_ACTIO } from "./starter.js";
 
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
   version: string;
@@ -155,15 +154,9 @@ cli
   });
 
 cli
-  .command("init [file]", "Scaffold a starter .actio.yml file")
-  .action(async (file = "ci.actio.yml") => {
-    if (existsSync(file)) {
-      process.stderr.write(`${pc.yellow("warning")}: ${file} already exists; not overwriting\n`);
-      process.exitCode = 1;
-      return;
-    }
-    await writeFile(file, STARTER_ACTIO, "utf8");
-    process.stderr.write(`${pc.green("✓")} created ${file}\n`);
+  .command("init [name]", "Scaffold a starter .actio.yml file (defaults to ci.actio.yml)")
+  .action(async (name?: string) => {
+    process.exitCode = await runInit(name);
   });
 
 cli

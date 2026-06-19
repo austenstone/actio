@@ -371,14 +371,25 @@
     },
     {
       "generated": {
+        "line": 49
+      },
+      "source": 0,
+      "original": {
+        "line": 52,
+        "col": 15
+      },
+      "path": "jobs.workflows.steps.5.name"
+    },
+    {
+      "generated": {
         "line": 50
       },
       "source": 0,
       "original": {
-        "line": 54,
+        "line": 53,
         "col": 14
       },
-      "path": "jobs.lint-workflows.runs-on"
+      "path": "jobs.workflows.steps.5.run"
     },
     {
       "generated": {
@@ -387,20 +398,9 @@
       "source": 0,
       "original": {
         "line": 56,
-        "col": 15
+        "col": 14
       },
-      "path": "jobs.lint-workflows.steps.0.uses"
-    },
-    {
-      "generated": {
-        "line": 53
-      },
-      "source": 0,
-      "original": {
-        "line": 57,
-        "col": 15
-      },
-      "path": "jobs.lint-workflows.steps.1.name"
+      "path": "jobs.lint-workflows.runs-on"
     },
     {
       "generated": {
@@ -409,6 +409,28 @@
       "source": 0,
       "original": {
         "line": 58,
+        "col": 15
+      },
+      "path": "jobs.lint-workflows.steps.0.uses"
+    },
+    {
+      "generated": {
+        "line": 55
+      },
+      "source": 0,
+      "original": {
+        "line": 59,
+        "col": 15
+      },
+      "path": "jobs.lint-workflows.steps.1.name"
+    },
+    {
+      "generated": {
+        "line": 56
+      },
+      "source": 0,
+      "original": {
+        "line": 60,
         "col": 14
       },
       "path": "jobs.lint-workflows.steps.1.run"

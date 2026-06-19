@@ -16,8 +16,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { transpile } from "../packages/core/dist/index.js";
 import { parseDocument } from "yaml";
+import { transpile } from "../packages/core/dist/index.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const fixturesDir = join(repoRoot, "tests", "fixtures");
@@ -72,9 +72,7 @@ function discoverFixtures() {
     .filter((name) => existsSync(join(fixturesDir, name, "input.actio.yml")))
     .map((name) => {
       const optionsPath = join(fixturesDir, name, "options.json");
-      const options = existsSync(optionsPath)
-        ? JSON.parse(readFileSync(optionsPath, "utf8"))
-        : {};
+      const options = existsSync(optionsPath) ? JSON.parse(readFileSync(optionsPath, "utf8")) : {};
       return { name, options };
     })
     .filter(({ options }) => options.validate !== false)
@@ -105,7 +103,9 @@ function buildFixtureWorkflow(name, options) {
 
   const doc = parseDocument(result.yaml);
   if (emittedHasJobLevelUses(doc)) {
-    return { skipped: "emits a reusable-workflow call (job-level uses:) GitHub can't resolve here" };
+    return {
+      skipped: "emits a reusable-workflow call (job-level uses:) GitHub can't resolve here",
+    };
   }
   doc.set("on", doc.createNode({ workflow_call: {}, workflow_dispatch: {} }));
   return { content: fixtureHeader(name) + String(doc) };
