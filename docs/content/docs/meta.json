@@ -8,6 +8,7 @@
     "macros",
     "cli",
     "configuration",
+    "glossary",
     "supply-chain",
     "source-maps",
     "editor-support",

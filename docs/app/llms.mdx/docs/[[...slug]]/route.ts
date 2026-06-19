@@ -9,7 +9,7 @@ export async function GET(_req: Request, { params }: RouteContext<'/llms.mdx/doc
   const page = source.getPage(slug?.slice(0, -1));
   if (!page) notFound();
 
-  return new Response(await getLLMText(page), {
+  return new Response(await getLLMText(page, { includeSitemap: true }), {
     headers: {
       'Content-Type': 'text/markdown',
     },
