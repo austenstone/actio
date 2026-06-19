@@ -3,7 +3,7 @@ import type { ParseContext } from "../parser.js";
 import { clone, combineIf, isObject, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
-const JOB_DEFAULT_KEYS = [
+export const JOB_DEFAULT_KEYS = [
   "if",
   "permissions",
   "concurrency",
@@ -18,7 +18,7 @@ const JOB_DEFAULT_KEYS = [
   "defaults",
 ] as const;
 
-type JobDefaultKey = (typeof JOB_DEFAULT_KEYS)[number];
+export type JobDefaultKey = (typeof JOB_DEFAULT_KEYS)[number];
 
 export const EXECUTOR_KEYS = [
   "runs-on",
@@ -60,7 +60,7 @@ export const JOB_DEFAULTS_SAFE_SUBSET = new Set<string>([
   "timeout-minutes",
 ]);
 
-type ExecutorKey = (typeof EXECUTOR_KEYS)[number];
+export type ExecutorKey = (typeof EXECUTOR_KEYS)[number];
 type InlinePresence = Record<JobDefaultKey | ExecutorKey, boolean>;
 
 const EXECUTOR_KEY_SET = new Set<string>(EXECUTOR_KEYS);
