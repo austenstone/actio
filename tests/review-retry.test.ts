@@ -59,4 +59,71 @@ jobs:
     expect(ids).toContain("step_foo_attempt_1");
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  it("pre-reserves ids on retry steps nested in fallback", () => {
+    const { errors, doc } = build(`on: [push]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Main
+        run: exit 1
+        fallback:
+          recover: true
+          steps:
+            - name: Foo
+              id: step_foo_attempt_1
+              run: echo fallback
+              retry: 3
+`);
+    expect(errors).toEqual([]);
+    const ids = doc.jobs.j.steps
+      .map((s: { id?: string }) => s.id)
+      .filter((id: string | undefined): id is string => Boolean(id));
+    expect(ids).toContain("step_foo_attempt_1");
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("pre-reserves sibling ids in job-level fallback before retry expansion", () => {
+    const { errors, doc } = build(`on: [push]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: exit 1
+    fallback:
+      - name: Foo
+        run: echo retry
+        retry: 3
+      - id: step_foo_attempt_1
+        run: echo sibling
+`);
+    expect(errors).toEqual([]);
+    const ids = doc.jobs.j.steps
+      .map((s: { id?: string }) => s.id)
+      .filter((id: string | undefined): id is string => Boolean(id));
+    expect(ids).toContain("step_foo_attempt_1");
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("pre-reserves job-level fallback ids before top-level retry expansion", () => {
+    const { errors, doc } = build(`on: [push]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Foo
+        run: echo retry
+        retry: 3
+    fallback:
+      - id: step_foo_attempt_1
+        run: echo fallback
+`);
+    expect(errors).toEqual([]);
+    const ids = doc.jobs.j.steps
+      .map((s: { id?: string }) => s.id)
+      .filter((id: string | undefined): id is string => Boolean(id));
+    expect(ids).toContain("step_foo_attempt_1");
+    expect(new Set(ids).size).toBe(ids.length);
+  });
 });

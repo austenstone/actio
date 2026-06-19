@@ -115,10 +115,25 @@ export function recordOrigin(ctx: ParseContext, node: object, path: Path): Origi
  */
 export function cloneNode<T extends object>(ctx: ParseContext, node: T): T {
   const copy = structuredClone(node);
-  const origin = ctx.origins.get(node);
-  if (origin) ctx.origins.set(copy, origin);
+  copyOrigins(ctx, node, copy);
   reapplyKeyOrder(node, copy);
   return copy;
+}
+
+function copyOrigins(ctx: ParseContext, src: unknown, dst: unknown): void {
+  if (src === null || dst === null || typeof src !== "object" || typeof dst !== "object") return;
+  const origin = ctx.origins.get(src);
+  if (origin) ctx.origins.set(dst, origin);
+
+  if (Array.isArray(src) && Array.isArray(dst)) {
+    src.forEach((item, i) => {
+      copyOrigins(ctx, item, dst[i]);
+    });
+    return;
+  }
+  if (isObject(src) && isObject(dst)) {
+    for (const k of Object.keys(src)) copyOrigins(ctx, src[k], dst[k]);
+  }
 }
 
 /**
@@ -162,23 +177,41 @@ export function seedOrigins(ctx: ParseContext): void {
     if (!isObject(job)) continue;
     recordOrigin(ctx, job, ["jobs", id]);
     const steps = (job as Job).steps;
-    if (Array.isArray(steps)) {
-      steps.forEach((step, i) => {
-        if (isObject(step)) recordOrigin(ctx, step, ["jobs", id, "steps", i]);
-      });
-    }
+    if (Array.isArray(steps)) recordStepOrigins(ctx, steps, ["jobs", id, "steps"]);
+    recordFallbackOrigins(ctx, job, ["jobs", id, "fallback"]);
   }
   const frags = workflow(ctx).fragments;
   if (isObject(frags)) {
     for (const [name, value] of Object.entries(frags)) {
       if (Array.isArray(value)) {
-        value.forEach((step, i) => {
-          if (isObject(step)) recordOrigin(ctx, step, ["fragments", name, i]);
-        });
+        recordStepOrigins(ctx, value, ["fragments", name]);
       } else if (isObject(value)) {
         recordOrigin(ctx, value, ["fragments", name]);
+        recordFallbackOrigins(ctx, value, ["fragments", name, "fallback"]);
       }
     }
+  }
+}
+
+function recordStepOrigins(ctx: ParseContext, steps: unknown[], path: Path): void {
+  steps.forEach((step, i) => {
+    if (!isObject(step)) return;
+    const stepPath = [...path, i];
+    recordOrigin(ctx, step, stepPath);
+    recordFallbackOrigins(ctx, step, [...stepPath, "fallback"]);
+  });
+}
+
+function recordFallbackOrigins(
+  ctx: ParseContext,
+  container: { fallback?: unknown },
+  path: Path,
+): void {
+  const fallback = container.fallback;
+  if (Array.isArray(fallback)) {
+    recordStepOrigins(ctx, fallback, path);
+  } else if (isObject(fallback) && Array.isArray(fallback.steps)) {
+    recordStepOrigins(ctx, fallback.steps, [...path, "steps"]);
   }
 }
 
