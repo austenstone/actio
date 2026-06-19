@@ -14,6 +14,11 @@ only the deltas. Actio merges the template at compile time and strips both
 `call-templates` and `extends` from the output — the generated YAML is byte-identical
 to the hand-written call jobs.
 
+Each job inherits `uses`, `needs`, `secrets`, and the shared `with` keys; only the
+per-job `afterBuild` differs:
+
+<CodeCompare>
+
 ```yaml title=".actio.yml"
 name: Build and test
 on: [push]
@@ -39,9 +44,6 @@ jobs:
       afterBuild: pnpm test:integration
 ```
 
-Each job inherits `uses`, `needs`, `secrets`, and the shared `with` keys; only the
-per-job `afterBuild` differs:
-
 ```yaml title="generated .yml"
 jobs:
   build:
@@ -64,6 +66,8 @@ jobs:
     secrets: inherit
 ```
 
+</CodeCompare>
+
 ## Merge semantics
 
 | Key | Behaviour |
@@ -85,6 +89,12 @@ stays its sole owner, and set `permissions`/`concurrency` per job or via
 
 `extends:` accepts a single name or a list. Templates are merged left-to-right
 (later wins), and an inline value on the job always wins over all of them:
+
+`needs` unions across both templates and the job; `with.shared` resolves to the
+inline value while `kept` and `added` survive; the two `secrets` maps merge; and
+both `if` gates combine:
+
+<CodeCompare>
 
 ```yaml title=".actio.yml"
 call-templates:
@@ -113,10 +123,6 @@ jobs:
     if: ${{ success() }}
 ```
 
-`needs` unions across both templates and the job; `with.shared` resolves to the
-inline value while `kept` and `added` survive; the two `secrets` maps merge; and
-both `if` gates combine:
-
 ```yaml title="generated .yml"
 jobs:
   composed:
@@ -134,6 +140,8 @@ jobs:
       EXTRA: ${{ secrets.EXTRA }}
     if: github.event_name == 'push' && success()
 ```
+
+</CodeCompare>
 
 ## Precedence with job-defaults
 

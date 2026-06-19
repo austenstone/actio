@@ -6,6 +6,11 @@ description: The headline feature — generate a matrix at runtime from a script
 The headline feature. A job-level block whose `script` prints a JSON array (or
 `{include:[...]}`); Actio generates the setup job + wiring.
 
+Splits into a setup job (compact JSON via heredoc) and the matrix job (`needs` +
+`fromJSON` + `fail-fast: false` + empty-matrix guard):
+
+<CodeCompare>
+
 ```yaml title=".actio.yml"
 jobs:
   test:
@@ -16,9 +21,6 @@ jobs:
     steps:
       - run: ./run-shard.sh ${{ matrix.shard }}
 ```
-
-Splits into a setup job (compact JSON via heredoc) and the matrix job (`needs` +
-`fromJSON` + `fail-fast: false` + empty-matrix guard):
 
 ```yaml title="generated .yml"
 jobs:
@@ -46,6 +48,8 @@ jobs:
     steps:
       - run: ./run-shard.sh ${{ matrix.shard }}
 ```
+
+</CodeCompare>
 
 ## Example: one job per open PR
 

@@ -5,6 +5,10 @@ description: Retry flaky steps with automatic backoff.
 
 Retry flaky steps with automatic backoff. Works with both `run:` and `uses:` steps.
 
+Fans out into conditional attempts, each gated on prior failure:
+
+<CodeCompare>
+
 ```yaml title=".actio.yml"
 jobs:
   deploy:
@@ -19,8 +23,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
 ```
-
-Fans out into conditional attempts, each gated on prior failure:
 
 ```yaml title="generated .yml"
 jobs:
@@ -54,6 +56,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
 ```
+
+</CodeCompare>
 
 ## How it works
 

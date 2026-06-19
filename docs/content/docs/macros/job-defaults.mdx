@@ -7,6 +7,11 @@ Define default job-level settings once at the top level; Actio merges them into
 every job at compile time and strips both `job-defaults` and `executors` from the
 output — zero residual directives.
 
+Both jobs inherit `runs-on` and `timeout-minutes`; `env` is deep-merged so `lint`
+ends up with both `CI` and `DEBUG`:
+
+<CodeCompare>
+
 ```yaml title=".actio.yml"
 name: CI
 on: [push]
@@ -25,9 +30,6 @@ jobs:
     steps:
       - run: npm run lint
 ```
-
-Both jobs inherit `runs-on` and `timeout-minutes`; `env` is deep-merged so `lint`
-ends up with both `CI` and `DEBUG`:
 
 ```yaml title="generated .yml"
 jobs:
@@ -48,6 +50,8 @@ jobs:
       - run: npm run lint
 ```
 
+</CodeCompare>
+
 ## Merge semantics
 
 | Key | Behaviour |
@@ -56,6 +60,8 @@ jobs:
 | `permissions`, `concurrency`, `strategy` | **Replace-on-presence** — inline value wins entirely; default only applies when the key is absent. |
 | `runs-on`, `timeout-minutes`, `continue-on-error`, `environment` | **Inline wins** — job value takes precedence. |
 | `env`, `container`, `services`, `defaults` | **Deep-merged** — job keys overlay the default. |
+
+<CodeCompare>
 
 ```yaml title=".actio.yml"
 name: CI
@@ -85,6 +91,8 @@ jobs:
       - run: ./deploy.sh
 ```
 
+</CodeCompare>
+
 <Callout title="Reusable-workflow call jobs">
   Jobs with `uses:` only receive the call-compatible subset of defaults: `if`,
   `permissions`, `concurrency`, and `strategy`. Runner keys like `runs-on`,
@@ -96,6 +104,8 @@ jobs:
 
 Named runner presets — a companion to `job-defaults` for extracting repeated
 runner configuration into a reusable template.
+
+<CodeCompare>
 
 ```yaml title=".actio.yml"
 name: CI
@@ -123,6 +133,8 @@ jobs:
     steps:
       - run: npm test
 ```
+
+</CodeCompare>
 
 Compose multiple executors by passing a list — they are merged left-to-right,
 with later entries overriding earlier ones for scalar keys:

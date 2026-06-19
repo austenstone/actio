@@ -17,6 +17,10 @@ runtime contexts.
 Place `static-if` directly on a job or step. A false expression deletes the whole
 map from the output.
 
+With `params.deploy` false, the `release` job never appears:
+
+<CodeCompare>
+
 ```yaml title=".actio.yml"
 name: Deploy
 on: [push]
@@ -36,8 +40,6 @@ jobs:
       - run: ./release.sh
 ```
 
-With `params.deploy` false, the `release` job never appears:
-
 ```yaml title="generated .yml"
 jobs:
   build:
@@ -46,6 +48,8 @@ jobs:
       - run: echo build
 ```
 
+</CodeCompare>
+
 Flip `default: true` and the job is emitted with the `static-if` key removed.
 
 ## Form B — conditional merge
@@ -53,6 +57,8 @@ Flip `default: true` and the job is emitted with the `static-if` key removed.
 `static-if(<expr>):` is a merge key. When the expression is true, its mapping is
 merged into the parent map; when false, the whole block is dropped. This works on
 jobs, steps, and `env:` maps.
+
+<CodeCompare>
 
 ```yaml title=".actio.yml"
 name: Build
@@ -82,6 +88,8 @@ jobs:
           name: dist
           retention-days: "1"
 ```
+
+</CodeCompare>
 
 ## `static-if` vs `if`
 

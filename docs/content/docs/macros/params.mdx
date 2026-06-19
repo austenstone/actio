@@ -6,6 +6,10 @@ description: Typed compile-time inputs interpolated with double-brace tokens.
 Define compile-time parameters once, then interpolate them with `{{ params.x }}`
 for scalars or `{{ toJSON(params.x) }}` for objects/lists.
 
+`params` is stripped and literals are fully resolved:
+
+<CodeCompare>
+
 ```yaml title=".actio.yml"
 name: Deploy
 on: [push]
@@ -24,8 +28,6 @@ jobs:
       - run: echo "env={{ params.env }} retries={{ params.retries }}"
 ```
 
-`params` is stripped and literals are fully resolved:
-
 ```yaml title="generated .yml"
 jobs:
   deploy:
@@ -33,6 +35,8 @@ jobs:
     steps:
       - run: echo "env=staging retries=3"
 ```
+
+</CodeCompare>
 
 ## Token rules
 

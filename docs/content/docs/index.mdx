@@ -11,37 +11,32 @@ and no lock-in. Everything that isn't a macro is passthrough: a macro-free
 Here's the smallest useful example. [`fragments`](/docs/macros/fragments) defines
 reusable steps, `inject` splices them in, and ordinary steps pass straight through:
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  fragments:
-    setup:
+```yaml title=".actio.yml"
+fragments:
+  setup:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: setup
+      - run: npm test
+```
+
+```yaml title="generated .yml"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-  jobs:
-    test:
-      runs-on: ubuntu-latest
-      steps:
-        - inject: setup
-        - run: npm test
-  ```
+      - run: npm test
+```
 
-  </Tab>
-  <Tab value="generated .yml">
-
-  ```yaml
-  jobs:
-    test:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-node@v4
-        - run: npm test
-  ```
-
-  </Tab>
-</Tabs>
+</CodeCompare>
 
 ## Why
 

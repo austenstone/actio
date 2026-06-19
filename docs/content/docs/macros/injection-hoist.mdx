@@ -12,6 +12,8 @@ It is **on by default**. Untrusted interpolation is lifted into a step `env:`
 var and the body is rewritten to reference the shell variable instead, so the
 value can never be parsed as shell.
 
+<CodeCompare>
+
 ```yaml title=".actio.yml"
 steps:
   - name: Greet PR author
@@ -25,6 +27,8 @@ steps:
       PR_TITLE: ${{ github.event.pull_request.title }}
     run: echo Hello "$PR_TITLE"
 ```
+
+</CodeCompare>
 
 The expansion now happens in the `env` block (never word-split or re-evaluated),
 and the shell only ever sees a quoted variable reference.

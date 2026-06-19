@@ -8,6 +8,11 @@ request or push match a glob pattern. Actio synthesizes **one** shared
 [`dorny/paths-filter`](https://github.com/dorny/paths-filter) setup job, computes
 every flag once, and folds the guard into each node's `if:`.
 
+Compiles to a shared setup job plus an `if:` guard and `needs:` on the consuming
+job:
+
+<CodeCompare>
+
 ```yaml title=".actio.yml"
 jobs:
   build:
@@ -22,9 +27,6 @@ jobs:
       - name: Always run
         run: ./test.sh
 ```
-
-Compiles to a shared setup job plus an `if:` guard and `needs:` on the consuming
-job:
 
 ```yaml title="generated .yml"
 jobs:
@@ -53,6 +55,8 @@ jobs:
     needs:
       - actio_changes
 ```
+
+</CodeCompare>
 
 ## Value
 
@@ -110,6 +114,8 @@ paths-filter once.
 An existing `if:` is preserved and AND-combined with the change guard, so both
 conditions must hold:
 
+<CodeCompare>
+
 ```yaml title=".actio.yml"
 jobs:
   smoke:
@@ -125,6 +131,8 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.actio_changes.outputs.filter_1 == 'true' && github.ref == 'refs/heads/main'
 ```
+
+</CodeCompare>
 
 ## Diff base
 

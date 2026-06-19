@@ -9,6 +9,10 @@ A native try/catch. Attach `fallback:` to a step (or a job).
 
 The error is *not* swallowed; fallback runs via `if: failure()`, the job still fails.
 
+The guarded step gets an `id`; the fallback is gated on its `conclusion`:
+
+<CodeCompare>
+
 ```yaml title=".actio.yml"
 jobs:
   deploy:
@@ -21,8 +25,6 @@ jobs:
             run: ./notify.sh failure
 ```
 
-The guarded step gets an `id`; the fallback is gated on its `conclusion`:
-
 ```yaml title="generated .yml"
 steps:
   - name: Deploy
@@ -32,6 +34,8 @@ steps:
     run: ./notify.sh failure
     if: failure() && steps.step_deploy.conclusion == 'failure'
 ```
+
+</CodeCompare>
 
 ## recover: true
 
@@ -49,6 +53,11 @@ Some failures aren't your code — they're the runner (OOM kills, flaky hosted
 infra, a job that needs more cores). `retry:` re-runs the *same step* in a brand
 new job on a different `runs-on`, gated on the original job failing.
 
+The guarded step is lifted into a sibling `<job>_retry` job with
+`needs: [<job>]` and `if: failure()`, running on the fallback runner:
+
+<CodeCompare>
+
 ```yaml title=".actio.yml"
 jobs:
   build:
@@ -62,9 +71,6 @@ jobs:
           retry:
             runs-on: ubuntu-latest-8-cores
 ```
-
-The guarded step is lifted into a sibling `<job>_retry` job with
-`needs: [<job>]` and `if: failure()`, running on the fallback runner:
 
 ```yaml title="generated .yml"
 jobs:
@@ -86,11 +92,15 @@ jobs:
         run: ./build.sh
 ```
 
+</CodeCompare>
+
 ### when-exit-code
 
 Only retry on *specific* exit codes (e.g. `137` = SIGKILL/OOM) instead of any
 failure. Actio captures the original step's real exit code via an `EXIT` trap,
 exposes it as a job output, and gates the retry job on it.
+
+<CodeCompare>
 
 ```yaml title=".actio.yml"
 - name: Run tests
@@ -123,6 +133,8 @@ jobs:
       - name: Run tests
         run: ./run-tests.sh
 ```
+
+</CodeCompare>
 
 `when-exit-code` accepts a single number or a list (`[137, 143]`, OR-joined).
 
