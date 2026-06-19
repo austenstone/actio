@@ -108,14 +108,9 @@ jobs:
     expect(job.if).toContain("!= ''");
   });
 
-  it("keeps inline strategy over dynamic-matrix while dynamic-matrix still overrides inherited defaults", () => {
+  it("keeps inline strategy over dynamic-matrix while dynamic-matrix still writes missing strategy", () => {
     const { doc, errors } = build(`name: x
 on: [push]
-job-defaults:
-  strategy:
-    matrix:
-      from_default: [a, b]
-    fail-fast: true
 jobs:
   inline_wins:
     runs-on: ubuntu-latest
@@ -128,7 +123,7 @@ jobs:
       fail-fast: true
     steps:
       - run: echo \${{ matrix.keep }}
-  defaults_overridden:
+  dynamic_matrix:
     runs-on: ubuntu-latest
     dynamic-matrix:
       script: echo '["y"]'
@@ -141,20 +136,15 @@ jobs:
       matrix: { keep: ["manual"] },
       "fail-fast": true,
     });
-    expect(doc.jobs.defaults_overridden.strategy).toEqual({
-      matrix: { shard: "${{ fromJSON(needs.actio_setup_defaults_overridden.outputs.matrix) }}" },
-      "fail-fast": true,
+    expect(doc.jobs.dynamic_matrix.strategy).toEqual({
+      matrix: { shard: "${{ fromJSON(needs.actio_setup_dynamic_matrix.outputs.matrix) }}" },
+      "fail-fast": false,
     });
   });
 
-  it("applies fail-fast precedence as inline > dynamic-matrix > job-defaults", () => {
+  it("applies fail-fast precedence as inline > dynamic-matrix > default", () => {
     const { result, errors, doc } = build(`name: x
 on: [push]
-job-defaults:
-  strategy:
-    matrix:
-      from_default: [a, b]
-    fail-fast: true
 jobs:
   inline_full:
     runs-on: ubuntu-latest
@@ -179,12 +169,19 @@ jobs:
         keep: [manual]
     steps:
       - run: echo \${{ matrix.keep }}
-  defaults_only:
+  dynamic_only:
     runs-on: ubuntu-latest
     dynamic-matrix:
       script: echo '["z"]'
       alias: shard
-      fail-fast: false
+      fail-fast: true
+    steps:
+      - run: echo \${{ matrix.shard }}
+  implicit_default:
+    runs-on: ubuntu-latest
+    dynamic-matrix:
+      script: echo '["q"]'
+      alias: shard
     steps:
       - run: echo \${{ matrix.shard }}
 `);
@@ -197,8 +194,12 @@ jobs:
       matrix: { keep: ["manual"] },
       "fail-fast": false,
     });
-    expect(doc.jobs.defaults_only.strategy).toEqual({
-      matrix: { shard: "${{ fromJSON(needs.actio_setup_defaults_only.outputs.matrix) }}" },
+    expect(doc.jobs.dynamic_only.strategy).toEqual({
+      matrix: { shard: "${{ fromJSON(needs.actio_setup_dynamic_only.outputs.matrix) }}" },
+      "fail-fast": true,
+    });
+    expect(doc.jobs.implicit_default.strategy).toEqual({
+      matrix: { shard: "${{ fromJSON(needs.actio_setup_implicit_default.outputs.matrix) }}" },
       "fail-fast": false,
     });
     expect(
@@ -463,10 +464,6 @@ job-defaults:
     contents: read
   concurrency:
     group: ci
-  strategy:
-    fail-fast: false
-    matrix:
-      shard: [a, b]
   runs-on: ubuntu-latest
   timeout-minutes: 15
   env:
@@ -489,17 +486,57 @@ jobs:
     expect(doc.jobs.call.if).toBe("github.ref == 'refs/heads/main' && success()");
     expect(doc.jobs.call.permissions).toEqual({ contents: "read" });
     expect(doc.jobs.call.concurrency).toEqual({ group: "ci" });
-    expect(doc.jobs.call.strategy).toEqual({
-      "fail-fast": false,
-      matrix: { shard: ["a", "b"] },
-    });
+    expect(doc.jobs.call.strategy).toBeUndefined();
+    expect(doc.jobs.test.strategy).toBeUndefined();
+
+    const infos = result.diagnostics.filter((d) => d.severity === "info");
+    expect(infos.some((d) => d.message.includes("job-defaults-uses-skipped"))).toBe(true);
+  });
+
+  it("rejects job-defaults strategy with a per-job guidance diagnostic", () => {
+    const { result, errors } = build(`name: x
+on: [push]
+job-defaults:
+  strategy:
+    fail-fast: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(false);
+    expect(
+      errors.some((d) =>
+        d.message.includes(
+          'Key "strategy" is not allowed in job-defaults; declare strategy on each job instead',
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("preserves per-job strategy when applying other job-defaults", () => {
+    const { result, errors, doc } = build(`name: x
+on: [push]
+job-defaults:
+  timeout-minutes: 15
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [a, b]
+    steps:
+      - run: echo \${{ matrix.shard }}
+`);
+    expect(result.ok).toBe(true);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.test["timeout-minutes"]).toBe(15);
     expect(doc.jobs.test.strategy).toEqual({
       "fail-fast": false,
       matrix: { shard: ["a", "b"] },
     });
-
-    const infos = result.diagnostics.filter((d) => d.severity === "info");
-    expect(infos.some((d) => d.message.includes("job-defaults-uses-skipped"))).toBe(true);
   });
 
   it("errors on unknown executor names", () => {
@@ -567,9 +604,8 @@ jobs:
 `);
       expect(result.ok).toBe(false);
       expect(errors.some((d) => d.message.includes("executor-rejected-key"))).toBe(true);
-      expect(errors.some((d) => d.message.includes(`Key "${key}" is not supported here`))).toBe(
-        true,
-      );
+      const reason = key === "strategy" ? "not allowed here" : "not supported here";
+      expect(errors.some((d) => d.message.includes(`Key "${key}" is ${reason}`))).toBe(true);
     }
   });
 

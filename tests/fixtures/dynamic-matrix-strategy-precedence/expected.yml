@@ -31,7 +31,7 @@ jobs:
     needs:
       - actio_setup_inline_wins
     if: needs.actio_setup_inline_wins.outputs.matrix != '[]' && needs.actio_setup_inline_wins.outputs.matrix != ''
-  actio_setup_defaults_overridden:
+  actio_setup_dynamic_matrix:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.actio_eval.outputs.matrix }}
@@ -44,14 +44,14 @@ jobs:
             echo '["y"]' | jq -c .
             echo ACTIO_EOF
           } >> "$GITHUB_OUTPUT"
-  defaults_overridden:
+  dynamic_matrix:
     runs-on: ubuntu-latest
     steps:
       - run: echo ${{ matrix.shard }}
+    needs:
+      - actio_setup_dynamic_matrix
     strategy:
       matrix:
-        shard: ${{ fromJSON(needs.actio_setup_defaults_overridden.outputs.matrix) }}
-      fail-fast: true
-    needs:
-      - actio_setup_defaults_overridden
-    if: needs.actio_setup_defaults_overridden.outputs.matrix != '[]' && needs.actio_setup_defaults_overridden.outputs.matrix != ''
+        shard: ${{ fromJSON(needs.actio_setup_dynamic_matrix.outputs.matrix) }}
+      fail-fast: false
+    if: needs.actio_setup_dynamic_matrix.outputs.matrix != '[]' && needs.actio_setup_dynamic_matrix.outputs.matrix != ''

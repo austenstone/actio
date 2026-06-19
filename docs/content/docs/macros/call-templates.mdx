@@ -149,8 +149,8 @@ jobs:
 job is what `job-defaults` sees. A template value (or inline job value) already
 present blocks the default from overwriting it — precedence is
 **inline > extends > job-defaults**. The `if` key AND-combines all three; for
-keys a template can't carry (`permissions`, `concurrency`, `strategy`),
-`job-defaults` fills them on the materialized call job.
+keys a template can't carry (`permissions`, `concurrency`), `job-defaults` fills
+them on the materialized call job. Keep `strategy` inline on the call job.
 
 <Callout title="Call-job only">
   `extends:` is for reusable-workflow call jobs. A job that sets inline `steps:`

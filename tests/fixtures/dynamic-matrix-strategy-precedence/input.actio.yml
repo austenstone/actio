@@ -1,10 +1,5 @@
 name: Dynamic Matrix Strategy Precedence
 on: [push]
-job-defaults:
-  strategy:
-    matrix:
-      from_default: [a, b]
-    fail-fast: true
 jobs:
   inline_wins:
     runs-on: ubuntu-latest
@@ -17,7 +12,7 @@ jobs:
       fail-fast: true
     steps:
       - run: echo ${{ matrix.keep }}
-  defaults_overridden:
+  dynamic_matrix:
     runs-on: ubuntu-latest
     dynamic-matrix:
       alias: shard

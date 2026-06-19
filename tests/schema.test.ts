@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { actioSchema, CALL_TEMPLATE_KEYS, EXECUTOR_KEYS, transpile } from "actio-core";
+import {
+  actioSchema,
+  CALL_TEMPLATE_KEYS,
+  EXECUTOR_KEYS,
+  JOB_DEFAULT_KEYS,
+  transpile,
+} from "actio-core";
 import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
@@ -15,6 +21,9 @@ const extensionsSchema = JSON.parse(
   ),
 ) as {
   addDefinitions: {
+    jobDefaults: {
+      properties: Record<string, unknown>;
+    };
     executorDefinition: {
       properties: Record<string, unknown>;
     };
@@ -304,6 +313,21 @@ jobs:
     expect(sourceKeys).toEqual(runtimeKeys);
   });
 
+  it("keeps jobDefaults schema in lockstep with runtime JOB_DEFAULT_KEYS", () => {
+    const runtimeKeys = [...JOB_DEFAULT_KEYS].sort();
+    const mergedKeys = Object.keys(
+      (
+        actioSchema() as {
+          definitions: { jobDefaults: { properties: Record<string, unknown> } };
+        }
+      ).definitions.jobDefaults.properties,
+    ).sort();
+    const sourceKeys = Object.keys(extensionsSchema.addDefinitions.jobDefaults.properties).sort();
+
+    expect(mergedKeys).toEqual(runtimeKeys);
+    expect(sourceKeys).toEqual(runtimeKeys);
+  });
+
   it("keeps callTemplateDefinition in lockstep with runtime CALL_TEMPLATE_KEYS", () => {
     const runtimeKeys = [...CALL_TEMPLATE_KEYS].sort();
     const mergedKeys = Object.keys(
@@ -386,7 +410,7 @@ jobs:
     }
   });
 
-  it("accepts job-defaults strategy for reusable-workflow caller jobs", () => {
+  it("rejects strategy in job-defaults", () => {
     const doc = load(`on: [push]
 job-defaults:
   strategy:
@@ -396,6 +420,18 @@ job-defaults:
 jobs:
   call:
     uses: org/repo/.github/workflows/reuse.yml@main`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("accepts per-job strategy for reusable-workflow caller jobs", () => {
+    const doc = load(`on: [push]
+jobs:
+  call:
+    uses: org/repo/.github/workflows/reuse.yml@main
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [a, b]`);
     expect(validate(doc)).toBe(true);
   });
 

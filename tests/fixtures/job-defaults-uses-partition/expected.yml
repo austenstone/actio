@@ -14,12 +14,6 @@ jobs:
     concurrency:
       group: default-group
       cancel-in-progress: true
-    strategy:
-      fail-fast: false
-      matrix:
-        shard:
-          - a
-          - b
   test:
     runs-on: ubuntu-latest
     steps:
@@ -30,12 +24,6 @@ jobs:
     concurrency:
       group: default-group
       cancel-in-progress: true
-    strategy:
-      fail-fast: false
-      matrix:
-        shard:
-          - a
-          - b
     timeout-minutes: 15
     env:
       CI: "true"
