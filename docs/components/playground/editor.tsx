@@ -6,6 +6,7 @@ import actioSchema from 'actio-core/schema/actio.schema.json';
 import * as monaco from 'monaco-editor';
 import { configureMonacoYaml } from 'monaco-yaml';
 import { useEffect, useMemo, useState } from 'react';
+import { findActioKeywordRanges } from '@/lib/actio-keywords';
 import { basePath } from '@/lib/shared';
 import { GITHUB_DARK, GITHUB_LIGHT, registerGithubThemes } from './github-themes';
 
@@ -55,6 +56,27 @@ function useIsDark(): boolean {
   return isDark;
 }
 
+// Paint Actio macro keywords in the editable source with the same accent the
+// static docs use (.actio-keyword in global.css). Monaco runs a different
+// highlighter than Shiki, so we reuse the shared keyword list as inline
+// decorations rather than the Shiki transformer. Source model only — generated
+// output has no Actio keywords left to highlight.
+function highlightActioKeywords(editor: monaco.editor.IStandaloneCodeEditor): monaco.IDisposable {
+  const collection = editor.createDecorationsCollection();
+  const apply = () => {
+    const model = editor.getModel();
+    if (!model) return;
+    collection.set(
+      findActioKeywordRanges(model.getValue()).map((r) => ({
+        range: new monaco.Range(r.line, r.startColumn, r.line, r.endColumn),
+        options: { inlineClassName: 'actio-keyword' },
+      })),
+    );
+  };
+  apply();
+  return editor.onDidChangeModelContent(apply);
+}
+
 interface EditorProps {
   value: string;
   onChange?: (value: string) => void;
@@ -93,6 +115,11 @@ export function Editor({ value, onChange, readOnly, ariaLabel }: EditorProps) {
       path={readOnly ? OUTPUT_PATH : SOURCE_PATH}
       value={value}
       onChange={(next) => onChange?.(next ?? '')}
+      onMount={(editor) => {
+        if (readOnly) return;
+        const sub = highlightActioKeywords(editor);
+        editor.onDidDispose(() => sub.dispose());
+      }}
       theme={isDark ? GITHUB_DARK : GITHUB_LIGHT}
       options={options}
       loading={

@@ -1,44 +1,6 @@
 import type { ShikiTransformer, ThemedToken } from '@shikijs/types';
+import { ACTIO_KEY_RE, ACTIO_KEYWORDS } from './actio-keywords';
 
-// Actio-only macro keywords. Source of truth: the keyword table in
-// docs/content/docs/syntax.mdx (plus call-templates/extends/if-changed, which
-// are real macros documented in their detailed sections). Keep this in sync
-// with that table — grouped by scope to make drift obvious.
-const ACTIO_KEYWORDS = new Set([
-  // workflow
-  'params',
-  'fragments',
-  'job-defaults',
-  'executors',
-  'call-templates',
-  'injection-hoist',
-  'finally',
-  // job
-  'executor',
-  'dynamic-matrix',
-  'extends',
-  // job / step
-  'static-if',
-  'fallback',
-  'ensure',
-  'on-success',
-  'on-failure',
-  'on-abort',
-  'if-changed',
-  // step
-  'inject',
-  'for-each',
-  'retry',
-  'share',
-  'unsafe',
-  'trust',
-  'force',
-]);
-
-// Matches the first mapping key on a line, with an optional `- ` list marker.
-// The optional `(...)` tail covers the `static-if(<expr>)` keyed-merge form;
-// only the keyword name (group 2) is highlighted, not the expression.
-const KEY_RE = /^(\s*(?:-\s+)?)([A-Za-z][\w-]*)(?:\([^)]*\))?\s*:/;
 const MARK = '__actioKeyword';
 
 const isActioBlock = (meta: { title?: unknown; __raw?: unknown } | undefined): boolean => {
@@ -58,7 +20,7 @@ export function transformerActioKeywords(): ShikiTransformer {
 
       for (const line of lines) {
         const text = line.map((token) => token.content).join('');
-        const match = KEY_RE.exec(text);
+        const match = ACTIO_KEY_RE.exec(text);
         if (!match) continue;
         if (!ACTIO_KEYWORDS.has(match[2])) continue;
 
