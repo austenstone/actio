@@ -892,9 +892,229 @@ const processJobLoop = (
   return { [jobId]: job };
 };
 
-const processStepLoopsForJob = (ctx: ParseContext, jobId: string, job: Job): void => {
-  if (!Array.isArray(job.steps)) return;
+const STATE_ENV_RE = /\bGITHUB_(ENV|PATH)\b/;
+
+/**
+ * A step "establishes shared state" when its effects (a populated workspace, a
+ * mutated `$GITHUB_ENV`/`$GITHUB_PATH`) are observed by *later* in-job steps.
+ * Hoisting a downstream loop onto a fresh matrix runner silently drops that
+ * state, so we refuse the rewrite when such a step sits before the loop.
+ */
+const isStateEstablishingStep = (step: unknown): boolean => {
+  if (!isObject(step)) return false;
+  const uses = step.uses;
+  if (typeof uses === "string" && /^actions\/checkout(@|$)/.test(uses.trim())) return true;
+  const run = step.run;
+  if (typeof run === "string" && STATE_ENV_RE.test(run)) return true;
+  return false;
+};
+
+const isRuntimeStepLoop = (step: unknown): boolean => {
+  if (!isObject(step) || !Object.hasOwn(step, "for_each")) return false;
+  const config = normalizedConfig(step.for_each);
+  return !!config && typeof config.in === "string" && isRuntimeExpr(config.in);
+};
+
+/**
+ * Build the matrixed loop job from a runtime-list step loop: replicate the
+ * job's execution context (runs-on/env/container/services/defaults via clone),
+ * emit `strategy.matrix.<as>: ${{ fromJSON(...) }}`, bind the loop var to
+ * `${{ matrix.<as> }}`, and expand the loop body in place.
+ */
+const buildRuntimeLoopJob = (
+  ctx: ParseContext,
+  loopJobId: string,
+  job: Job,
+  config: LoopConfig,
+  source: LoopSourceRuntimeExpr,
+  loopVar: string,
+  body: unknown[],
+  needs: string[],
+): Job => {
+  const loopJob = cloneNode(ctx, job);
+  delete loopJob.for_each;
+  loopJob.steps = structuredClone(body) as Step[];
+  if (needs.length > 0) loopJob.needs = needs;
+  else delete loopJob.needs;
+
+  const asName = normalizeAs(config.as, loopVar);
+  const strategy = isObject(loopJob.strategy) ? { ...loopJob.strategy } : {};
+  const matrix = isObject(strategy.matrix) ? { ...strategy.matrix } : {};
+  matrix[asName] = source.expression;
+  strategy.matrix = matrix;
+  setMatrixFailFastAndMaxParallel(strategy, config);
+  loopJob.strategy = strategy;
+
+  const symbols = [
+    matrixSymbol(loopVar, `\${{ matrix.${asName} }}`),
+    matrixSymbol(`for_each.${loopVar}`, `\${{ matrix.${asName} }}`),
+    matrixSymbol("index", `\${{ matrix.${asName} }}`),
+    matrixSymbol("key", `\${{ matrix.${asName} }}`),
+  ];
+  withScopedSymbols(ctx, symbols, () => {
+    applyCompileSubstitution(ctx, loopJob, ["jobs", loopJobId]);
+    if (Array.isArray(loopJob.steps)) {
+      loopJob.steps = expandLoopInSteps(
+        ctx,
+        loopJobId,
+        loopJob.steps,
+        ["jobs", loopJobId, "steps"],
+        [loopVar],
+      );
+    }
+  });
+  recordShareContract(ctx, loopJobId, "parallel-matrix", [], [], true);
+  return loopJob;
+};
+
+/**
+ * Auto-rewrite the cleanly-hoistable shape of a step-level for_each over a
+ * runtime `${{ }}` list into a native matrix job. Returns the replacement job
+ * map on success, a single-job fail-loud map when the shape is unsafe, or
+ * `undefined` to fall through to the generic serial-step path.
+ *
+ * Acceptance bar: correct native matrix OR fail loud — never silently wrong.
+ */
+const tryHoistRuntimeStepLoop = (
+  ctx: ParseContext,
+  jobId: string,
+  job: Job,
+): Record<string, Job> | undefined => {
+  const steps = job.steps;
+  if (!Array.isArray(steps)) return undefined;
+
+  const runtimeIdxs: number[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    if (isRuntimeStepLoop(steps[i])) runtimeIdxs.push(i);
+  }
+  if (runtimeIdxs.length === 0) return undefined;
+
+  const stepsPath: Path = ["jobs", jobId, "steps"];
+
+  if (runtimeIdxs.length > 1) {
+    const secondIdx = runtimeIdxs[1] ?? 0;
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "for-each-step-runtime",
+        "a job with more than one runtime-list for_each step loop can't be hoisted into a single matrix; split them across jobs or make the lists compile-time",
+      ),
+      [...stepsPath, secondIdx, "for_each", "in"],
+    );
+    return { [jobId]: job };
+  }
+
+  const loopIdx = runtimeIdxs[0];
+  if (loopIdx === undefined) return undefined;
+  const loopStep = steps[loopIdx] as Step;
+  const loopPath: Path = [...stepsPath, loopIdx, "for_each"];
+  const config = normalizedConfig(loopStep.for_each);
+  if (!config || !checkRequiredConfig(ctx, loopPath, config)) return { [jobId]: job };
+  const loopVar = String(config.var).trim();
+
+  if (!normalizeParallel(config.parallel)) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "for-each-step-runtime",
+        "a serial (parallel: false) for_each over a runtime list needs a compile-time list; a runtime list can only fan out as a matrix",
+      ),
+      [...loopPath, "parallel"],
+    );
+    return { [jobId]: job };
+  }
+
+  const source = resolveLoopSource(ctx, config.in, [...loopPath, "in"]);
+  if (!source) return { [jobId]: job };
+  if (source.kind !== "runtime-expr") return undefined;
+
+  const body = collectBodySteps(loopStep);
+  if (collectShareProducers(body).length > 0) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "E-share-in-dynamic-loop",
+        "share: inside a runtime-list for_each can't emit per-iteration outputs (matrix outputs are last-leg-wins); make the list static or await v2 artifact fan-in",
+      ),
+      [...stepsPath, loopIdx, "steps"],
+    );
+    return { [jobId]: job };
+  }
+
+  const preSteps = steps.slice(0, loopIdx);
+  const postSteps = steps.slice(loopIdx + 1);
+
+  if (postSteps.length > 0) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "for-each-step-runtime",
+        "steps after a runtime-list for_each can't observe per-iteration matrix state once the loop is hoisted into its own job; move them into the loop body or make the list compile-time",
+      ),
+      [...stepsPath, loopIdx + 1],
+    );
+    return { [jobId]: job };
+  }
+
+  const coupledPre = preSteps.findIndex(isStateEstablishingStep);
+  if (coupledPre >= 0) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "for-each-step-runtime",
+        "a runtime-list for_each can't be hoisted past a step that establishes shared state (checkout, $GITHUB_ENV/$GITHUB_PATH); the matrix legs run on fresh runners. Make the list compile-time or fold the setup into the loop body",
+      ),
+      [...stepsPath, coupledPre],
+    );
+    return { [jobId]: job };
+  }
+
+  const originalNeeds = normalizeNeedsArray(job.needs);
+
+  if (preSteps.length === 0) {
+    return {
+      [jobId]: buildRuntimeLoopJob(ctx, jobId, job, config, source, loopVar, body, originalNeeds),
+    };
+  }
+
+  const preJobId = `${jobId}-pre`;
+  const preJob = cloneNode(ctx, job);
+  delete preJob.for_each;
+  delete preJob.strategy;
+  delete preJob.outputs;
+  preJob.steps = expandLoopInSteps(
+    ctx,
+    preJobId,
+    structuredClone(preSteps) as Step[],
+    ["jobs", preJobId, "steps"],
+    [],
+  );
+  if (originalNeeds.length > 0) preJob.needs = originalNeeds;
+  else delete preJob.needs;
+
+  const loopJob = buildRuntimeLoopJob(ctx, jobId, job, config, source, loopVar, body, [
+    preJobId,
+    ...originalNeeds,
+  ]);
+
+  return { [preJobId]: preJob, [jobId]: loopJob };
+};
+
+const processStepLoopsForJob = (
+  ctx: ParseContext,
+  jobId: string,
+  job: Job,
+): Record<string, Job> => {
+  if (!Array.isArray(job.steps)) return { [jobId]: job };
+  const hoisted = tryHoistRuntimeStepLoop(ctx, jobId, job);
+  if (hoisted) return hoisted;
   job.steps = expandLoopInSteps(ctx, jobId, job.steps, ["jobs", jobId, "steps"], []);
+  return { [jobId]: job };
 };
 
 export const forEachPass = (ctx: ParseContext): void => {
@@ -924,10 +1144,11 @@ export const forEachPass = (ctx: ParseContext): void => {
 
     for (const [nextId, nextJobRaw] of Object.entries(transformed)) {
       if (!isObject(nextJobRaw)) continue;
-      const nextJob = nextJobRaw as Job;
-      processStepLoopsForJob(ctx, nextId, nextJob);
-      rebuilt[nextId] = nextJob;
-      rebuiltOrder.push(nextId);
+      const expanded = processStepLoopsForJob(ctx, nextId, nextJobRaw as Job);
+      for (const [outId, outJob] of Object.entries(expanded)) {
+        rebuilt[outId] = outJob;
+        rebuiltOrder.push(outId);
+      }
     }
   }
 

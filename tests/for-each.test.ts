@@ -189,7 +189,76 @@ jobs:
     expect(hasCode(result, "for-each-step-parallel")).toBe(true);
   });
 
-  it("errors when a step-level loop iterates a runtime expression", () => {
+  it("hoists a whole-job runtime step loop into a matrixed job", () => {
+    const { result, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    env:
+      GREETING: hi
+    steps:
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.setup.outputs.list) }}"
+        steps:
+          - run: echo {{ x }} $GREETING
+`);
+    expect(result.ok).toBe(true);
+    const jobs = jobsOf(doc as never);
+    // The loop is hoisted in place: the job keeps its id so downstream needs still resolve.
+    expect(Object.keys(jobs)).toEqual(["build"]);
+    const buildJob = jobs.build as Record<string, unknown>;
+    expect(buildJob.for_each).toBeUndefined();
+    expect((buildJob.strategy as Record<string, unknown>).matrix).toEqual({
+      x: "${{ fromJSON(needs.setup.outputs.list) }}",
+    });
+    // runs-on / env / needs are replicated onto the matrixed job.
+    expect(buildJob["runs-on"]).toBe("ubuntu-latest");
+    expect(buildJob.env).toEqual({ GREETING: "hi" });
+    expect(buildJob.needs).toEqual(["setup"]);
+    // The loop variable binds to the matrix leg; the shell var is untouched.
+    const steps = buildJob.steps as { run?: string }[];
+    expect(steps).toHaveLength(1);
+    expect(steps[0]?.run).toBe("echo ${{ matrix.x }} $GREETING");
+  });
+
+  it("splits pure pre-steps into a -pre job and matrixes the loop", () => {
+    const { result, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo pure-pre
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.setup.outputs.list) }}"
+        steps:
+          - run: echo {{ x }}
+`);
+    expect(result.ok).toBe(true);
+    const jobs = jobsOf(doc as never);
+    expect(Object.keys(jobs).sort()).toEqual(["build", "build-pre"]);
+    const pre = jobs["build-pre"] as Record<string, unknown>;
+    const loop = jobs.build as Record<string, unknown>;
+    // The pre job keeps the original needs and surrounding step.
+    expect(pre.needs).toEqual(["setup"]);
+    expect(pre.for_each).toBeUndefined();
+    expect((pre.steps as { run?: string }[])[0]?.run).toBe("echo pure-pre");
+    // The loop job runs after the pre job and still sees the original needs.
+    expect(loop.needs).toEqual(["build-pre", "setup"]);
+    expect((loop.strategy as Record<string, unknown>).matrix).toEqual({
+      x: "${{ fromJSON(needs.setup.outputs.list) }}",
+    });
+    expect((loop.steps as { run?: string }[])[0]?.run).toBe("echo ${{ matrix.x }}");
+  });
+
+  it("fails loud when a runtime loop follows a checkout (shared state)", () => {
     const { result } = build(`
 name: ci
 on: [push]
@@ -197,6 +266,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - for_each:
           var: x
           in: "\${{ fromJSON(needs.setup.outputs.list) }}"
@@ -205,6 +275,109 @@ jobs:
 `);
     expect(result.ok).toBe(false);
     expect(hasCode(result, "for-each-step-runtime")).toBe(true);
+  });
+
+  it("fails loud when a runtime loop follows a step that writes $GITHUB_ENV", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "K=v" >> $GITHUB_ENV
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.setup.outputs.list) }}"
+        steps:
+          - run: echo {{ x }}
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "for-each-step-runtime")).toBe(true);
+  });
+
+  it("fails loud when a step follows a runtime loop (post-loop state)", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.setup.outputs.list) }}"
+        steps:
+          - run: echo {{ x }}
+      - run: echo after
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "for-each-step-runtime")).toBe(true);
+  });
+
+  it("fails loud when two runtime loops live in one job", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.setup.outputs.a) }}"
+        steps:
+          - run: echo {{ x }}
+      - for_each:
+          var: y
+          in: "\${{ fromJSON(needs.setup.outputs.b) }}"
+        steps:
+          - run: echo {{ y }}
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "for-each-step-runtime")).toBe(true);
+  });
+
+  it("fails loud when a runtime loop requests serial execution", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.setup.outputs.list) }}"
+          parallel: false
+        steps:
+          - run: echo {{ x }}
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "for-each-step-runtime")).toBe(true);
+  });
+
+  it("keeps E-share-in-dynamic-loop when a share producer is inside a runtime loop", () => {
+    const { result } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - for_each:
+          var: x
+          in: "\${{ fromJSON(needs.setup.outputs.list) }}"
+        steps:
+          - share: { value: "\${{ matrix.x }}", as: out }
+`);
+    expect(result.ok).toBe(false);
+    expect(hasCode(result, "E-share-in-dynamic-loop")).toBe(true);
   });
 
   it("warns that serial-only knobs are ignored on a step loop", () => {
