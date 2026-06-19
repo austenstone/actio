@@ -6,7 +6,7 @@ import { resolveCompileTimeExpressionValue, resolveCompileTimeTextBoundaries } f
 import type { Pass } from "./registry.js";
 
 type Scalar = string | number | boolean | null;
-type ForEachMode = "serial-step" | "serial-jobs" | "parallel-matrix";
+type ForEachMode = "serial-step" | "serial-jobs" | "parallel-matrix" | "parallel-variant-jobs";
 
 interface LoopConfig {
   var?: unknown;
@@ -708,6 +708,177 @@ const buildSerialSiblingJobs = (
   return jobs;
 };
 
+const authorMatrixKeys = (matrix: Record<string, unknown>): Set<string> => {
+  const keys = new Set<string>();
+  for (const key of Object.keys(matrix)) {
+    if (key === "include" || key === "exclude") continue;
+    keys.add(key);
+  }
+  for (const listKey of ["include", "exclude"] as const) {
+    const list = matrix[listKey];
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      if (isObject(entry)) for (const key of Object.keys(entry)) keys.add(key);
+    }
+  }
+  return keys;
+};
+
+const VARIANT_ID_FIELDS = ["key", "name", "id", "slug"] as const;
+
+const isSlugValue = (value: unknown): boolean =>
+  typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+
+const deriveVariantSlug = (
+  ctx: ParseContext,
+  config: LoopConfig,
+  binding: LoopIterationBinding,
+  source: LoopSourceStaticScalar | LoopSourceStaticObject,
+  path: Path,
+): string => {
+  if (source.kind === "static-scalar") {
+    return slugify(String(binding.value)) || String(binding.index);
+  }
+  const obj = isObject(binding.value) ? binding.value : {};
+  const configured = typeof config.key === "string" ? config.key.trim() : "";
+  const field =
+    configured && Object.hasOwn(obj, configured) && isSlugValue(obj[configured])
+      ? configured
+      : VARIANT_ID_FIELDS.find((f) => Object.hasOwn(obj, f) && isSlugValue(obj[f]));
+  if (field) {
+    const slug = slugify(String(obj[field]));
+    if (slug.length > 0) return slug;
+  }
+  pushDiagnostic(
+    ctx,
+    "warning",
+    diagnosticMessage(
+      "for-each-variant-id-fallback",
+      `object variant has no usable slug field (tried ${configured ? `"${configured}", ` : ""}key/name/id/slug); using index ${binding.index} for the job id`,
+    ),
+    path,
+  );
+  return String(binding.index);
+};
+
+const warnCoexistKnobsIgnored = (ctx: ParseContext, config: LoopConfig, path: Path): void => {
+  const keys: Array<[string, unknown]> = [
+    ["fail-fast", config["fail-fast"]],
+    ["fail_fast", config.fail_fast],
+    ["max-parallel", config["max-parallel"]],
+    ["max_in_flight", config.max_in_flight],
+    ["as", config.as],
+  ];
+  for (const [key, value] of keys) {
+    if (value === undefined) continue;
+    pushDiagnostic(
+      ctx,
+      "warning",
+      diagnosticMessage(
+        "for-each-loop-knob-ignored-coexist",
+        `"${key}" can't target a for_each that multiplies a job with its own strategy.matrix (variants become separate jobs); ignoring`,
+      ),
+      [...path, key],
+    );
+  }
+};
+
+/**
+ * Issue #79: a parallel job-level `for_each` on a job that ALSO has an
+ * author-written `strategy.matrix`. Rather than folding the variant into that
+ * matrix (one combined job, one status check), clone the job once per variant
+ * so each keeps its full matrix — producing N separate jobs / status checks,
+ * matching hand-written `test-<variant>` clusters. Mirrors
+ * `buildSerialSiblingJobs` but parallel (every sibling keeps the original
+ * `needs`, no chain) and preserves each clone's `strategy.matrix`.
+ */
+const buildParallelVariantJobs = (
+  ctx: ParseContext,
+  jobId: string,
+  job: Job,
+  config: LoopConfig,
+  source: LoopSourceStaticScalar | LoopSourceStaticObject,
+  loopVar: string,
+  path: Path,
+): Record<string, Job> | undefined => {
+  const asName = normalizeAs(config.as, loopVar);
+  const strategy = job.strategy as Record<string, unknown>;
+  const matrix = strategy.matrix as Record<string, unknown>;
+
+  const matrixKeys = authorMatrixKeys(matrix);
+  for (const name of new Set([loopVar, asName])) {
+    if (!matrixKeys.has(name)) continue;
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "for-each-matrix-key-collision",
+        `for_each variable "${name}" reuses strategy.matrix key "${name}"; rename the loop with "as:" so the variant and the matrix axis stay distinct`,
+      ),
+      path,
+    );
+    return { [jobId]: job };
+  }
+
+  const bindings = buildBindings(source);
+  if (bindings.length === 0) {
+    pushDiagnostic(
+      ctx,
+      "warning",
+      diagnosticMessage(
+        "for-each-empty-literal",
+        `for_each "in" is empty; the loop expands to nothing`,
+      ),
+      [...path, "in"],
+    );
+    return {};
+  }
+
+  warnCoexistKnobsIgnored(ctx, config, path);
+
+  const jobs: Record<string, Job> = {};
+  const seenIds = new Set<string>();
+  for (const binding of bindings) {
+    const slug = deriveVariantSlug(ctx, config, binding, source, [...path, "in"]);
+    const siblingId = `${jobId}-${slug}`;
+    if (seenIds.has(siblingId)) {
+      pushDiagnostic(
+        ctx,
+        "error",
+        diagnosticMessage(
+          "for-each-job-id-collision",
+          `for_each generates duplicate job id "${siblingId}"`,
+        ),
+        path,
+      );
+      return undefined;
+    }
+    seenIds.add(siblingId);
+
+    const sibling = cloneNode(ctx, job);
+    delete sibling.for_each;
+
+    const symbols = bindingSymbols(loopVar, binding);
+    withScopedSymbols(ctx, symbols, () => {
+      applyCompileSubstitution(ctx, sibling, ["jobs", jobId]);
+    });
+    if (Array.isArray(sibling.steps)) {
+      sibling.steps = expandLoopInSteps(
+        ctx,
+        siblingId,
+        sibling.steps,
+        ["jobs", siblingId, "steps"],
+        [loopVar],
+      );
+    }
+    jobs[siblingId] = sibling;
+  }
+
+  const producers = collectShareProducers(job.steps ?? []);
+  recordShareContract(ctx, jobId, "parallel-variant-jobs", bindings, producers, false);
+  return jobs;
+};
+
 const applyParallelMatrixLoop = (
   ctx: ParseContext,
   jobId: string,
@@ -893,6 +1064,16 @@ const processJobLoop = (
     !validateObjectFields(ctx, ["jobs", jobId, "for_each", "in"], loopVar, job, source.values)
   ) {
     return { [jobId]: job };
+  }
+
+  const hasAuthorMatrix =
+    isObject(job.strategy) && isObject((job.strategy as Record<string, unknown>).matrix);
+  if (hasAuthorMatrix) {
+    return buildParallelVariantJobs(ctx, jobId, job, config, source, loopVar, [
+      "jobs",
+      jobId,
+      "for_each",
+    ]);
   }
 
   applyParallelMatrixLoop(ctx, jobId, job, config, source, loopVar);

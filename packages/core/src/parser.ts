@@ -21,7 +21,7 @@ export interface ForEachShareContractEntry {
 
 export interface ForEachShareContract {
   jobId: string;
-  mode: "serial-step" | "serial-jobs" | "parallel-matrix";
+  mode: "serial-step" | "serial-jobs" | "parallel-matrix" | "parallel-variant-jobs";
   dynamic: boolean;
   entries: ForEachShareContractEntry[];
 }
