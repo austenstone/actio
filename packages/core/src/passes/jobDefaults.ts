@@ -7,7 +7,6 @@ export const JOB_DEFAULT_KEYS = [
   "if",
   "permissions",
   "concurrency",
-  "strategy",
   "continue-on-error",
   "environment",
   "timeout-minutes",
@@ -31,8 +30,8 @@ export const EXECUTOR_KEYS = [
   "defaults",
 ] as const;
 
-const CALL_JOB_DEFAULT_KEYS = new Set<string>(["if", "permissions", "concurrency", "strategy"]);
-const REPLACE_ON_PRESENCE_KEYS = new Set(["permissions", "concurrency", "strategy"]);
+const CALL_JOB_DEFAULT_KEYS = new Set<string>(["if", "permissions", "concurrency"]);
+const REPLACE_ON_PRESENCE_KEYS = new Set(["permissions", "concurrency"]);
 const REPLACE_KEYS = new Set(["runs-on", "timeout-minutes", "continue-on-error", "environment"]);
 const REJECTED_TEMPLATE_KEYS = new Set([
   "steps",
@@ -40,6 +39,7 @@ const REJECTED_TEMPLATE_KEYS = new Set([
   "uses",
   "with",
   "secrets",
+  "strategy",
   "name",
   "outputs",
 ]);
@@ -187,10 +187,15 @@ function validateTemplateKey(
   code: string,
 ): boolean {
   if (allowedKeys.has(key)) return true;
+  const rejectedMessage =
+    code === "job-defaults-rejected-key" && key === "strategy"
+      ? `[${code}] Key "strategy" is not allowed in job-defaults; declare strategy on each job instead`
+      : undefined;
   const message =
-    REJECTED_TEMPLATE_KEYS.has(key) || MACRO_KEYS.has(key)
+    rejectedMessage ??
+    (REJECTED_TEMPLATE_KEYS.has(key) || MACRO_KEYS.has(key)
       ? `[${code}] Key "${key}" is not allowed here`
-      : `[${code}] Key "${key}" is not supported here`;
+      : `[${code}] Key "${key}" is not supported here`);
   pushDiagnostic(ctx, "error", message, path, {
     hint: `Allowed keys: ${[...allowedKeys].join(", ")}`,
   });

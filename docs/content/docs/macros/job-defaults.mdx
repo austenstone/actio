@@ -57,9 +57,13 @@ jobs:
 | Key | Behaviour |
 |---|---|
 | `if` | **AND-combined** — `default && inline`. Never replaced. |
-| `permissions`, `concurrency`, `strategy` | **Replace-on-presence** — inline value wins entirely; default only applies when the key is absent. |
+| `permissions`, `concurrency` | **Replace-on-presence** — inline value wins entirely; default only applies when the key is absent. |
 | `runs-on`, `timeout-minutes`, `continue-on-error`, `environment` | **Inline wins** — job value takes precedence. |
 | `env`, `container`, `services`, `defaults` | **Deep-merged** — job keys overlay the default. |
+
+`strategy` is intentionally per-job only. Put matrix and `fail-fast` settings on
+each job so Actio does not silently turn per-job identity into a workflow-wide
+default.
 
 <CodeCompare>
 
@@ -95,9 +99,9 @@ jobs:
 
 <Callout title="Reusable-workflow call jobs">
   Jobs with `uses:` only receive the call-compatible subset of defaults: `if`,
-  `permissions`, `concurrency`, and `strategy`. Runner keys like `runs-on`,
-  `env`, and `timeout-minutes` are silently skipped (an `info` diagnostic is
-  emitted listing what was dropped). `executor:` is not supported on call jobs.
+  `permissions`, and `concurrency`. Runner keys like `runs-on`, `env`, and
+  `timeout-minutes` are silently skipped (an `info` diagnostic is emitted listing
+  what was dropped). `executor:` is not supported on call jobs.
 </Callout>
 
 ## executors

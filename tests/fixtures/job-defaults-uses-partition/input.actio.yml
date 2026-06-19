@@ -8,10 +8,6 @@ job-defaults:
   concurrency:
     group: default-group
     cancel-in-progress: true
-  strategy:
-    fail-fast: false
-    matrix:
-      shard: [a, b]
   runs-on: ubuntu-latest
   timeout-minutes: 15
   env:

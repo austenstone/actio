@@ -150,7 +150,6 @@ generated workflow YAML.
     if: { type: 'string', description: 'AND-combined with each job if condition.' },
     permissions: { type: 'map', description: 'Replaces the job permissions when the job omits its own.' },
     concurrency: { type: 'map', description: 'Replaces job concurrency on presence.' },
-    strategy: { type: 'map', description: 'Replaces job strategy on presence.' },
     'continue-on-error': { type: 'boolean', description: 'Inline job value wins when set.' },
     environment: { type: 'string | map', description: 'Inline job value wins when set.' },
     'timeout-minutes': { type: 'number', description: 'Inline job value wins when set.' },
@@ -163,9 +162,10 @@ generated workflow YAML.
 />
 
 Merge semantics vary by key: `if` is **AND-combined** (`default && inline`);
-`permissions`/`concurrency`/`strategy` **replace on presence**; `runs-on`,
-`timeout-minutes`, `continue-on-error`, `environment` are **inline-wins**; `env`,
-`container`, `services`, `defaults` are **deep-merged**.
+`permissions`/`concurrency` **replace on presence**; `runs-on`, `timeout-minutes`,
+`continue-on-error`, `environment` are **inline-wins**; `env`, `container`,
+`services`, `defaults` are **deep-merged**. `strategy` is intentionally per-job
+only and is rejected in `job-defaults`.
 
 <CodeCompare>
 
@@ -192,8 +192,8 @@ jobs:
 
 <Callout title="Reusable-workflow call jobs">
   Jobs with `uses:` only receive the call-compatible subset: `if`, `permissions`,
-  `concurrency`, and `strategy`. Runner keys are skipped, and `executor:` is not
-  supported on call jobs.
+  and `concurrency`. Runner keys are skipped, and `executor:` is not supported on
+  call jobs.
 </Callout>
 
 Full guide: [job-defaults](/docs/macros/job-defaults).

@@ -435,7 +435,6 @@
         "if": { "$ref": "#/definitions/normalJob/properties/if" },
         "permissions": { "$ref": "#/definitions/normalJob/properties/permissions" },
         "concurrency": { "$ref": "#/definitions/normalJob/properties/concurrency" },
-        "strategy": { "$ref": "#/definitions/normalJob/properties/strategy" },
         "continue-on-error": {
           "$ref": "#/definitions/normalJob/properties/continue-on-error"
         },
