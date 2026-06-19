@@ -10,52 +10,47 @@ output — zero residual directives.
 Both jobs inherit `runs-on` and `timeout-minutes`; `env` is deep-merged so `lint`
 ends up with both `CI` and `DEBUG`:
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  name: CI
-  on: [push]
-  job_defaults:
+```yaml title=".actio.yml"
+name: CI
+on: [push]
+job_defaults:
+  runs-on: ubuntu-latest
+  timeout-minutes: 30
+  env:
+    CI: "true"
+jobs:
+  test:
+    steps:
+      - run: npm test
+  lint:
+    env:
+      DEBUG: "1"
+    steps:
+      - run: npm run lint
+```
+
+```yaml title="generated .yml"
+jobs:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       CI: "true"
-  jobs:
-    test:
-      steps:
-        - run: npm test
-    lint:
-      env:
-        DEBUG: "1"
-      steps:
-        - run: npm run lint
-  ```
+    steps:
+      - run: npm test
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      DEBUG: "1"
+    steps:
+      - run: npm run lint
+```
 
-  </Tab>
-  <Tab value="generated .yml">
-
-  ```yaml
-  jobs:
-    test:
-      runs-on: ubuntu-latest
-      timeout-minutes: 30
-      env:
-        CI: "true"
-      steps:
-        - run: npm test
-    lint:
-      runs-on: ubuntu-latest
-      timeout-minutes: 30
-      env:
-        CI: "true"
-        DEBUG: "1"
-      steps:
-        - run: npm run lint
-  ```
-
-  </Tab>
-</Tabs>
+</CodeCompare>
 
 ## Merge semantics
 
@@ -66,42 +61,37 @@ ends up with both `CI` and `DEBUG`:
 | `runs-on`, `timeout-minutes`, `continue-on-error`, `environment` | **Inline wins** — job value takes precedence. |
 | `env`, `container`, `services`, `defaults` | **Deep-merged** — job keys overlay the default. |
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  name: CI
-  on: [push]
-  job_defaults:
-    if: ${{ github.ref == 'refs/heads/main' }}
+```yaml title=".actio.yml"
+name: CI
+on: [push]
+job_defaults:
+  if: ${{ github.ref == 'refs/heads/main' }}
+  env:
+    REGION: us-east-1
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ success() }}
     env:
-      REGION: us-east-1
-  jobs:
-    deploy:
-      runs-on: ubuntu-latest
-      if: ${{ success() }}
-      env:
-        REGION: eu-west-1
-      steps:
-        - run: ./deploy.sh
-  ```
+      REGION: eu-west-1
+    steps:
+      - run: ./deploy.sh
+```
 
-  </Tab>
-  <Tab value="generated .yml">
+```yaml title="generated .yml"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && success()
+    env:
+      REGION: eu-west-1
+    steps:
+      - run: ./deploy.sh
+```
 
-  ```yaml
-  jobs:
-    deploy:
-      runs-on: ubuntu-latest
-      if: github.ref == 'refs/heads/main' && success()
-      env:
-        REGION: eu-west-1
-      steps:
-        - run: ./deploy.sh
-  ```
-
-  </Tab>
-</Tabs>
+</CodeCompare>
 
 <Callout title="Reusable-workflow call jobs">
   Jobs with `uses:` only receive the call-compatible subset of defaults: `if`,
@@ -115,41 +105,36 @@ ends up with both `CI` and `DEBUG`:
 Named runner presets — a companion to `job_defaults` for extracting repeated
 runner configuration into a reusable template.
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  name: CI
-  on: [push]
-  executors:
-    hardened:
-      runs-on: ubuntu-latest
-      timeout-minutes: 20
-      env:
-        HARDENED: "true"
-  jobs:
-    test:
-      executor: hardened
-      steps:
-        - run: npm test
-  ```
+```yaml title=".actio.yml"
+name: CI
+on: [push]
+executors:
+  hardened:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HARDENED: "true"
+jobs:
+  test:
+    executor: hardened
+    steps:
+      - run: npm test
+```
 
-  </Tab>
-  <Tab value="generated .yml">
+```yaml title="generated .yml"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HARDENED: "true"
+    steps:
+      - run: npm test
+```
 
-  ```yaml
-  jobs:
-    test:
-      runs-on: ubuntu-latest
-      timeout-minutes: 20
-      env:
-        HARDENED: "true"
-      steps:
-        - run: npm test
-  ```
-
-  </Tab>
-</Tabs>
+</CodeCompare>
 
 Compose multiple executors by passing a list — they are merged left-to-right,
 with later entries overriding earlier ones for scalar keys:

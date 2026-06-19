@@ -10,3 +10,35 @@ html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
 }
+
+/* Side-by-side .actio.yml vs generated .yml, collapsing to tabs when the
+   content column is too narrow. Driven by a container query so it reacts to
+   actual content width (sidebar/TOC visibility), not just the viewport. */
+.code-compare {
+  container-type: inline-size;
+}
+
+.code-compare-grid {
+  display: none;
+}
+
+.code-compare-grid > div {
+  min-width: 0;
+}
+
+.code-compare-grid > div > figure {
+  height: 100%;
+}
+
+@container (min-width: 48rem) {
+  .code-compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+
+  .code-compare-tabs {
+    display: none;
+  }
+}

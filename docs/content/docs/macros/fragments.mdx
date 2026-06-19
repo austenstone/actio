@@ -8,40 +8,35 @@ Define reusable step blocks at the top of the file; splice them in with
 
 `fragments` is stripped, `inject` expanded in place:
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  name: Fragments
-  on: [push]
-  fragments:
-    setup:
+```yaml title=".actio.yml"
+name: Fragments
+on: [push]
+fragments:
+  setup:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: setup
+      - run: npm test
+```
+
+```yaml title="generated .yml"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-  jobs:
-    test:
-      runs-on: ubuntu-latest
-      steps:
-        - inject: setup
-        - run: npm test
-  ```
+      - run: npm test
+```
 
-  </Tab>
-  <Tab value="generated .yml">
-
-  ```yaml
-  jobs:
-    test:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-node@v4
-          with:
-            node-version: 20
-        - run: npm test
-  ```
-
-  </Tab>
-</Tabs>
+</CodeCompare>

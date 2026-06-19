@@ -12,28 +12,23 @@ It is **on by default**. Untrusted interpolation is lifted into a step `env:`
 var and the body is rewritten to reference the shell variable instead, so the
 value can never be parsed as shell.
 
-<Tabs items={['.actio.yml', 'generated .yml']}>
-  <Tab value=".actio.yml">
+<CodeCompare>
 
-  ```yaml
-  steps:
-    - name: Greet PR author
-      run: echo Hello ${{ github.event.pull_request.title }}
-  ```
+```yaml title=".actio.yml"
+steps:
+  - name: Greet PR author
+    run: echo Hello ${{ github.event.pull_request.title }}
+```
 
-  </Tab>
-  <Tab value="generated .yml">
+```yaml title="generated .yml"
+steps:
+  - name: Greet PR author
+    env:
+      PR_TITLE: ${{ github.event.pull_request.title }}
+    run: echo Hello "$PR_TITLE"
+```
 
-  ```yaml
-  steps:
-    - name: Greet PR author
-      env:
-        PR_TITLE: ${{ github.event.pull_request.title }}
-      run: echo Hello "$PR_TITLE"
-  ```
-
-  </Tab>
-</Tabs>
+</CodeCompare>
 
 The expansion now happens in the `env` block (never word-split or re-evaluated),
 and the shell only ever sees a quoted variable reference.
