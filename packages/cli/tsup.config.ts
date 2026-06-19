@@ -1,7 +1,10 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/cli.ts", "src/config-export.ts"],
+  entry: {
+    cli: "src/main.ts",
+    "config-export": "src/config-export.ts",
+  },
   format: ["esm"],
   clean: true,
   sourcemap: true,
