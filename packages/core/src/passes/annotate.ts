@@ -40,7 +40,7 @@ export function annotatePass(ctx: ParseContext): void {
     if: "failure()",
     permissions: { contents: "read", actions: "read" },
     steps: [
-      { uses: "actions/checkout@v4" },
+      { uses: "actions/checkout@v4", with: { "persist-credentials": false } },
       { uses: ANNOTATE_ACTION, with: { token: "${{ github.token }}" } },
     ],
   };

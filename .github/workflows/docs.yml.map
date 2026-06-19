@@ -85,51 +85,29 @@
     },
     {
       "generated": {
-        "line": 15
-      },
-      "source": 0,
-      "original": {
-        "line": 12,
-        "col": 10
-      },
-      "path": "permissions.pages"
-    },
-    {
-      "generated": {
         "line": 16
       },
       "source": 0,
       "original": {
-        "line": 13,
-        "col": 13
-      },
-      "path": "permissions.id-token"
-    },
-    {
-      "generated": {
-        "line": 18
-      },
-      "source": 0,
-      "original": {
-        "line": 16,
+        "line": 14,
         "col": 10
       },
       "path": "concurrency.group"
     },
     {
       "generated": {
-        "line": 19
+        "line": 17
       },
       "source": 0,
       "original": {
-        "line": 17,
+        "line": 15,
         "col": 23
       },
       "path": "concurrency.cancel-in-progress"
     },
     {
       "generated": {
-        "line": 21
+        "line": 19
       },
       "source": 0,
       "original": {
@@ -140,7 +118,7 @@
     },
     {
       "generated": {
-        "line": 22
+        "line": 20
       },
       "source": 0,
       "original": {
@@ -151,7 +129,7 @@
     },
     {
       "generated": {
-        "line": 24
+        "line": 22
       },
       "source": 0,
       "original": {
@@ -162,7 +140,7 @@
     },
     {
       "generated": {
-        "line": 25
+        "line": 23
       },
       "source": 0,
       "original": {
@@ -173,14 +151,25 @@
     },
     {
       "generated": {
+        "line": 25
+      },
+      "source": 0,
+      "original": {
+        "line": 19,
+        "col": 13
+      },
+      "path": "jobs.build.steps.0.uses"
+    },
+    {
+      "generated": {
         "line": 27
       },
       "source": 0,
       "original": {
         "line": 21,
-        "col": 13
+        "col": 30
       },
-      "path": "jobs.build.steps.0.uses"
+      "path": "jobs.build.steps.0.with.persist-credentials"
     },
     {
       "generated": {
@@ -354,9 +343,9 @@
       "source": 0,
       "original": {
         "line": 52,
-        "col": 13
+        "col": 14
       },
-      "path": "jobs.deploy.environment.name"
+      "path": "jobs.deploy.permissions.pages"
     },
     {
       "generated": {
@@ -365,9 +354,9 @@
       "source": 0,
       "original": {
         "line": 53,
-        "col": 12
+        "col": 17
       },
-      "path": "jobs.deploy.environment.url"
+      "path": "jobs.deploy.permissions.id-token"
     },
     {
       "generated": {
@@ -378,7 +367,7 @@
         "line": 55,
         "col": 13
       },
-      "path": "jobs.deploy.steps.0.id"
+      "path": "jobs.deploy.environment.name"
     },
     {
       "generated": {
@@ -387,6 +376,28 @@
       "source": 0,
       "original": {
         "line": 56,
+        "col": 12
+      },
+      "path": "jobs.deploy.environment.url"
+    },
+    {
+      "generated": {
+        "line": 54
+      },
+      "source": 0,
+      "original": {
+        "line": 58,
+        "col": 13
+      },
+      "path": "jobs.deploy.steps.0.id"
+    },
+    {
+      "generated": {
+        "line": 55
+      },
+      "source": 0,
+      "original": {
+        "line": 59,
         "col": 15
       },
       "path": "jobs.deploy.steps.0.uses"
