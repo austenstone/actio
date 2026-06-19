@@ -99,6 +99,7 @@ describe("sortPasses", () => {
       "retry",
       "fallback",
       "dynamic_matrix",
+      "lifecycle",
     ]);
   });
 });
@@ -126,6 +127,7 @@ describe("PassRegistry", () => {
       "retry",
       "fallback",
       "dynamic_matrix",
+      "lifecycle",
       "post",
     ]);
   });
@@ -161,6 +163,7 @@ describe("createRegistry", () => {
       "retry",
       "fallback",
       "dynamic_matrix",
+      "lifecycle",
     ]);
   });
 

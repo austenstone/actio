@@ -1,0 +1,10 @@
+name: CI
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker compose up -d
+        ensure:
+          - run: docker compose down
