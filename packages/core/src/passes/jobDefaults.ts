@@ -399,6 +399,6 @@ export function jobDefaultsPass(ctx: ParseContext): void {
 
 export const jobDefaults: Pass = {
   name: "job_defaults",
-  runsAfter: ["params"],
+  runsAfter: ["params", "call_templates"],
   apply: jobDefaultsPass,
 };

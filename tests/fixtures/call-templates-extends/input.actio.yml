@@ -1,0 +1,28 @@
+name: Build and test
+on: [push]
+
+call_templates:
+  test:
+    uses: ./.github/workflows/test_reusable.yml
+    needs: build
+    with:
+      testTimingsArtifact: test-timings
+    secrets: inherit
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+  test-unit:
+    extends: test
+    with:
+      afterBuild: pnpm test:unit
+  test-integration:
+    extends: test
+    with:
+      afterBuild: pnpm test:integration
+  test-e2e:
+    extends: test
+    with:
+      afterBuild: pnpm test:e2e

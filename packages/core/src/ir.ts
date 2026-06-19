@@ -56,6 +56,7 @@ export interface Job {
   defaults?: unknown;
   uses?: string;
   executor?: unknown;
+  extends?: string | string[];
   retry?: unknown;
   fallback?: unknown;
   dynamic_matrix?: unknown;
@@ -67,6 +68,7 @@ export interface Workflow {
   on?: unknown;
   jobs?: Record<string, Job>;
   fragments?: Record<string, Step | Step[]>;
+  call_templates?: Record<string, Record<string, unknown>>;
   [key: string]: unknown;
 }
 
