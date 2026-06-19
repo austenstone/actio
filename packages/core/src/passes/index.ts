@@ -18,7 +18,7 @@ import {
 } from "./jobDefaults.js";
 import { lifecycle } from "./lifecycle.js";
 import { params } from "./params.js";
-import { applyPasses, type Pass, PassRegistry } from "./registry.js";
+import { type Pass, PassRegistry, runCompletePassPipeline } from "./registry.js";
 import { retry } from "./retry.js";
 import { share } from "./share.js";
 import { whenCompile } from "./whenCompile.js";
@@ -47,9 +47,14 @@ export const builtinPasses: Pass[] = [
   injectionHoist,
 ];
 
-/** Run a set of passes (defaults to the built-ins) in dependency order. */
+/**
+ * Run pass transforms (defaults to the built-ins), then resolve final
+ * compile-time text interpolation.
+ *
+ * Use `applyPasses()` only when you specifically need the raw pass-only stage.
+ */
 export function runPasses(ctx: ParseContext, passes: Pass[] = builtinPasses): void {
-  applyPasses(ctx, passes);
+  runCompletePassPipeline(ctx, passes);
 }
 
 /**

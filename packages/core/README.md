@@ -21,8 +21,14 @@ Requires Node ≥ 20.
 ## Usage
 
 ```ts
-import { defineConfig, transformSteps, type Pass } from "actio-core";
+import { defineConfig, transformSteps, transpile, type Pass } from "actio-core";
 ```
+
+Use `transpile()` for complete compilation from `.actio.yml` source to generated
+workflow YAML. If you already have a parsed context, `runPasses()` and
+`PassRegistry.run()` run the same transform-plus-final-interpolation pipeline.
+`applyPasses()` is intentionally lower level: it runs only pass transforms and may
+leave compile-time `{{ ... }}` text interpolation unresolved.
 
 See the [full documentation and API reference](https://github.com/austenstone/actio#readme).
 

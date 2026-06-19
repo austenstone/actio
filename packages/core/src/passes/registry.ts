@@ -1,5 +1,6 @@
 import { seedOrigins } from "../ir.js";
 import type { ParseContext } from "../parser.js";
+import { resolveCompileTimeTextBoundaries } from "./params.js";
 
 /** The transform a pass performs. Mutates `ctx.data` in place. */
 export type PassFn = (ctx: ParseContext) => void;
@@ -47,7 +48,14 @@ export function sortPasses(passes: Pass[]): Pass[] {
   return sorted;
 }
 
-/** Sort the given passes, then run each against `ctx`. */
+/**
+ * Sort the given passes, then run each against `ctx`.
+ *
+ * This is the pass-only primitive. It intentionally does not perform the final
+ * compile-time text interpolation phase that turns `{{ ... }}` tokens into
+ * literals; use `runPasses()` or `PassRegistry.run()` for the complete public
+ * pipeline.
+ */
 export function applyPasses(ctx: ParseContext, passes: Pass[]): void {
   seedOrigins(ctx);
   for (const pass of sortPasses(passes)) {
@@ -55,9 +63,17 @@ export function applyPasses(ctx: ParseContext, passes: Pass[]): void {
   }
 }
 
+/** Run pass transforms, then resolve final compile-time text boundaries. */
+export function runCompletePassPipeline(ctx: ParseContext, passes: Pass[]): void {
+  applyPasses(ctx, passes);
+  resolveCompileTimeTextBoundaries(ctx, ctx.data, []);
+}
+
 /**
  * A mutable collection of passes. Lets external code add or remove transforms
- * without editing core, then run the whole pipeline in dependency order.
+ * without editing core, then run the complete transform pipeline in dependency
+ * order. `run()` resolves final compile-time text interpolation after all
+ * registered passes have executed.
  */
 export class PassRegistry {
   #passes = new Map<string, Pass>();
@@ -89,8 +105,8 @@ export class PassRegistry {
     return sortPasses([...this.#passes.values()]);
   }
 
-  /** Run every registered pass against `ctx` in dependency order. */
+  /** Run every registered pass, then resolve final compile-time text interpolation. */
   run(ctx: ParseContext): void {
-    applyPasses(ctx, [...this.#passes.values()]);
+    runCompletePassPipeline(ctx, [...this.#passes.values()]);
   }
 }
