@@ -9,29 +9,38 @@ A native try/catch. Attach `fallback:` to a step (or a job).
 
 The error is *not* swallowed; fallback runs via `if: failure()`, the job still fails.
 
-```yaml title=".actio.yml"
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy
-        run: ./deploy.sh
-        fallback:
-          - name: Notify
-            run: ./notify.sh failure
-```
-
 The guarded step gets an `id`; the fallback is gated on its `conclusion`:
 
-```yaml title="generated .yml"
-steps:
-  - name: Deploy
-    run: ./deploy.sh
-    id: step_deploy
-  - name: Notify
-    run: ./notify.sh failure
-    if: failure() && steps.step_deploy.conclusion == 'failure'
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
+
+  ```yaml
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Deploy
+          run: ./deploy.sh
+          fallback:
+            - name: Notify
+              run: ./notify.sh failure
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  steps:
+    - name: Deploy
+      run: ./deploy.sh
+      id: step_deploy
+    - name: Notify
+      run: ./notify.sh failure
+      if: failure() && steps.step_deploy.conclusion == 'failure'
+  ```
+
+  </Tab>
+</Tabs>
 
 ## recover: true
 
@@ -49,42 +58,51 @@ Some failures aren't your code — they're the runner (OOM kills, flaky hosted
 infra, a job that needs more cores). `retry:` re-runs the *same step* in a brand
 new job on a different `runs-on`, gated on the original job failing.
 
-```yaml title=".actio.yml"
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Build
-        run: ./build.sh
-        fallback:
-          retry:
-            runs-on: ubuntu-latest-8-cores
-```
-
 The guarded step is lifted into a sibling `<job>_retry` job with
 `needs: [<job>]` and `if: failure()`, running on the fallback runner:
 
-```yaml title="generated .yml"
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Build
-        run: ./build.sh
-  build_retry:
-    name: Retry "Build" on ubuntu-latest-8-cores
-    needs:
-      - build
-    if: failure()
-    runs-on: ubuntu-latest-8-cores
-    steps:
-      - name: Build
-        run: ./build.sh
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
+
+  ```yaml
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+        - name: Build
+          run: ./build.sh
+          fallback:
+            retry:
+              runs-on: ubuntu-latest-8-cores
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+        - name: Build
+          run: ./build.sh
+    build_retry:
+      name: Retry "Build" on ubuntu-latest-8-cores
+      needs:
+        - build
+      if: failure()
+      runs-on: ubuntu-latest-8-cores
+      steps:
+        - name: Build
+          run: ./build.sh
+  ```
+
+  </Tab>
+</Tabs>
 
 ### when_exit_code
 
@@ -92,37 +110,46 @@ Only retry on *specific* exit codes (e.g. `137` = SIGKILL/OOM) instead of any
 failure. Actio captures the original step's real exit code via an `EXIT` trap,
 exposes it as a job output, and gates the retry job on it.
 
-```yaml title=".actio.yml"
-- name: Run tests
-  run: ./run-tests.sh
-  fallback:
-    retry:
-      runs-on: ubuntu-latest-16-cores
-      when_exit_code: [137]
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
 
-```yaml title="generated .yml"
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run tests
-        run: |-
-          trap 'echo "exit_code=$?" >> "$GITHUB_OUTPUT"' EXIT
-          ./run-tests.sh
-        id: step_run_tests
-    outputs:
-      step_run_tests_exit_code: ${{ steps.step_run_tests.outputs.exit_code }}
-  test_retry:
-    name: Retry "Run tests" on ubuntu-latest-16-cores
-    needs:
-      - test
-    if: failure() && needs.test.outputs.step_run_tests_exit_code == '137'
-    runs-on: ubuntu-latest-16-cores
-    steps:
-      - name: Run tests
-        run: ./run-tests.sh
-```
+  ```yaml
+  - name: Run tests
+    run: ./run-tests.sh
+    fallback:
+      retry:
+        runs-on: ubuntu-latest-16-cores
+        when_exit_code: [137]
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Run tests
+          run: |-
+            trap 'echo "exit_code=$?" >> "$GITHUB_OUTPUT"' EXIT
+            ./run-tests.sh
+          id: step_run_tests
+      outputs:
+        step_run_tests_exit_code: ${{ steps.step_run_tests.outputs.exit_code }}
+    test_retry:
+      name: Retry "Run tests" on ubuntu-latest-16-cores
+      needs:
+        - test
+      if: failure() && needs.test.outputs.step_run_tests_exit_code == '137'
+      runs-on: ubuntu-latest-16-cores
+      steps:
+        - name: Run tests
+          run: ./run-tests.sh
+  ```
+
+  </Tab>
+</Tabs>
 
 `when_exit_code` accepts a single number or a list (`[137, 143]`, OR-joined).
 
