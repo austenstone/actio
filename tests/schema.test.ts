@@ -307,8 +307,30 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
+  it("accepts normal jobs whose runs-on is supplied by job-defaults", () => {
+    const doc = load(`on: [push]
+job-defaults:
+  runs-on: ubuntu-latest
+jobs:
+  test:
+    steps:
+      - run: echo test`);
+    expect(validate(doc)).toBe(true);
+  });
+
   it("rejects plain normal jobs without runs-on or executor", () => {
     const doc = load(`on: [push]
+jobs:
+  test:
+    steps:
+      - run: echo test`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("rejects plain normal jobs when job-defaults does not supply runs-on", () => {
+    const doc = load(`on: [push]
+job-defaults:
+  timeout-minutes: 10
 jobs:
   test:
     steps:

@@ -47,6 +47,23 @@
       "markdownDescription": "**Actio macro**: workflow-scoped teardown (sibling to `jobs:`).\n\nEach named entry compiles to an aggregator job that `needs:` every real job and runs on the normal path (`if: !cancelled()`), plus an auto cancel-companion (`if: cancelled()`, `timeout-minutes: 5`). Nest `on-success`/`on-failure`/`on-abort` for outcome-branch jobs; `on-abort: []` opts out of the cancel job.\n\n```yaml\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./deploy.sh\nfinally:\n  teardown:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./cleanup.sh\n```\n\nFor job/step teardown use `ensure:` instead."
     }
   },
+  "rootAllOf": [
+    {
+      "if": {
+        "not": {
+          "required": ["job-defaults"],
+          "properties": {
+            "job-defaults": { "required": ["runs-on"] }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "jobs": { "$ref": "#/definitions/jobsWithExplicitExecutionShape" }
+        }
+      }
+    }
+  ],
   "jobOneOf": [{ "$ref": "#/definitions/extendsCallJob" }],
   "patchDefinitions": {
     "reusableWorkflowCallJob": {
@@ -134,7 +151,6 @@
     },
     "normalJob": {
       "required": [],
-      "anyOf": [{ "required": ["runs-on"] }, { "required": ["executor"] }],
       "properties": {
         "static-if": {
           "type": ["string", "boolean"],
@@ -427,6 +443,28 @@
           "items": { "$ref": "#/definitions/step" }
         }
       }
+    },
+    "jobExecutionShape": {
+      "description": "Normal jobs need `runs-on` or Actio `executor`; call jobs need `uses` or Actio `extends`. Top-level `job-defaults.runs-on` can satisfy normal jobs globally.",
+      "anyOf": [
+        { "required": ["runs-on"] },
+        { "required": ["executor"] },
+        { "required": ["uses"] },
+        { "required": ["extends"] }
+      ]
+    },
+    "jobsWithExplicitExecutionShape": {
+      "type": "object",
+      "patternProperties": {
+        "^[_a-zA-Z][a-zA-Z0-9_-]*$": {
+          "allOf": [
+            { "$ref": "#/definitions/jobExecutionShape" },
+            { "$ref": "#/properties/jobs/patternProperties/^[_a-zA-Z][a-zA-Z0-9_-]*$" }
+          ]
+        }
+      },
+      "minProperties": 1,
+      "additionalProperties": false
     },
     "jobDefaults": {
       "type": "object",

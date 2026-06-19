@@ -29,6 +29,7 @@ export function buildSchema() {
     "`npm run schema:refresh -w actio-core`.";
 
   s.properties = { ...s.properties, ...ext.rootProperties };
+  if (ext.rootAllOf) s.allOf = [...(s.allOf ?? []), ...ext.rootAllOf];
 
   for (const [def, patch] of Object.entries(ext.patchDefinitions)) {
     const target = s.definitions[def];
