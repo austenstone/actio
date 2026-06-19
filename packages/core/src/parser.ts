@@ -74,6 +74,23 @@ export function setKeyOrder(obj: object, order: string[]): void {
   });
 }
 
+const YAML_RUN_QUOTE_TRAP_HINT =
+  "GitHub Actions `run:` is still YAML: quote the whole command with single quotes or use a block scalar (`run: |`) when the shell command contains `: ` or nested quotes.";
+
+function sourceLineAt(source: string, line: number): string {
+  return source.split(/\r?\n/)[line - 1] ?? "";
+}
+
+function runScalarYamlHint(
+  source: string,
+  line: number,
+): Pick<Diagnostic, "code" | "hint"> | undefined {
+  const match = sourceLineAt(source, line).match(/\brun\s*:(.*)$/);
+  const value = match?.[1]?.trimStart();
+  if (!value || value.startsWith("|") || value.startsWith(">")) return undefined;
+  return { code: "yaml-run-quote-trap", hint: YAML_RUN_QUOTE_TRAP_HINT };
+}
+
 /**
  * Where an IR node came from in the original source. `path` indexes the parsed
  * document and stays stable as passes mutate `ctx.data`, so it remains a valid
@@ -132,18 +149,25 @@ export function parseActio(source: string, fileName: string): ParseContext {
   const diagnostics: Diagnostic[] = [];
 
   for (const err of doc.errors) {
-    diagnostics.push({
+    const range = err.pos
+      ? {
+          start: offsetToPosition(lineCounter, err.pos[0]),
+          end: offsetToPosition(lineCounter, err.pos[1]),
+        }
+      : undefined;
+    const hint = range ? runScalarYamlHint(source, range.start.line) : undefined;
+    const diagnostic: Diagnostic = {
       severity: "error",
       source: "yaml",
       file: fileName,
       message: err.message,
-      range: err.pos
-        ? {
-            start: offsetToPosition(lineCounter, err.pos[0]),
-            end: offsetToPosition(lineCounter, err.pos[1]),
-          }
-        : undefined,
-    });
+      range,
+    };
+    if (hint) {
+      diagnostic.code = hint.code;
+      diagnostic.hint = hint.hint;
+    }
+    diagnostics.push(diagnostic);
   }
 
   for (const warn of doc.warnings) {
