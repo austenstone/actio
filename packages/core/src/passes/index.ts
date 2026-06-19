@@ -10,18 +10,20 @@ import {
   type ExecutorKey,
   JOB_DEFAULT_KEYS,
   JOB_DEFAULTS_SAFE_SUBSET,
-  jobDefaults,
   type JobDefaultKey,
+  jobDefaults,
 } from "./jobDefaults.js";
+import { lifecycle } from "./lifecycle.js";
 import { params } from "./params.js";
 import { applyPasses, type Pass, PassRegistry } from "./registry.js";
 import { retry } from "./retry.js";
+import { share } from "./share.js";
 import { whenCompile } from "./whenCompile.js";
 
 /**
  * The transforms Actio ships with. Order is derived from each pass's `runsAfter`
  * (see registry.ts), not this array, so the effective pipeline is:
- *   params → job_defaults → for_each → when_compile → fragments → retry → fallback → dynamic_matrix
+ *   params → job_defaults → for_each → when_compile → fragments → share → retry → fallback → dynamic_matrix → lifecycle
  */
 export const builtinPasses: Pass[] = [
   params,
@@ -29,9 +31,11 @@ export const builtinPasses: Pass[] = [
   forEach,
   whenCompile,
   fragments,
+  share,
   retry,
   fallback,
   dynamicMatrix,
+  lifecycle,
 ];
 
 /** Run a set of passes (defaults to the built-ins) in dependency order. */
@@ -70,9 +74,11 @@ export {
   fragments,
   JOB_DEFAULT_KEYS,
   JOB_DEFAULTS_SAFE_SUBSET,
-  jobDefaults,
   type JobDefaultKey,
+  jobDefaults,
+  lifecycle,
   params,
   retry,
+  share,
   whenCompile,
 };

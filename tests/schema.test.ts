@@ -77,6 +77,64 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
+  it("accepts share value-form, capture-form, and json on a step", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: VERSION=1.2.3
+        share:
+          version: $VERSION
+          tag:
+            value: $TAG
+            required: true
+            type: string
+          config:
+            run: cat config.json
+            json: true`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects an empty share mapping", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        share: {}`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("rejects unknown keys in a share output definition", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        share:
+          version:
+            value: $V
+            bogus: true`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("rejects an unknown share output type", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        share:
+          version:
+            value: $V
+            type: weird`);
+    expect(validate(doc)).toBe(false);
+  });
+
   it("accepts top-level typed params", () => {
     const doc = load(`on: [push]
 params:
@@ -301,5 +359,95 @@ jobs:
   it("starter still transpiles cleanly with the modeline present", () => {
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);
+  });
+
+  it("accepts a bare top-level finally block", () => {
+    const doc = load(`on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+finally:
+  teardown:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./cleanup.sh`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts finally outcome branches and when: sugar", () => {
+    const doc = load(`on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+finally:
+  on_failure:
+    rollback:
+      runs-on: ubuntu-latest
+      when: deploy.failed
+      steps:
+        - run: ./rollback.sh
+  on_abort: []`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects a non-mapping finally", () => {
+    const doc = load(`on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./a.sh
+finally: ./teardown.sh`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("accepts step-scoped ensure and on_failure hooks", () => {
+    const doc = load(`on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+        on_failure:
+          - run: ./rollback.sh
+        ensure:
+          - run: ./cleanup.sh`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts job-scoped ensure and outcome hooks", () => {
+    const doc = load(`on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    ensure:
+      - run: ./teardown.sh
+    on_success:
+      - run: ./notify.sh
+    steps:
+      - run: ./build.sh`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("exposes finally and lifecycle grammar in the extensions surface", () => {
+    const ext = JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL("../packages/core/schema/actio.extensions.json", import.meta.url)),
+        "utf8",
+      ),
+    ) as {
+      rootProperties: Record<string, unknown>;
+      patchDefinitions: { step: { properties: Record<string, unknown> } };
+      addDefinitions: Record<string, unknown>;
+    };
+    expect(ext.rootProperties).toHaveProperty("finally");
+    expect(ext.patchDefinitions.step.properties).toHaveProperty("ensure");
+    expect(ext.patchDefinitions.step.properties).toHaveProperty("on_failure");
+    expect(ext.addDefinitions).toHaveProperty("finallyBlock");
+    expect(ext.addDefinitions).toHaveProperty("lifecycleHook");
   });
 });

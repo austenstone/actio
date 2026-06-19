@@ -1,0 +1,12 @@
+name: CI
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker compose up -d
+      - run: ./run-tests.sh
+    ensure:
+      - run: docker compose logs > logs.txt
+      - run: docker compose down

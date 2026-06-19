@@ -10,6 +10,16 @@ const fixtureDirsByPassName: Record<string, string[]> = {
   dynamic_matrix: ["dynamic-matrix"],
   fallback: ["fallback-job", "fallback-notify", "fallback-recover"],
   fragments: ["fragments"],
+  lifecycle: [
+    "bare-finally",
+    "ensure-job",
+    "ensure-step",
+    "finally-auto-needs-all-real-jobs",
+    "finally-on-abort-empty",
+    "finally-on-abort-replace",
+    "finally-outcome-branches",
+    "finally-when-sugar",
+  ],
   params: ["params-scalar", "params-list", "params-step-list", "params-enum"],
   job_defaults: [
     "job-defaults-normal-merge",
@@ -20,6 +30,14 @@ const fixtureDirsByPassName: Record<string, string[]> = {
     "executors-compose",
   ],
   retry: ["retry-basic", "retry-delay", "retry-shorthand"],
+  share: [
+    "share-simple-single",
+    "share-same-job",
+    "share-multiline",
+    "share-json-fanout",
+    "share-required",
+    "share-escape",
+  ],
 };
 
 const hasGoldenPair = (fixtureDir: string): boolean =>

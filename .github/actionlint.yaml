@@ -1,0 +1,18 @@
+paths:
+  # The e2e driver references every fixture as a reusable workflow with
+  # `if: false` on purpose: GitHub still validates each `uses:` at run-graph
+  # build time (catching startup failures) while never spending runner minutes.
+  # actionlint's if-cond rule flags the literal `false`, so we silence only that
+  # message for this generated driver.
+  .github/workflows/e2e.yml:
+    ignore:
+      - 'constant expression "false" in condition\. remove the if: section'
+  # e2e-fixture-*.yml are machine-generated from tests/fixtures/* and are
+  # validated by GitHub itself when the e2e driver builds its run graph. They
+  # intentionally exercise edge-case emits (custom runner labels, partial action
+  # inputs on never-run steps) that actionlint's static rules reject, so we skip
+  # them here to avoid duplicating - and conflicting with - the harness's own
+  # GitHub-side validation. Regenerate with: npm run build:e2e-fixtures
+  .github/workflows/e2e-fixture-*.yml:
+    ignore:
+      - '.*'
