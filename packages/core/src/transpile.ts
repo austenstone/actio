@@ -39,6 +39,11 @@ export interface TranspileOptions {
    * targets. The resolver that computes this data lives in the CLI/build layer.
    */
   nativeDependencies?: NativeDependencies;
+  /**
+   * Global default mode for the injection-hoist security pass. Per-block
+   * `injectionHoist:` knobs (root/job/step) override this. Default "fix".
+   */
+  injectionHoist?: "fix" | "warn" | "error" | "off";
 }
 
 export interface TranspileResult {
@@ -90,6 +95,9 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
     const registry = createRegistry(options.passes ?? []);
     if (enableAnnotate) registry.register(annotate);
     passes = registry.list();
+  }
+  if (options.injectionHoist !== undefined) {
+    ctx.internal.injectionHoist = options.injectionHoist;
   }
   runPasses(ctx, passes);
   resolveCompileTimeTextBoundaries(ctx, ctx.data, []);

@@ -1,0 +1,103 @@
+---
+title: injectionHoist
+description: Auto-defuse script injection by hoisting untrusted ${{ }} out of run: blocks.
+---
+
+Untrusted `${{ }}` interpolation inside a `run:` body is a classic
+[script-injection](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#understanding-the-risk-of-script-injections)
+sink: an attacker-controlled value (a PR title, a branch name) is spliced into
+your shell command and evaluated. `injectionHoist` defuses it automatically.
+
+It is **on by default**. Untrusted interpolation is lifted into a step `env:`
+var and the body is rewritten to reference the shell variable instead, so the
+value can never be parsed as shell.
+
+```yaml title=".actio.yml"
+steps:
+  - name: Greet PR author
+    run: echo Hello ${{ github.event.pull_request.title }}
+```
+
+```yaml title="generated .yml"
+steps:
+  - name: Greet PR author
+    env:
+      PR_TITLE: ${{ github.event.pull_request.title }}
+    run: echo Hello "$PR_TITLE"
+```
+
+The expansion now happens in the `env` block (never word-split or re-evaluated),
+and the shell only ever sees a quoted variable reference.
+
+## What is untrusted
+
+Hoisted: `github.event.*` (PR title/body/author and friends), `github.head_ref`,
+`github.ref_name`, and `github.ref`. `head_ref`/`ref_name` hoist
+**unconditionally**.
+
+Left inline (trusted): `secrets.*`, `github.sha`, `github.run_id`,
+`github.actor`, `matrix.*`, `runner.*`, `vars.*`, `env.*`, `inputs.*`,
+`steps.*`, `needs.*`, and the structural/id leaves of an event payload
+(`...id`, `...number`, `...sha`, ...).
+
+Only `run:` bodies are rewritten. `if:`, `name:`, `with:`, `env:`,
+`concurrency:`, and `uses:` are never touched.
+
+## Modes
+
+Set `injectionHoist:` at the step, job, or root level (closest scope wins;
+default `fix`):
+
+| Mode    | Behavior                                              |
+| ------- | ----------------------------------------------------- |
+| `fix`   | Hoist + rewrite (default).                             |
+| `warn`  | Emit env + a diagnostic, leave the body unchanged.    |
+| `error` | Fail the build on any untrusted interpolation.        |
+| `off`   | Do nothing.                                            |
+
+```yaml title=".actio.yml"
+injectionHoist: error          # global default
+jobs:
+  build:
+    injectionHoist: warn       # per-job override
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build.sh ${{ github.head_ref }}
+        injectionHoist: fix    # per-step override
+```
+
+The global default can also be set in [`actio.config`](/docs/configuration) or
+passed as a transpile option.
+
+## Opt-outs and overrides
+
+Bare step keys, stripped from the generated workflow:
+
+- `unsafe: true` — skip this step entirely (you accept the risk).
+- `trust: [path...]` — leave these paths inline even though they look untrusted.
+- `force: [path...]` — hoist these paths even though they are trusted.
+
+```yaml title=".actio.yml"
+steps:
+  - run: echo ${{ github.event.pull_request.title }}
+    unsafe: true                       # opt this step out
+  - run: ./pin.sh ${{ github.sha }}
+    force: [github.sha]                # hoist a trusted value anyway
+```
+
+## Shells
+
+Quoting is shell-aware (generated refs are always double-quoted):
+
+- `bash` / `sh` → `"$VAR"` (bare `$VAR` when already inside `"..."`).
+- `pwsh` / `powershell` → `"$env:VAR"`.
+- `python` → **warn-only**: the `env:` entry is emitted but the body is left
+  unchanged (there is no safe in-place rewrite), so you read `os.environ["VAR"]`
+  yourself.
+
+## Heredocs
+
+An unquoted heredoc (`<<EOF`) still expands interpolation, so it is hoisted
+normally. A quoted heredoc (`<<'EOF'`) suppresses expansion and cannot be safely
+rewritten, so an untrusted value inside one is an **error** — quote the value or
+restructure the step.

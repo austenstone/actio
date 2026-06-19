@@ -34,6 +34,12 @@ export interface ActioConfig {
    * - `github-actions-native-dependencies-preview`: emits a native `dependencies:` block.
    */
   target?: ActioTarget;
+  /**
+   * Global default mode for the injection-hoist security pass that defuses
+   * `${{ }}` script-injection in `run:` blocks. Per-block `injectionHoist:`
+   * knobs override this. Default "fix".
+   */
+  injectionHoist?: "fix" | "warn" | "error" | "off";
 }
 
 /** Identity helper that gives `actio.config.ts` authors full type-checking and inference. */
