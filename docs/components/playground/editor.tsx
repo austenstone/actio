@@ -2,9 +2,19 @@
 
 import { yaml } from '@codemirror/lang-yaml';
 import CodeMirror, { EditorView, type Extension } from '@uiw/react-codemirror';
-import { useEffect, useState } from 'react';
+import { yamlSchema } from '@valtown/codemirror-json-schema/yaml';
+// biome-ignore lint/style/useImportType: JSON value imported at runtime, not a type.
+import actioSchema from 'actio-core/schema/actio.schema.json';
+import { useEffect, useMemo, useState } from 'react';
 
-const yamlExtension: Extension[] = [yaml(), EditorView.lineWrapping];
+/** Read-only panes (generated output) get highlighting only. */
+const plainExtensions: Extension[] = [yaml(), EditorView.lineWrapping];
+
+/** Editable source pane gets schema-driven completion, hover, and linting. */
+const schemaExtensions: Extension[] = [
+  ...yamlSchema(actioSchema as Parameters<typeof yamlSchema>[0]),
+  EditorView.lineWrapping,
+];
 
 /** Track the site's dark/light mode via the `dark` class fumadocs toggles on <html>. */
 function useIsDark(): boolean {
@@ -29,6 +39,10 @@ interface EditorProps {
 
 export function Editor({ value, onChange, readOnly, ariaLabel }: EditorProps) {
   const isDark = useIsDark();
+  const extensions = useMemo(
+    () => (readOnly ? plainExtensions : schemaExtensions),
+    [readOnly],
+  );
   return (
     <CodeMirror
       value={value}
@@ -36,7 +50,7 @@ export function Editor({ value, onChange, readOnly, ariaLabel }: EditorProps) {
       readOnly={readOnly}
       editable={!readOnly}
       theme={isDark ? 'dark' : 'light'}
-      extensions={yamlExtension}
+      extensions={extensions}
       height="100%"
       style={{ height: '100%', fontSize: 13 }}
       aria-label={ariaLabel}
