@@ -30,6 +30,12 @@ html > body[data-scroll-locked] {
   height: 100%;
 }
 
+/* In tab mode the tab label already names the file, so hide the code block's
+   own title bar (file icon + filename + copy) to avoid the duplicate caption. */
+.code-compare-tabs figure div:has(> figcaption) {
+  display: none;
+}
+
 @container (min-width: 48rem) {
   .code-compare-grid {
     display: grid;
