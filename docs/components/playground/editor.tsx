@@ -102,6 +102,10 @@ export function Editor({ value, onChange, readOnly, ariaLabel }: EditorProps) {
       padding: { top: 8, bottom: 8 },
       renderLineHighlight: readOnly ? 'none' : 'line',
       scrollbar: { alwaysConsumeMouseWheel: false },
+      // Render hover/suggest/context widgets in a fixed-position layer so they
+      // escape the editor panel's rounded `overflow:hidden` clip instead of
+      // getting cut off at its edges.
+      fixedOverflowWidgets: true,
       // Surface completions as you type, including inside string values.
       quickSuggestions: { other: true, comments: false, strings: true },
       suggestOnTriggerCharacters: true,
