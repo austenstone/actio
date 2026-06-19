@@ -8,51 +8,60 @@ request or push match a glob pattern. Actio synthesizes **one** shared
 [`dorny/paths-filter`](https://github.com/dorny/paths-filter) setup job, computes
 every flag once, and folds the guard into each node's `if:`.
 
-```yaml title=".actio.yml"
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build docs
-        run: ./build-docs.sh
-        if_changed:
-          - "docs/**"
-          - "*.md"
-      - name: Always run
-        run: ./test.sh
-```
-
 Compiles to a shared setup job plus an `if:` guard and `needs:` on the consuming
 job:
 
-```yaml title="generated .yml"
-jobs:
-  actio_changes:
-    runs-on: ubuntu-latest
-    outputs:
-      filter_1: ${{ steps.actio_filter.outputs.filter_1 }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: actio_filter
-        with:
-          filters: |-
-            filter_1:
-              - 'docs/**'
-              - '*.md'
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build docs
-        run: ./build-docs.sh
-        if: needs.actio_changes.outputs.filter_1 == 'true'
-      - name: Always run
-        run: ./test.sh
-    needs:
-      - actio_changes
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
+
+  ```yaml
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Build docs
+          run: ./build-docs.sh
+          if_changed:
+            - "docs/**"
+            - "*.md"
+        - name: Always run
+          run: ./test.sh
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    actio_changes:
+      runs-on: ubuntu-latest
+      outputs:
+        filter_1: ${{ steps.actio_filter.outputs.filter_1 }}
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dorny/paths-filter@v3
+          id: actio_filter
+          with:
+            filters: |-
+              filter_1:
+                - 'docs/**'
+                - '*.md'
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Build docs
+          run: ./build-docs.sh
+          if: needs.actio_changes.outputs.filter_1 == 'true'
+        - name: Always run
+          run: ./test.sh
+      needs:
+        - actio_changes
+  ```
+
+  </Tab>
+</Tabs>
 
 ## Value
 
@@ -110,21 +119,30 @@ paths-filter once.
 An existing `if:` is preserved and AND-combined with the change guard, so both
 conditions must hold:
 
-```yaml title=".actio.yml"
-jobs:
-  smoke:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    if_changed: "services/api/**"
-    steps:
-      - run: ./smoke.sh
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
 
-```yaml title="generated .yml"
-  smoke:
-    runs-on: ubuntu-latest
-    if: needs.actio_changes.outputs.filter_1 == 'true' && github.ref == 'refs/heads/main'
-```
+  ```yaml
+  jobs:
+    smoke:
+      runs-on: ubuntu-latest
+      if: github.ref == 'refs/heads/main'
+      if_changed: "services/api/**"
+      steps:
+        - run: ./smoke.sh
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+    smoke:
+      runs-on: ubuntu-latest
+      if: needs.actio_changes.outputs.filter_1 == 'true' && github.ref == 'refs/heads/main'
+  ```
+
+  </Tab>
+</Tabs>
 
 ## Diff base
 

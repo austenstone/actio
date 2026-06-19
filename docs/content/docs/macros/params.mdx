@@ -6,33 +6,42 @@ description: Typed compile-time inputs interpolated with double-brace tokens.
 Define compile-time parameters once, then interpolate them with `{{ params.x }}`
 for scalars or `{{ toJSON(params.x) }}` for objects/lists.
 
-```yaml title=".actio.yml"
-name: Deploy
-on: [push]
-params:
-  env:
-    type: enum
-    values: [dev, staging, prod]
-    default: staging
-  retries:
-    type: number
-    default: 3
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "env={{ params.env }} retries={{ params.retries }}"
-```
-
 `params` is stripped and literals are fully resolved:
 
-```yaml title="generated .yml"
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "env=staging retries=3"
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
+
+  ```yaml
+  name: Deploy
+  on: [push]
+  params:
+    env:
+      type: enum
+      values: [dev, staging, prod]
+      default: staging
+    retries:
+      type: number
+      default: 3
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo "env={{ params.env }} retries={{ params.retries }}"
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo "env=staging retries=3"
+  ```
+
+  </Tab>
+</Tabs>
 
 ## Token rules
 

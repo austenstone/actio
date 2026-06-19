@@ -7,46 +7,55 @@ Define default job-level settings once at the top level; Actio merges them into
 every job at compile time and strips both `job_defaults` and `executors` from the
 output — zero residual directives.
 
-```yaml title=".actio.yml"
-name: CI
-on: [push]
-job_defaults:
-  runs-on: ubuntu-latest
-  timeout-minutes: 30
-  env:
-    CI: "true"
-jobs:
-  test:
-    steps:
-      - run: npm test
-  lint:
-    env:
-      DEBUG: "1"
-    steps:
-      - run: npm run lint
-```
-
 Both jobs inherit `runs-on` and `timeout-minutes`; `env` is deep-merged so `lint`
 ends up with both `CI` and `DEBUG`:
 
-```yaml title="generated .yml"
-jobs:
-  test:
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
+
+  ```yaml
+  name: CI
+  on: [push]
+  job_defaults:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       CI: "true"
-    steps:
-      - run: npm test
-  lint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      CI: "true"
-      DEBUG: "1"
-    steps:
-      - run: npm run lint
-```
+  jobs:
+    test:
+      steps:
+        - run: npm test
+    lint:
+      env:
+        DEBUG: "1"
+      steps:
+        - run: npm run lint
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+      timeout-minutes: 30
+      env:
+        CI: "true"
+      steps:
+        - run: npm test
+    lint:
+      runs-on: ubuntu-latest
+      timeout-minutes: 30
+      env:
+        CI: "true"
+        DEBUG: "1"
+      steps:
+        - run: npm run lint
+  ```
+
+  </Tab>
+</Tabs>
 
 ## Merge semantics
 
@@ -57,33 +66,42 @@ jobs:
 | `runs-on`, `timeout-minutes`, `continue-on-error`, `environment` | **Inline wins** — job value takes precedence. |
 | `env`, `container`, `services`, `defaults` | **Deep-merged** — job keys overlay the default. |
 
-```yaml title=".actio.yml"
-name: CI
-on: [push]
-job_defaults:
-  if: ${{ github.ref == 'refs/heads/main' }}
-  env:
-    REGION: us-east-1
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    if: ${{ success() }}
-    env:
-      REGION: eu-west-1
-    steps:
-      - run: ./deploy.sh
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
 
-```yaml title="generated .yml"
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && success()
+  ```yaml
+  name: CI
+  on: [push]
+  job_defaults:
+    if: ${{ github.ref == 'refs/heads/main' }}
     env:
-      REGION: eu-west-1
-    steps:
-      - run: ./deploy.sh
-```
+      REGION: us-east-1
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      if: ${{ success() }}
+      env:
+        REGION: eu-west-1
+      steps:
+        - run: ./deploy.sh
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      if: github.ref == 'refs/heads/main' && success()
+      env:
+        REGION: eu-west-1
+      steps:
+        - run: ./deploy.sh
+  ```
+
+  </Tab>
+</Tabs>
 
 <Callout title="Reusable-workflow call jobs">
   Jobs with `uses:` only receive the call-compatible subset of defaults: `if`,
@@ -97,32 +115,41 @@ jobs:
 Named runner presets — a companion to `job_defaults` for extracting repeated
 runner configuration into a reusable template.
 
-```yaml title=".actio.yml"
-name: CI
-on: [push]
-executors:
-  hardened:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      HARDENED: "true"
-jobs:
-  test:
-    executor: hardened
-    steps:
-      - run: npm test
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
 
-```yaml title="generated .yml"
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      HARDENED: "true"
-    steps:
-      - run: npm test
-```
+  ```yaml
+  name: CI
+  on: [push]
+  executors:
+    hardened:
+      runs-on: ubuntu-latest
+      timeout-minutes: 20
+      env:
+        HARDENED: "true"
+  jobs:
+    test:
+      executor: hardened
+      steps:
+        - run: npm test
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+      timeout-minutes: 20
+      env:
+        HARDENED: "true"
+      steps:
+        - run: npm test
+  ```
+
+  </Tab>
+</Tabs>
 
 Compose multiple executors by passing a list — they are merged left-to-right,
 with later entries overriding earlier ones for scalar keys:

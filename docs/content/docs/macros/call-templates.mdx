@@ -14,55 +14,64 @@ only the deltas. Actio merges the template at compile time and strips both
 `call_templates` and `extends` from the output — the generated YAML is byte-identical
 to the hand-written call jobs.
 
-```yaml title=".actio.yml"
-name: Build and test
-on: [push]
-call_templates:
-  test:
-    uses: ./.github/workflows/test_reusable.yml
-    needs: build
-    with:
-      testTimingsArtifact: test-timings
-    secrets: inherit
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo build
-  test-unit:
-    extends: test
-    with:
-      afterBuild: pnpm test:unit
-  test-integration:
-    extends: test
-    with:
-      afterBuild: pnpm test:integration
-```
-
 Each job inherits `uses`, `needs`, `secrets`, and the shared `with` keys; only the
 per-job `afterBuild` differs:
 
-```yaml title="generated .yml"
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo build
-  test-unit:
-    uses: ./.github/workflows/test_reusable.yml
-    needs: build
-    with:
-      testTimingsArtifact: test-timings
-      afterBuild: pnpm test:unit
-    secrets: inherit
-  test-integration:
-    uses: ./.github/workflows/test_reusable.yml
-    needs: build
-    with:
-      testTimingsArtifact: test-timings
-      afterBuild: pnpm test:integration
-    secrets: inherit
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
+
+  ```yaml
+  name: Build and test
+  on: [push]
+  call_templates:
+    test:
+      uses: ./.github/workflows/test_reusable.yml
+      needs: build
+      with:
+        testTimingsArtifact: test-timings
+      secrets: inherit
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo build
+    test-unit:
+      extends: test
+      with:
+        afterBuild: pnpm test:unit
+    test-integration:
+      extends: test
+      with:
+        afterBuild: pnpm test:integration
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo build
+    test-unit:
+      uses: ./.github/workflows/test_reusable.yml
+      needs: build
+      with:
+        testTimingsArtifact: test-timings
+        afterBuild: pnpm test:unit
+      secrets: inherit
+    test-integration:
+      uses: ./.github/workflows/test_reusable.yml
+      needs: build
+      with:
+        testTimingsArtifact: test-timings
+        afterBuild: pnpm test:integration
+      secrets: inherit
+  ```
+
+  </Tab>
+</Tabs>
 
 ## Merge semantics
 
@@ -86,54 +95,63 @@ stays its sole owner, and set `permissions`/`concurrency` per job or via
 `extends:` accepts a single name or a list. Templates are merged left-to-right
 (later wins), and an inline value on the job always wins over all of them:
 
-```yaml title=".actio.yml"
-call_templates:
-  base:
-    uses: ./.github/workflows/reuse.yml
-    needs: build
-    with:
-      shared: base-shared
-      kept: base-kept
-    secrets:
-      TOKEN: ${{ secrets.BASE }}
-    if: ${{ github.event_name == 'push' }}
-  extra:
-    needs: lint
-    with:
-      shared: extra-shared
-    secrets:
-      EXTRA: ${{ secrets.EXTRA }}
-jobs:
-  composed:
-    extends: [base, extra]
-    needs: deploy
-    with:
-      shared: inline-shared
-      added: inline-added
-    if: ${{ success() }}
-```
-
 `needs` unions across both templates and the job; `with.shared` resolves to the
 inline value while `kept` and `added` survive; the two `secrets` maps merge; and
 both `if` gates combine:
 
-```yaml title="generated .yml"
-jobs:
-  composed:
-    uses: ./.github/workflows/reuse.yml
-    needs:
-      - build
-      - lint
-      - deploy
-    with:
-      shared: inline-shared
-      kept: base-kept
-      added: inline-added
-    secrets:
-      TOKEN: ${{ secrets.BASE }}
-      EXTRA: ${{ secrets.EXTRA }}
-    if: github.event_name == 'push' && success()
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
+
+  ```yaml
+  call_templates:
+    base:
+      uses: ./.github/workflows/reuse.yml
+      needs: build
+      with:
+        shared: base-shared
+        kept: base-kept
+      secrets:
+        TOKEN: ${{ secrets.BASE }}
+      if: ${{ github.event_name == 'push' }}
+    extra:
+      needs: lint
+      with:
+        shared: extra-shared
+      secrets:
+        EXTRA: ${{ secrets.EXTRA }}
+  jobs:
+    composed:
+      extends: [base, extra]
+      needs: deploy
+      with:
+        shared: inline-shared
+        added: inline-added
+      if: ${{ success() }}
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    composed:
+      uses: ./.github/workflows/reuse.yml
+      needs:
+        - build
+        - lint
+        - deploy
+      with:
+        shared: inline-shared
+        kept: base-kept
+        added: inline-added
+      secrets:
+        TOKEN: ${{ secrets.BASE }}
+        EXTRA: ${{ secrets.EXTRA }}
+      if: github.event_name == 'push' && success()
+  ```
+
+  </Tab>
+</Tabs>
 
 ## Precedence with job_defaults
 

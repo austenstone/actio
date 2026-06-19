@@ -5,55 +5,64 @@ description: Retry flaky steps with automatic backoff.
 
 Retry flaky steps with automatic backoff. Works with both `run:` and `uses:` steps.
 
-```yaml title=".actio.yml"
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy to production
-        uses: cloudflare/wrangler-action@v3
-        retry:
-          attempts: 3
-          delay: 10s
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-```
-
 Fans out into conditional attempts, each gated on prior failure:
 
-```yaml title="generated .yml"
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy to production (attempt 1/3)
-        uses: cloudflare/wrangler-action@v3
-        id: step_deploy_to_production_attempt_1
-        continue-on-error: true
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-      - name: Retry backoff (10s) before attempt 2/3
-        run: sleep 10
-        if: steps.step_deploy_to_production_attempt_1.outcome == 'failure'
-      - name: Deploy to production (attempt 2/3)
-        uses: cloudflare/wrangler-action@v3
-        id: step_deploy_to_production_attempt_2
-        if: steps.step_deploy_to_production_attempt_1.outcome == 'failure'
-        continue-on-error: true
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-      - name: Retry backoff (10s) before attempt 3/3
-        run: sleep 10
-        if: steps.step_deploy_to_production_attempt_2.outcome == 'failure'
-      - name: Deploy to production (attempt 3/3)
-        uses: cloudflare/wrangler-action@v3
-        id: step_deploy_to_production_attempt_3
-        if: steps.step_deploy_to_production_attempt_2.outcome == 'failure'
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-```
+<Tabs items={['.actio.yml', 'generated .yml']}>
+  <Tab value=".actio.yml">
+
+  ```yaml
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Deploy to production
+          uses: cloudflare/wrangler-action@v3
+          retry:
+            attempts: 3
+            delay: 10s
+          with:
+            apiToken: ${{ secrets.CF_API_TOKEN }}
+  ```
+
+  </Tab>
+  <Tab value="generated .yml">
+
+  ```yaml
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Deploy to production (attempt 1/3)
+          uses: cloudflare/wrangler-action@v3
+          id: step_deploy_to_production_attempt_1
+          continue-on-error: true
+          with:
+            apiToken: ${{ secrets.CF_API_TOKEN }}
+        - name: Retry backoff (10s) before attempt 2/3
+          run: sleep 10
+          if: steps.step_deploy_to_production_attempt_1.outcome == 'failure'
+        - name: Deploy to production (attempt 2/3)
+          uses: cloudflare/wrangler-action@v3
+          id: step_deploy_to_production_attempt_2
+          if: steps.step_deploy_to_production_attempt_1.outcome == 'failure'
+          continue-on-error: true
+          with:
+            apiToken: ${{ secrets.CF_API_TOKEN }}
+        - name: Retry backoff (10s) before attempt 3/3
+          run: sleep 10
+          if: steps.step_deploy_to_production_attempt_2.outcome == 'failure'
+        - name: Deploy to production (attempt 3/3)
+          uses: cloudflare/wrangler-action@v3
+          id: step_deploy_to_production_attempt_3
+          if: steps.step_deploy_to_production_attempt_2.outcome == 'failure'
+          with:
+            apiToken: ${{ secrets.CF_API_TOKEN }}
+  ```
+
+  </Tab>
+</Tabs>
 
 ## How it works
 
