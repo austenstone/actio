@@ -48,6 +48,57 @@ jobs:
       - run: ./run-shard.sh ${{ matrix.shard }}
 ```
 
+## Example: one job per open PR
+
+The pattern dynamic matrices exist for — the list literally doesn't exist until the
+run starts. Query the GitHub API for open PRs, then fan out **one runner per PR** that
+checks out that PR's code:
+
+```yaml title=".actio.yml"
+name: Per-PR checks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *" # hourly sweep of open PRs
+
+jobs:
+  check-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    dynamic_matrix:
+      mode: include
+      script: |
+        gh pr list --state open \
+          --json number,headRefName,headRefOid \
+          | jq -c '{include: map({pr: .number, branch: .headRefName, sha: .headRefOid})}'
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: gh pr checkout ${{ matrix.pr }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: |
+          echo "Checking PR #${{ matrix.pr }} (${{ matrix.branch }}) @ ${{ matrix.sha }}"
+          npm ci
+          npm test
+```
+
+[`include` mode](#heterogeneous-fan-out-include-mode) lets each entry carry the
+`pr`/`branch`/`sha` together, readable as `${{ matrix.pr }}` etc. The job-level
+`permissions` and `env` are carried onto the generated setup job, so `gh pr list` is
+authorized there too. Using `gh pr checkout` (rather than a bare `ref:`) means it also
+works for **fork PRs**, whose commits a plain checkout can't reach.
+
+Three things Actio handles that you'd otherwise hand-write: the setup job's
+`GITHUB_OUTPUT` heredoc plumbing, the `fail-fast: false` default so one bad PR doesn't
+cancel the rest, and the **empty-matrix guard** — with zero open PRs the matrix is
+`[]`, which GitHub would otherwise error on; the generated `if:` skips the job cleanly
+instead.
+
 ## Options
 
 `script` (required), `alias` (wrap a scalar array under `matrix.<alias>`; omit for
