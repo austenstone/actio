@@ -1,5 +1,5 @@
-import { deriveNode, visitJobs } from "../ir.js";
-import type { ParseContext, Path } from "../parser.js";
+import { deriveNode, originOf, setOrigin, visitJobs } from "../ir.js";
+import { type ParseContext, type Path, rangeOfPath } from "../parser.js";
 import { collectExpressionRoots, RUNTIME_CONTEXT_ROOT_SET } from "../symbols.js";
 import { isObject, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";
@@ -85,7 +85,13 @@ const isStepPath = (path: Path): boolean =>
   typeof path[3] === "number";
 
 const hintForRuntimeContext =
-  "static-if only supports compile-time roots (params.*, for-each.*, define.*). Use if: for runtime contexts.";
+  "static-if only supports compile-time values such as params.*, active for-each bindings, or symbols added by custom passes. Use if: for runtime contexts.";
+
+const hasOddBackslashRun = (value: string, index: number): boolean => {
+  let count = 0;
+  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor--) count++;
+  return count % 2 === 1;
+};
 
 class Tokenizer {
   readonly source: string;
@@ -166,7 +172,7 @@ class Tokenizer {
           this.#index += 2;
           continue;
         }
-        if (quote === '"' && this.source[this.#index - 1] === "\\") {
+        if (quote === '"' && hasOddBackslashRun(this.source, this.#index)) {
           value = `${value.slice(0, -1)}${quote}`;
           this.#index++;
           continue;
@@ -750,6 +756,21 @@ const OMIT = Symbol("actio.static-if.omit");
 
 type TransformedValue = unknown | typeof OMIT;
 
+const deriveMergedNode = (
+  ctx: ParseContext,
+  fallbackFrom: object,
+  node: object,
+  sourcePath: Path,
+): void => {
+  if (originOf(ctx, node)) return;
+  const range = rangeOfPath(ctx, sourcePath);
+  if (range) {
+    setOrigin(ctx, node, { path: sourcePath, range });
+    return;
+  }
+  deriveNode(ctx, fallbackFrom, node);
+};
+
 const transformNode = (ctx: ParseContext, value: unknown, path: Path): TransformedValue => {
   if (Array.isArray(value)) {
     const next: unknown[] = [];
@@ -806,7 +827,8 @@ const transformNode = (ctx: ParseContext, value: unknown, path: Path): Transform
     }
 
     for (const [mergeKey, mergeChild] of Object.entries(mergeValue)) {
-      const transformed = transformNode(ctx, mergeChild, [...path, key, mergeKey]);
+      const mergePath = [...path, key, mergeKey];
+      const transformed = transformNode(ctx, mergeChild, mergePath);
       if (transformed === OMIT) continue;
       if (Object.hasOwn(value, mergeKey)) {
         pushDiagnostic(
@@ -821,7 +843,7 @@ const transformNode = (ctx: ParseContext, value: unknown, path: Path): Transform
       }
       value[mergeKey] = transformed;
       if (isObject(transformed) || Array.isArray(transformed)) {
-        deriveNode(ctx, value, transformed as object);
+        deriveMergedNode(ctx, value, transformed as object, mergePath);
       }
     }
   }

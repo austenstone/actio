@@ -63,10 +63,10 @@
           "markdownDescription": "**Actio macro**: splice a fragment here.\n\nReplaced inline by `actio build` with the steps of the named fragment from top-level `fragments:`.\n\n```yaml\nsteps:\n  - inject: setup\n  - run: npm test\n```"
         },
         "static-if": {
-          "type": "string",
+          "type": ["string", "boolean"],
           "title": "static-if (Actio macro)",
           "description": "Actio macro. Compile-time structural condition. If false, this entire step map is omitted from emitted workflow YAML.",
-          "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for-each.*`, `define.*`). If the expression is false the entire step is removed from the generated workflow; if true the `static-if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\nsteps:\n  - name: Publish preview\n    static-if: params.deploy\n    run: ./publish.sh\n```"
+          "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time values (`params.*`, active `for-each` bindings like `<var>`/`for-each.<var>`/`key`/`index`, or custom compile-time symbols). If the expression is false the entire step is removed from the generated workflow; if true the `static-if` key is stripped and the rest is emitted verbatim. Boolean literals are accepted for passes that pre-resolve the condition. Use `if:` for runtime conditions.\n\n```yaml\nsteps:\n  - name: Publish preview\n    static-if: params.deploy\n    run: ./publish.sh\n```"
         },
         "retry": { "$ref": "#/definitions/retry" },
         "fallback": { "$ref": "#/definitions/fallback" },
@@ -137,10 +137,10 @@
       "anyOf": [{ "required": ["runs-on"] }, { "required": ["executor"] }],
       "properties": {
         "static-if": {
-          "type": "string",
+          "type": ["string", "boolean"],
           "title": "static-if (Actio macro)",
           "description": "Actio macro. Compile-time structural condition. If false, this entire job map is omitted from emitted workflow YAML.",
-          "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time roots (`params.*`, `for-each.*`, `define.*`). If the expression is false the entire job is removed from the generated workflow; if true the `static-if` key is stripped and the rest is emitted verbatim. Use `if:` for runtime conditions.\n\n```yaml\njobs:\n  release:\n    static-if: params.deploy\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./release.sh\n```"
+          "markdownDescription": "**Actio macro**: compile-time structural condition.\n\nEvaluated at transpile time against compile-time values (`params.*`, active `for-each` bindings like `<var>`/`for-each.<var>`/`key`/`index`, or custom compile-time symbols). If the expression is false the entire job is removed from the generated workflow; if true the `static-if` key is stripped and the rest is emitted verbatim. Boolean literals are accepted for passes that pre-resolve the condition. Use `if:` for runtime conditions.\n\n```yaml\njobs:\n  release:\n    static-if: params.deploy\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./release.sh\n```"
         },
         "dynamic-matrix": { "$ref": "#/definitions/dynamicMatrix" },
         "for-each": { "$ref": "#/definitions/forEach" },

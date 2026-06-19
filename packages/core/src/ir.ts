@@ -141,6 +141,8 @@ function reapplyKeyOrder(src: unknown, dst: unknown): void {
 
 /** Make a freshly built `node` map back to `from`'s source (synthetic nodes). */
 export function deriveNode<T extends object>(ctx: ParseContext, from: object, node: T): T {
+  const existing = ctx.origins.get(node);
+  if (existing) return node;
   const origin = ctx.origins.get(from);
   if (origin) ctx.origins.set(node, origin);
   return node;

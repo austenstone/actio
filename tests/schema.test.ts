@@ -213,6 +213,19 @@ jobs:
     expect(validate(doc)).toBe(true);
   });
 
+  it("accepts boolean static-if directives on jobs and steps", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    static-if: true
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        static-if: false
+`);
+    expect(validate(doc)).toBe(true);
+  });
+
   it("rejects enum params without values", () => {
     const doc = load(`on: [push]
 params:
