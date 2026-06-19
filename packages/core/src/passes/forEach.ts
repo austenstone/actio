@@ -4,6 +4,7 @@ import type { SymbolDef } from "../symbols.js";
 import { asArray, isObject, pushDiagnostic, slugify } from "./helpers.js";
 import { resolveCompileTimeExpressionValue, resolveCompileTimeTextBoundaries } from "./params.js";
 import type { Pass } from "./registry.js";
+import { freezeLoopStaticIf } from "./whenCompile.js";
 
 type Scalar = string | number | boolean | null;
 type ForEachMode = "serial-step" | "serial-jobs" | "parallel-matrix" | "parallel-variant-jobs";
@@ -561,24 +562,29 @@ const expandLoopInSteps = (
     for (const binding of bindings) {
       const symbols = bindingSymbols(varName, binding);
       const rendered = withScopedSymbols(ctx, symbols, () => {
+        let bodyOut: Step[] | undefined;
         if (source.kind === "static-step-list") {
           const placeholder = expandStepPlaceholder(
             rawBody,
             varName,
             source.values[binding.index] ?? {},
           );
-          if (placeholder.length > 0) return placeholder;
+          if (placeholder.length > 0) bodyOut = placeholder;
         }
-        const body = structuredClone(rawBody);
-        applyCompileSubstitution(ctx, body, [...path, index, "steps"]);
-        const bodySteps = asArray(body).filter(isStepRecord) as Step[];
-        return expandLoopInSteps(
-          ctx,
-          jobId,
-          bodySteps,
-          [...path, index, "steps"],
-          [...scopeVars, varName],
-        );
+        if (bodyOut === undefined) {
+          const body = structuredClone(rawBody);
+          applyCompileSubstitution(ctx, body, [...path, index, "steps"]);
+          const bodySteps = asArray(body).filter(isStepRecord) as Step[];
+          bodyOut = expandLoopInSteps(
+            ctx,
+            jobId,
+            bodySteps,
+            [...path, index, "steps"],
+            [...scopeVars, varName],
+          );
+        }
+        freezeLoopStaticIf(ctx, bodyOut, [...path, index, "steps"], varName);
+        return bodyOut;
       });
       out.push(...rendered);
     }
@@ -688,16 +694,17 @@ const buildSerialSiblingJobs = (
     const symbols = bindingSymbols(loopVar, binding);
     withScopedSymbols(ctx, symbols, () => {
       applyCompileSubstitution(ctx, sibling, ["jobs", jobId]);
+      if (Array.isArray(sibling.steps)) {
+        sibling.steps = expandLoopInSteps(
+          ctx,
+          siblingId,
+          sibling.steps,
+          ["jobs", siblingId, "steps"],
+          [loopVar],
+        );
+      }
+      freezeLoopStaticIf(ctx, sibling, ["jobs", siblingId], loopVar);
     });
-    if (Array.isArray(sibling.steps)) {
-      sibling.steps = expandLoopInSteps(
-        ctx,
-        siblingId,
-        sibling.steps,
-        ["jobs", siblingId, "steps"],
-        [loopVar],
-      );
-    }
     jobs[siblingId] = sibling;
     previousId = siblingId;
   }
