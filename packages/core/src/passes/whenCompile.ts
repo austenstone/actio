@@ -1,6 +1,7 @@
 import { deriveNode, originOf, setOrigin, visitJobs } from "../ir.js";
 import { type ParseContext, type Path, rangeOfPath } from "../parser.js";
 import { collectExpressionRoots, RUNTIME_CONTEXT_ROOT_SET } from "../symbols.js";
+import { hasOddBackslashRun } from "../text.js";
 import { isObject, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";
 
@@ -86,12 +87,6 @@ const isStepPath = (path: Path): boolean =>
 
 const hintForRuntimeContext =
   "static-if only supports compile-time values such as params.*, active for-each bindings, or symbols added by custom passes. Use if: for runtime contexts.";
-
-const hasOddBackslashRun = (value: string, index: number): boolean => {
-  let count = 0;
-  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor--) count++;
-  return count % 2 === 1;
-};
 
 class Tokenizer {
   readonly source: string;

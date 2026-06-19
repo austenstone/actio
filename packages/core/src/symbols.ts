@@ -1,3 +1,5 @@
+import { hasOddBackslashRun } from "./text.js";
+
 export type SymbolKind = "param-scalar" | "param-list" | "param-stepList" | "shared-output";
 
 export type ParamType = "string" | "number" | "boolean" | "enum" | "object" | "stepList" | "steps";
@@ -53,12 +55,6 @@ export function conservativeTaint(): TaintFacet {
 const isIdentifierStart = (char: string): boolean => /[A-Za-z_]/.test(char);
 
 const isIdentifierPart = (char: string): boolean => /[A-Za-z0-9_]/.test(char);
-
-const hasOddBackslashRun = (value: string, index: number): boolean => {
-  let count = 0;
-  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor--) count++;
-  return count % 2 === 1;
-};
 
 export function collectExpressionRoots(
   expression: string,
