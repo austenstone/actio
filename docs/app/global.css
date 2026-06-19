@@ -48,3 +48,19 @@ html > body[data-scroll-locked] {
     display: none;
   }
 }
+
+/* Actio macro keywords get a distinct accent so they stand out from standard
+   GitHub Actions YAML keys. Shiki emits inline `color` on token spans, so the
+   override needs `!important` to win. */
+:root {
+  --actio-keyword: #b5179e;
+}
+
+.dark {
+  --actio-keyword: #ff79c6;
+}
+
+.actio-keyword {
+  color: var(--actio-keyword) !important;
+  font-weight: 600;
+}
