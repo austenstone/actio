@@ -40,6 +40,18 @@ const sleep = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
+const PREVIEW_MAX_CHARS = 500;
+
+const isMissingFileError = (err: unknown): err is NodeJS.ErrnoException =>
+  err instanceof Error && "code" in err && err.code === "ENOENT";
+
+const truncatePreview = (contents: string): string =>
+  contents.length <= PREVIEW_MAX_CHARS
+    ? contents
+    : `${contents.slice(0, PREVIEW_MAX_CHARS)}... [truncated ${
+        contents.length - PREVIEW_MAX_CHARS
+      } chars]`;
+
 const waitForFileToContain = async (
   filePath: string,
   needle: string,
@@ -52,14 +64,16 @@ const waitForFileToContain = async (
     try {
       lastContents = await readFile(filePath, "utf8");
       if (lastContents.includes(needle)) return;
-    } catch {
-      // File may not exist yet while watch rebuild is in-flight.
+    } catch (err) {
+      if (!isMissingFileError(err)) throw err;
     }
     await sleep(50);
   }
 
   throw new Error(
-    `Timed out waiting for ${path.basename(filePath)} to contain "${needle}". Last contents: ${lastContents}`,
+    `Timed out waiting for ${path.basename(filePath)} to contain "${needle}". Last contents: ${truncatePreview(
+      lastContents,
+    )}`,
   );
 };
 
@@ -142,6 +156,9 @@ describe("runWatch", () => {
     const outPath = path.join(dir, "out", "c.yml");
     await writeFile(path.join(dir, "c.actio.yml"), SOURCE_A, "utf8");
 
+    const rebuild = await signal.next();
+    expect(rebuild.initial).toBe(false);
+    expect(rebuild.results.map((r) => r.file)).toContain("c.actio.yml");
     await waitForFileToContain(outPath, "echo a", 20000);
     expect(await readFile(outPath, "utf8")).toContain("echo a");
   }, 30000);
