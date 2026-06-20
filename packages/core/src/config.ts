@@ -1,7 +1,27 @@
 import type { CoercionMode } from "./coercion.js";
 import type { Pass } from "./passes/index.js";
+import type { PinCommentStyle } from "./passes/pin.js";
 
 export type ActioTarget = "legacy" | "github-actions-native-dependencies-preview";
+
+/**
+ * Pin-on-compile policy. At `actio build`, pinnable `uses:` refs are rewritten to
+ * an immutable SHA / digest with the original tag kept as a trailing comment.
+ */
+export interface PinConfig {
+  /** Master switch. Default true. */
+  enabled?: boolean;
+  /** Pin third-party actions (any owner other than `actions`/`github`). Default true. */
+  thirdParty?: boolean;
+  /** Pin first-party actions (`actions/*`, `github/*`). Default false. */
+  github?: boolean;
+  /** Pin `uses: docker://img:tag` references. Default true. */
+  docker?: boolean;
+  /** Globs (matched against `owner/repo` or the full ref) always left on their tag. */
+  allow?: string[];
+  /** Trailing comment style for pinned refs. Default "tag". */
+  comment?: PinCommentStyle;
+}
 
 /**
  * Shape of an `actio.config.{ts,js,mjs,cjs,json}` file. Every field is optional;
@@ -57,6 +77,12 @@ export interface ActioConfig {
    * `coercion:` key overrides this. Default "fix".
    */
   coercion?: CoercionMode;
+  /**
+   * Pin-on-compile policy. An object configures it granularly; the sugar `"all"`
+   * pins everything (including first-party) and `"off"` disables pinning entirely.
+   * Default: third-party + docker pinned, first-party left on-tag.
+   */
+  pin?: PinConfig | "all" | "off";
 }
 
 /** Identity helper that gives `actio.config.ts` authors full type-checking and inference. */

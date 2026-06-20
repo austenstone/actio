@@ -11,6 +11,7 @@ import { type ParseContext, type Path, parseActio } from "./parser.js";
 import { annotate } from "./passes/annotate.js";
 import { isObject, pushDiagnostic } from "./passes/helpers.js";
 import { createRegistry, type Pass, runPasses } from "./passes/index.js";
+import { applyPins, type PinOptions, type PinTarget } from "./passes/pin.js";
 import { buildSourceMap, resolveGeneratedLine, type SourceMap } from "./sourcemap.js";
 import { collectUnusedSymbolDiagnostics, type UnusedSymbolsMode } from "./unusedSymbols.js";
 import { validateWorkflowYaml } from "./validate.js";
@@ -67,6 +68,13 @@ export interface TranspileOptions {
    * `coercion:` key overrides this. Default "fix".
    */
   coercion?: CoercionMode;
+  /**
+   * Pin-on-compile request. When set, pinnable `uses:` literals are rewritten to
+   * their resolved digest after all passes run (so inline `{{ }}` refs are final);
+   * `resolutions` seeds known digests and discovered targets surface in the result.
+   * Network resolution lives in the CLI/build layer.
+   */
+  pin?: PinOptions;
 }
 
 export interface TranspileResult {
@@ -77,6 +85,8 @@ export interface TranspileResult {
   diagnostics: Diagnostic[];
   /** Generated→source line map, present only when `sourceMap` is set. */
   map?: SourceMap;
+  /** Pinnable `uses:` targets discovered (resolved or not); present only when `pin` is set. */
+  pinTargets?: PinTarget[];
 }
 
 /** Rewrite a generated-line diagnostic range to its originating source range. */
@@ -192,6 +202,8 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
     (ctx.data as Record<string, unknown>).dependencies = options.nativeDependencies;
   }
 
+  const pinTargets = options.pin ? applyPins(ctx, options.pin) : undefined;
+
   const coercion = resolveCoercionMode(ctx, options);
   if (coercion === "warn") warnCoercionTraps(ctx, ctx.data, []);
 
@@ -211,5 +223,5 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
   diagnostics.push(...unusedDiagnostics);
 
   const ok = !diagnostics.some((d) => d.severity === "error");
-  return { ok, yaml, diagnostics, map };
+  return { ok, yaml, diagnostics, map, pinTargets };
 }
