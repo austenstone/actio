@@ -5,6 +5,7 @@ import { parseActio } from "./parser.js";
 import { annotate } from "./passes/annotate.js";
 import { createRegistry, type Pass, runPasses } from "./passes/index.js";
 import { buildSourceMap, resolveGeneratedLine, type SourceMap } from "./sourcemap.js";
+import { collectUnusedSymbolDiagnostics, type UnusedSymbolsMode } from "./unusedSymbols.js";
 import { validateWorkflowYaml } from "./validate.js";
 
 export interface NativeDependencyEntry {
@@ -43,6 +44,13 @@ export interface TranspileOptions {
    * `injection-hoist:` knobs (root/job/step) override this. Default "fix".
    */
   injectionHoist?: "fix" | "warn" | "error" | "off";
+  /**
+   * Severity for dead-code diagnostics on declared-but-unreferenced `params`,
+   * `fragments`, and `executors`. `off` disables the check; `warn` reports
+   * warnings (default); `error` escalates them to build failures. Suppress a
+   * single symbol with a `# actio-keep` comment on its declaration.
+   */
+  unusedSymbols?: UnusedSymbolsMode;
 }
 
 export interface TranspileResult {
@@ -98,6 +106,11 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
   if (options.injectionHoist !== undefined) {
     ctx.internal.injectionHoist = options.injectionHoist;
   }
+
+  // Collect dead-code diagnostics before passes prune the declaration blocks
+  // and rewrite the references that prove a symbol is live.
+  const unusedDiagnostics = collectUnusedSymbolDiagnostics(ctx, options.unusedSymbols ?? "warn");
+
   runPasses(ctx, passes);
 
   if (
@@ -122,6 +135,7 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
     const schema = validateWorkflowYaml(yaml, fileName);
     diagnostics.push(...(map ? schema.map((d) => remapDiagnostic(d, map)) : schema));
   }
+  diagnostics.push(...unusedDiagnostics);
 
   const ok = !diagnostics.some((d) => d.severity === "error");
   return { ok, yaml, diagnostics, map };

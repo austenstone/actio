@@ -40,6 +40,14 @@ export interface ActioConfig {
    * knobs override this. Default "fix".
    */
   injectionHoist?: "fix" | "warn" | "error" | "off";
+  /**
+   * Severity for dead-code diagnostics on declared-but-unreferenced `params`,
+   * `fragments`, and `executors`. `off` disables the check; `warn` reports
+   * warnings (default); `error` escalates them to build failures (pairs well
+   * with `actio check` in CI). Suppress a single symbol with a `# actio-keep`
+   * comment on its declaration.
+   */
+  unusedSymbols?: "off" | "warn" | "error";
 }
 
 /** Identity helper that gives `actio.config.ts` authors full type-checking and inference. */

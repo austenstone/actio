@@ -39,6 +39,31 @@ order. Passing `--out-dir build/` always wins over the config's `outDir`, which 
 turn wins over the `.github/workflows` default. Positional file globs on the CLI
 override `files`/`include` from the config.
 
+## Dead-code diagnostics
+
+Actio flags `params`, `fragments`, and `executors` that are declared but never
+referenced — the copy-paste smell that `actio check` is built to catch. Each unused
+symbol gets a diagnostic pointing at its declaration. Tune the severity with
+`unusedSymbols`:
+
+```ts title="actio.config.ts"
+export default defineConfig({
+  unusedSymbols: "error", // off | warn (default) | error
+});
+```
+
+`off` disables the check, `warn` reports a warning, and `error` fails the build —
+handy in CI alongside `actio check`. The analysis is deliberately conservative: a
+symbol referenced inside a `static-if` branch, a fragment injected into another
+fragment, or any conditional path counts as used. Keep an intentionally-unused
+symbol by adding a `# actio-keep` comment on its declaration:
+
+```yaml title=".actio.yml"
+fragments:
+  scaffold: # actio-keep
+    - uses: actions/checkout@v4
+```
+
 ## Custom passes
 
 The `passes` field is the headline feature: a pass you supply is **merged** into
