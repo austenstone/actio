@@ -681,3 +681,48 @@ jobs:
     expect(ext.addDefinitions).toHaveProperty("lifecycleHook");
   });
 });
+
+describe("issue #107: macro-supplied job execution shape", () => {
+  it("accepts the executor example from the issue verbatim", () => {
+    const doc = load(`on: [push]
+executors:
+  node:
+    runs-on: ubuntu-latest
+jobs:
+  plan:
+    executor: node
+    steps:
+      - run: npm test`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts the extends example from the issue verbatim", () => {
+    const doc = load(`on: [push]
+call-templates:
+  reusable-check:
+    uses: ./.github/workflows/check.yml
+jobs:
+  reusable-unit:
+    extends: reusable-check
+    with:
+      command: npm test`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts a native reusable-workflow call job whose shape comes from uses", () => {
+    const doc = load(`on: [push]
+jobs:
+  reusable-unit:
+    uses: ./.github/workflows/check.yml`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("still rejects a plain job with none of runs-on, executor, uses, or extends", () => {
+    const doc = load(`on: [push]
+jobs:
+  plan:
+    steps:
+      - run: npm test`);
+    expect(validate(doc)).toBe(false);
+  });
+});
