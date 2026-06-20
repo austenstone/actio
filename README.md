@@ -1,6 +1,6 @@
 # Actio
 
-> A transpiler that compiles a clean `.actio.yml` source into the verbose GitHub Actions YAML you'd otherwise hand-write.
+A transpiler that compiles a clean `.actio.yml` source into the verbose GitHub Actions YAML you'd otherwise hand-write.
 
 **[documentation →](https://austenstone.github.io/actio)**
 
