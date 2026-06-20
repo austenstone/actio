@@ -1,0 +1,105 @@
+---
+title: Out of scope
+description: High-demand GitHub Actions asks a compile-time transpiler structurally can't solve — and why.
+---
+
+## Why document non-goals?
+
+Four waves of community research (community discussions, `actions/runner` issues,
+Reddit/SO, competitor authoring, and `github/customer-feedback` enterprise intake)
+surfaced a recurring set of **high-demand GitHub Actions asks that a compile-time
+transpiler structurally cannot solve**. Actio turns clean `.actio.yml` into standard
+workflow YAML *at build time* — it has no runtime, doesn't touch the platform, and
+can't see values that only exist while a run is executing.
+
+This page is a reference so we (and contributors) stop re-litigating these, can
+answer "why doesn't Actio just…", and have honest talking points. Each item below is
+grouped by the **structural root cause**, with a representative high-demand issue
+linked.
+
+<Callout title="Rule of thumb">
+If the answer depends on a value that exists **only at runtime**, or on **how GitHub
+stores/scopes/renders** something, Actio can't synthesize it. If it's authoring
+ergonomics over a **compile-time-known** value, it's in scope.
+</Callout>
+
+## 1. Runtime graph mutation
+
+The job graph is fixed when the workflow is parsed. You can't add/remove/reorder jobs
+or edges based on values computed during the run.
+
+- [github/customer-feedback#8205](https://github.com/github/customer-feedback/issues/8205) — dynamic `needs:` values
+- [github/customer-feedback#3758](https://github.com/github/customer-feedback/issues/3758) — fully dynamic workflows/jobs (runtime subset)
+- [community #73156](https://github.com/orgs/community/discussions/73156) — restart an individual failed job *while the workflow is still running*
+
+**Why not:** these mutate the DAG from runtime state. Actio only knows the DAG at
+compile time. *(Compile-time-known fan-out IS in scope — see edge cases.)*
+
+## 2. Platform security / secrets / identity
+
+Secret storage, scoping, environments, branch protection, and marketplace trust live
+in the GitHub platform, not in YAML.
+
+- [community #15379](https://github.com/orgs/community/discussions/15379) — org-wide environments & environment secrets
+- [community #13836](https://github.com/orgs/community/discussions/13836) — bypass/relax branch protection from a workflow
+- Marketplace-trust half of the pin ask (the *authoring* half ships separately, see [#96](https://github.com/austenstone/actio/issues/96))
+
+**Why not:** no amount of generated YAML changes where GitHub keeps secrets or
+enforces protection.
+
+## 3. UI / run-experience rendering
+
+How runs, jobs, and the Actions tab render is platform UI. YAML can't restyle it.
+
+- [github/customer-feedback#5584](https://github.com/github/customer-feedback/issues/5584) — hide non-running (skipped) jobs from the run graph
+- [community #18001](https://github.com/orgs/community/discussions/18001) — hide jobs in the UI when their `if:` is false
+- [community #26256](https://github.com/orgs/community/discussions/26256) — delete/hide old or renamed workflows
+- [community #12025](https://github.com/orgs/community/discussions/12025) — mark reusable workflows as templates / hide from the Actions tab
+
+**Why not:** runtime-`if` skipping and tab rendering are UI behaviors.
+*(Compile-time-known skips ARE in scope via [`static-if`](/docs/macros/static-if) —
+see edge cases.)*
+
+## 4. Runtime expression / context availability
+
+Some contexts and fields just aren't populated where users want them, at runtime.
+
+- [actions/runner#480](https://github.com/actions/runner/issues/480) + [#2372](https://github.com/actions/runner/issues/2372) — workflow-level `env` not usable in all fields
+- [community #8945](https://github.com/orgs/community/discussions/8945) — expose `job_id` in the `github` context
+- [actions/runner#1483](https://github.com/actions/runner/issues/1483) — boolean inputs aren't actually booleans at runtime
+
+**Why not:** when the value is runtime-input-driven, Actio can't inline it. *(When the
+value is compile-time-known, [`{{ params }}`](/docs/macros/params) already inlines it
+into `runs-on:`/`with:`/`if:` where `${{ env }}` is rejected — see edge cases.)*
+
+## 5. Concurrency / scheduling semantics
+
+The scheduler decides queueing, cancellation, and conclusions at runtime.
+
+- [community #12835](https://github.com/orgs/community/discussions/12835) — concurrency: queue *all* jobs in a group (don't cancel)
+- [actions/runner#662](https://github.com/actions/runner/issues/662) — command to early-exit a job and set its conclusion
+- [actions/runner#2347](https://github.com/actions/runner/issues/2347) — `allow-failure` for a given job
+
+**Why not:** these are runtime scheduler behaviors. Generated YAML can't change how
+the queue/conclusion engine works.
+
+## 6. Native-now — explicit non-goals (don't build)
+
+GitHub shipped these (or close enough). Building macros for them would be redundant
+churn.
+
+- [actions/runner#409](https://github.com/actions/runner/issues/409) — ternary / conditional operator → now native (`${{ ... && ... || ... }}`, and a real conditional landing). Don't add expr-ternary sugar.
+- [actions/runner#1182](https://github.com/actions/runner/issues/1182) — YAML anchors shipped ([changelog, 2025-09-18](https://github.blog/changelog/2025-09-18-actions-yaml-anchors-and-non-public-workflow-templates/)) **but without merge keys** ([frenck.dev write-up](https://frenck.dev/github-actions-yaml-anchors-aliases-merge-keys/), [merge-key request #185877](https://github.com/orgs/community/discussions/185877)). So [`fragments`](/docs/macros/fragments)/`inject` still win for step-list reuse (they compose maps; bare anchors can't) — keep them, don't reframe them as an "anchor polyfill."
+
+## Edge cases — the compile-time subset IS in scope
+
+The line isn't the topic, it's *when the value is known*. Where a runtime limitation
+has a compile-time-known slice, Actio already (or should) cover it:
+
+- **Skipping jobs** → runtime UI hide = platform; **compile-time-known** drop = [`static-if`](/docs/macros/static-if) ✅
+- **`env` in disallowed fields** → runtime `${{ env }}` = platform; **compile-time literal** = [`{{ params }}`](/docs/macros/params) interpolation ✅
+- **Per-leg matrix `needs`** → runtime `fromJSON` matrix = platform; **compile-time-known** matrix = `expand_matrix:` ([#97](https://github.com/austenstone/actio/issues/97))
+- **Typed/validated inputs** → runtime coercion = platform; **compile-time** typing = [`params`](/docs/macros/params) ✅
+
+If a future ask lands on the compile-time side of one of these lines, it's a
+candidate — file it. Everything above stays out of scope by design.
