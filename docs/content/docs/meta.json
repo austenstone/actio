@@ -13,6 +13,7 @@
     "source-maps",
     "editor-support",
     "architecture",
+    "out-of-scope",
     "api"
   ]
 }
