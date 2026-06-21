@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { ActioConfig, ActioTarget } from "actio-core";
+import type { ActioConfig, ActioTarget, CoercionMode } from "actio-core";
 import { createJiti } from "jiti";
 import type { BuildOptions } from "./commands/build.js";
 
@@ -9,6 +9,8 @@ const EXTENSIONS = ["ts", "mts", "cts", "js", "mjs", "cjs", "json"] as const;
 const DEFAULT_OUT_DIR = ".github/workflows";
 const DEFAULT_TARGET: ActioTarget = "legacy";
 const ACTIO_TARGETS = ["legacy", "github-actions-native-dependencies-preview"] as const;
+const DEFAULT_COERCION: CoercionMode = "fix";
+const COERCION_MODES = ["off", "warn", "fix"] as const;
 
 function parseActioTarget(raw: unknown, source: string): ActioTarget {
   if (typeof raw !== "string") {
@@ -18,6 +20,16 @@ function parseActioTarget(raw: unknown, source: string): ActioTarget {
   if (parsed === undefined) {
     throw new Error(
       `${source} target must be one of: ${ACTIO_TARGETS.join(", ")} (received "${raw}")`,
+    );
+  }
+  return parsed;
+}
+
+function parseCoercionMode(raw: unknown, source: string): CoercionMode {
+  const parsed = COERCION_MODES.find((mode) => mode === raw);
+  if (parsed === undefined) {
+    throw new Error(
+      `${source} coercion must be one of: ${COERCION_MODES.join(", ")} (received "${String(raw)}")`,
     );
   }
   return parsed;
@@ -82,7 +94,7 @@ export async function loadActioConfig(
  */
 export function resolveBuildOptions(args: {
   files: string[];
-  flags: { outDir?: string; target?: string };
+  flags: { outDir?: string; target?: string; coercion?: string };
   forceCheck: boolean;
   argv: string[];
   config: ActioConfig;
@@ -106,6 +118,11 @@ export function resolveBuildOptions(args: {
         ? parseActioTarget(config.target, "Config")
         : DEFAULT_TARGET,
     unusedSymbols: config.unusedSymbols,
+    coercion: passed("--coercion")
+      ? parseCoercionMode(flags.coercion, "CLI")
+      : config.coercion !== undefined
+        ? parseCoercionMode(config.coercion, "Config")
+        : DEFAULT_COERCION,
   };
 
   const patterns = files.length > 0 ? files : (config.files ?? config.include ?? []);

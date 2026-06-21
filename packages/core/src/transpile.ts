@@ -1,8 +1,15 @@
+import {
+  COERCION_MODES,
+  type CoercionMode,
+  coercionTrapCategory,
+  coercionWarning,
+} from "./coercion.js";
 import type { ActioTarget } from "./config.js";
 import type { Diagnostic } from "./diagnostics.js";
 import { emitYaml, generatedHeader } from "./emit.js";
-import { parseActio } from "./parser.js";
+import { type ParseContext, type Path, parseActio } from "./parser.js";
 import { annotate } from "./passes/annotate.js";
+import { isObject, pushDiagnostic } from "./passes/helpers.js";
 import { createRegistry, type Pass, runPasses } from "./passes/index.js";
 import { buildSourceMap, resolveGeneratedLine, type SourceMap } from "./sourcemap.js";
 import { collectUnusedSymbolDiagnostics, type UnusedSymbolsMode } from "./unusedSymbols.js";
@@ -51,6 +58,14 @@ export interface TranspileOptions {
    * single symbol with a `# actio-keep` comment on its declaration.
    */
   unusedSymbols?: UnusedSymbolsMode;
+  /**
+   * YAML type-coercion guard mode. `fix` force-quotes emitted string scalars
+   * that a YAML-1.1 consumer (the Actions runner) would silently coerce
+   * (e.g. `no`→false, `1:30`→90, `2024-01-01`→Date); `warn` leaves them
+   * unquoted and emits a `yaml-coercion-trap` warning; `off` disables the
+   * guard. An in-source root `coercion:` key overrides this. Default "fix".
+   */
+  coercion?: CoercionMode;
 }
 
 export interface TranspileResult {
@@ -70,6 +85,60 @@ function remapDiagnostic(diagnostic: Diagnostic, map: SourceMap): Diagnostic {
   if (!origin) return diagnostic;
   const start = { line: origin.line, col: origin.col };
   return { ...diagnostic, range: { start, end: start } };
+}
+
+/**
+ * Resolve the effective coercion mode and strip the in-source root `coercion:`
+ * key so it never leaks into emitted YAML. Precedence: in-source key → option →
+ * default `fix`. An invalid key value warns and inherits.
+ */
+function resolveCoercionMode(ctx: ParseContext, options: TranspileOptions): CoercionMode {
+  const root = ctx.data as Record<string, unknown>;
+  let rootMode: CoercionMode | undefined;
+  if ("coercion" in root) {
+    const value = root.coercion;
+    if (typeof value === "string" && COERCION_MODES.has(value)) {
+      rootMode = value as CoercionMode;
+    } else {
+      pushDiagnostic(
+        ctx,
+        "warning",
+        `coercion must be one of "off" | "warn" | "fix" (got ${
+          value === null ? "null" : typeof value
+        }); using inherited mode`,
+        ["coercion"],
+        { code: "coercion-mode-invalid" },
+      );
+    }
+    delete root.coercion;
+  }
+  return rootMode ?? options.coercion ?? "fix";
+}
+
+/**
+ * Walk the final data tree and warn on every string scalar a YAML-1.1 consumer
+ * would coerce. Mirrors the emitter's skip-key behavior: only object values and
+ * array items are visited, never mapping keys (so the `on:` events key, a job id
+ * like `build`, etc. are never flagged).
+ */
+function warnCoercionTraps(ctx: ParseContext, value: unknown, path: Path): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      warnCoercionTraps(ctx, item, [...path, index]);
+    });
+    return;
+  }
+  if (isObject(value)) {
+    for (const [key, child] of Object.entries(value)) warnCoercionTraps(ctx, child, [...path, key]);
+    return;
+  }
+  if (typeof value !== "string") return;
+  const category = coercionTrapCategory(value);
+  if (category) {
+    pushDiagnostic(ctx, "warning", coercionWarning(value, category), path, {
+      code: "yaml-coercion-trap",
+    });
+  }
 }
 
 /** Compile a single `.actio.yml` source string into standard GitHub Actions YAML. */
@@ -122,7 +191,10 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
     (ctx.data as Record<string, unknown>).dependencies = options.nativeDependencies;
   }
 
-  const body = emitYaml(ctx.data, { header: false });
+  const coercion = resolveCoercionMode(ctx, options);
+  if (coercion === "warn") warnCoercionTraps(ctx, ctx.data, []);
+
+  const body = emitYaml(ctx.data, { header: false, coercion });
   const header = options.header === false ? "" : generatedHeader(fileName);
   const yaml = header + body;
 
