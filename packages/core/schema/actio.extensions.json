@@ -49,6 +49,12 @@
       "title": "finally (Actio macro)",
       "description": "Actio macro. Workflow-scoped teardown. Each named entry compiles to an aggregator job that `needs:` every real job and runs on the normal path (`if: !cancelled()`), plus an auto cancel-companion (`if: cancelled()`, `timeout-minutes: 5`). Nest `on-success`/`on-failure`/`on-abort` for outcome-branch jobs. Use `ensure:` for job/step-scoped teardown, not `finally:`.",
       "markdownDescription": "**Actio macro**: workflow-scoped teardown (sibling to `jobs:`).\n\nEach named entry compiles to an aggregator job that `needs:` every real job and runs on the normal path (`if: !cancelled()`), plus an auto cancel-companion (`if: cancelled()`, `timeout-minutes: 5`). Nest `on-success`/`on-failure`/`on-abort` for outcome-branch jobs; `on-abort: []` opts out of the cancel job.\n\n```yaml\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./deploy.sh\nfinally:\n  teardown:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./cleanup.sh\n```\n\nFor job/step teardown use `ensure:` instead."
+    },
+    "reusable": {
+      "$ref": "#/definitions/reusableWorkflow",
+      "title": "reusable (Actio macro)",
+      "description": "Actio macro. Declare a workflow as both callable (`workflow_call`) and dispatchable (`workflow_dispatch`) once. Actio emits both trigger blocks (the `workflow_dispatch` inputs derive from the shared inputs) and normalizes every `${{ github.event.inputs.x }}` reference to the canonical `${{ inputs.x }}`. Stripped from the generated workflow YAML.",
+      "markdownDescription": "**Actio macro**: one declaration, both triggers.\n\nDeclare shared inputs once; Actio emits `on.workflow_call` plus `on.workflow_dispatch` (its inputs derived from yours) and rewrites the dispatch-only footgun `${{ github.event.inputs.x }}` (null under `workflow_call`) to the canonical `${{ inputs.x }}` everywhere. Set `dispatch: false` to emit only `workflow_call`.\n\n```yaml\nreusable:\n  inputs:\n    target: { type: string, required: true }\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo \"to ${{ inputs.target }}\"\n```"
     }
   },
   "rootAllOf": [
@@ -730,6 +736,52 @@
         },
         "runs-on": { "$ref": "#/definitions/normalJob/properties/runs-on" },
         "steps": { "$ref": "#/definitions/normalJob/properties/steps" }
+      }
+    },
+    "reusableWorkflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Actio macro. Generates `on.workflow_call` (always) and `on.workflow_dispatch` (unless `dispatch: false`) from one shared declaration, deriving the dispatch inputs from the shared inputs.",
+      "properties": {
+        "inputs": {
+          "type": "object",
+          "description": "Shared input definitions used for both triggers. Types are limited to the workflow_call subset (string, boolean, number) so the same definition is valid for workflow_dispatch.",
+          "additionalProperties": { "$ref": "#/definitions/reusableInput" }
+        },
+        "secrets": {
+          "type": "object",
+          "description": "workflow_call secrets, emitted verbatim under `on.workflow_call.secrets`.",
+          "additionalProperties": true
+        },
+        "outputs": {
+          "type": "object",
+          "description": "workflow_call outputs, emitted verbatim under `on.workflow_call.outputs`.",
+          "additionalProperties": true
+        },
+        "dispatch": {
+          "type": "boolean",
+          "description": "Whether to also emit `on.workflow_dispatch`. Defaults to true; set to false to generate a call-only workflow while still normalizing input references."
+        }
+      }
+    },
+    "reusableInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Actio macro. A shared input definition valid for both workflow_call and workflow_dispatch. `type` defaults to string when omitted.",
+      "properties": {
+        "type": {
+          "description": "Input type. Limited to the subset shared by workflow_call and workflow_dispatch.",
+          "enum": ["string", "boolean", "number"]
+        },
+        "required": { "type": "boolean", "description": "Whether the input must be supplied." },
+        "default": {
+          "type": ["string", "boolean", "number"],
+          "description": "Default value used when the input is omitted."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the input."
+        }
       }
     }
   }
