@@ -7,6 +7,7 @@ import {
 import type { ActioTarget } from "./config.js";
 import type { Diagnostic } from "./diagnostics.js";
 import { emitYaml, generatedHeader } from "./emit.js";
+import { type ActionlintRunner, type LintMode, lintWorkflowYaml } from "./lint.js";
 import { type ParseContext, type Path, parseActio } from "./parser.js";
 import { annotate } from "./passes/annotate.js";
 import { isObject, pushDiagnostic } from "./passes/helpers.js";
@@ -31,6 +32,16 @@ export interface TranspileOptions {
   header?: boolean;
   /** Validate generated YAML against GitHub's workflow schema. Default true. */
   validate?: boolean;
+  /**
+   * Lint the generated workflow with `actionlint` and surface findings on the
+   * `.actio.yml` source. `off` skips it (default); `warn` reports warnings;
+   * `error` escalates findings to build failures. Distinct from `validate`,
+   * which gates the schema check. A missing `actionlint` binary is skipped
+   * gracefully with an informational note.
+   */
+  lint?: LintMode;
+  /** Injectable actionlint runner (tests provide this to avoid the real binary). */
+  actionlintRunner?: ActionlintRunner;
   /** Extra transform passes merged into the built-in pipeline (ordered by `runsAfter`). */
   passes?: Pass[];
   /** Produce a source map and remap schema diagnostics back to source. Default false. */
@@ -219,6 +230,15 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
   if (options.validate !== false) {
     const schema = validateWorkflowYaml(yaml, fileName);
     diagnostics.push(...(map ? schema.map((d) => remapDiagnostic(d, map)) : schema));
+  }
+  if ((options.lint ?? "off") !== "off") {
+    const lint = lintWorkflowYaml(
+      yaml,
+      fileName,
+      options.lint as LintMode,
+      options.actionlintRunner,
+    );
+    diagnostics.push(...(map ? lint.map((d) => remapDiagnostic(d, map)) : lint));
   }
   diagnostics.push(...unusedDiagnostics);
 

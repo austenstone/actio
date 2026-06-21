@@ -34,6 +34,7 @@ const baseOpts = (cwd: string): BuildOptions => ({
   target: "legacy",
   coercion: "fix",
   cwd,
+  lint: "off",
 });
 
 const sleep = (ms: number): Promise<void> =>

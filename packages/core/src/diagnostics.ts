@@ -13,7 +13,7 @@ export interface Range {
 }
 
 /** Where a diagnostic originated. */
-export type DiagnosticSource = "yaml" | "actio" | "schema";
+export type DiagnosticSource = "yaml" | "actio" | "schema" | "actionlint";
 
 export interface Diagnostic {
   severity: Severity;

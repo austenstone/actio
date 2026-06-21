@@ -204,4 +204,33 @@ describe("resolveBuildOptions precedence", () => {
     });
     expect(off.options.annotate).toBe(false);
   });
+
+  it("defaults lint off and reads it from config", () => {
+    expect(resolveBuildOptions({ ...base, config: {} }).options.lint).toBe("off");
+    expect(resolveBuildOptions({ ...base, config: { lint: "error" } }).options.lint).toBe("error");
+  });
+
+  it("lets an explicit --lint flag override config lint", () => {
+    const { options } = resolveBuildOptions({
+      ...base,
+      flags: { lint: "warn" },
+      argv: ["build", "--lint", "warn"],
+      config: { lint: "error" },
+    });
+    expect(options.lint).toBe("warn");
+  });
+
+  it("rejects unknown lint modes", () => {
+    expect(() =>
+      resolveBuildOptions({
+        ...base,
+        flags: { lint: "loud" },
+        argv: ["build", "--lint", "loud"],
+        config: {},
+      }),
+    ).toThrow(/lint must be one of/);
+    expect(() => resolveBuildOptions({ ...base, config: { lint: "loud" as never } })).toThrow(
+      /lint must be one of/,
+    );
+  });
 });

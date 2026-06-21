@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { ActioConfig, ActioTarget, CoercionMode, PinPolicy } from "actio-core";
+import type { ActioConfig, ActioTarget, CoercionMode, LintMode, PinPolicy } from "actio-core";
 import { createJiti } from "jiti";
 import type { BuildOptions } from "./commands/build.js";
 
@@ -11,6 +11,8 @@ const DEFAULT_TARGET: ActioTarget = "legacy";
 const ACTIO_TARGETS = ["legacy", "github-actions-native-dependencies-preview"] as const;
 const DEFAULT_COERCION: CoercionMode = "fix";
 const COERCION_MODES = ["off", "warn", "fix"] as const;
+const DEFAULT_LINT: LintMode = "off";
+const LINT_MODES = ["off", "warn", "error"] as const;
 
 function parseActioTarget(raw: unknown, source: string): ActioTarget {
   if (typeof raw !== "string") {
@@ -30,6 +32,16 @@ function parseCoercionMode(raw: unknown, source: string): CoercionMode {
   if (parsed === undefined) {
     throw new Error(
       `${source} coercion must be one of: ${COERCION_MODES.join(", ")} (received "${String(raw)}")`,
+    );
+  }
+  return parsed;
+}
+
+function parseLintMode(raw: unknown, source: string): LintMode {
+  const parsed = LINT_MODES.find((mode) => mode === raw);
+  if (parsed === undefined) {
+    throw new Error(
+      `${source} lint must be one of: ${LINT_MODES.join(", ")} (received "${String(raw)}")`,
     );
   }
   return parsed;
@@ -128,7 +140,7 @@ function resolvePinPolicy(raw: ActioConfig["pin"], passed: (name: string) => boo
  */
 export function resolveBuildOptions(args: {
   files: string[];
-  flags: { outDir?: string; target?: string; coercion?: string };
+  flags: { outDir?: string; target?: string; coercion?: string; lint?: string };
   forceCheck: boolean;
   argv: string[];
   config: ActioConfig;
@@ -159,6 +171,11 @@ export function resolveBuildOptions(args: {
       : config.coercion !== undefined
         ? parseCoercionMode(config.coercion, "Config")
         : DEFAULT_COERCION,
+    lint: passed("--lint")
+      ? parseLintMode(flags.lint, "CLI")
+      : config.lint !== undefined
+        ? parseLintMode(config.lint, "Config")
+        : DEFAULT_LINT,
   };
 
   const patterns = files.length > 0 ? files : (config.files ?? config.include ?? []);
