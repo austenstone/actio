@@ -86,6 +86,12 @@ export interface TranspileOptions {
    * Network resolution lives in the CLI/build layer.
    */
   pin?: PinOptions;
+  /**
+   * Inline step-level `artifacts:` macro config. `uploader` is the action ref
+   * emitted for the trailing upload step (pinned downstream like any other ref).
+   * Default "actions/upload-artifact@v4".
+   */
+  artifacts?: { uploader?: string };
 }
 
 export interface TranspileResult {
@@ -196,6 +202,9 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
   }
   if (options.injectionHoist !== undefined) {
     ctx.internal.injectionHoist = options.injectionHoist;
+  }
+  if (options.artifacts !== undefined) {
+    ctx.internal.artifacts = options.artifacts;
   }
 
   // Collect dead-code diagnostics before passes prune the declaration blocks

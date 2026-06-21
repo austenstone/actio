@@ -91,6 +91,12 @@ export interface ActioConfig {
    * Default: third-party + docker pinned, first-party left on-tag.
    */
   pin?: PinConfig | "all" | "off";
+  /**
+   * Inline step-level `artifacts:` macro config. `uploader` is the action ref
+   * emitted for the trailing upload step (then pinned like any other ref under
+   * pin policy). Default "actions/upload-artifact@v4".
+   */
+  artifacts?: { uploader?: string };
 }
 
 /** Identity helper that gives `actio.config.ts` authors full type-checking and inference. */

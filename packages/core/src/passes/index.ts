@@ -1,4 +1,5 @@
 import type { ParseContext } from "../parser.js";
+import { artifacts } from "./artifacts.js";
 import { CALL_TEMPLATE_KEYS, type CallTemplateKey, callTemplates } from "./callTemplates.js";
 import { dynamicMatrix } from "./dynamicMatrix.js";
 import { expandMatrix } from "./expandMatrix.js";
@@ -29,13 +30,17 @@ import { whenCompile } from "./whenCompile.js";
 /**
  * The transforms Actio ships with. Order is derived from each pass's `runsAfter`
  * (see registry.ts), not this array, so the effective pipeline is:
- *   params → call-templates → job-defaults → for-each → when-compile → fragments → share → retry → fallback → soft-fail → dynamic-matrix → expand-matrix → lifecycle → if-changed → injection-hoist
+ *   params → call-templates → job-defaults → for-each → when-compile → fragments → artifacts → share → retry → fallback → soft-fail → dynamic-matrix → expand-matrix → lifecycle → if-changed → injection-hoist
  *
  * `reusable` runs right after `params` so its input-reference normalization sees
  * fully resolved compile-time text before the call/normal job partition.
  *
  * `call-templates` slots in immediately after `params` (and before `job-defaults`)
  * so `extends:` materializes `uses` before the call/normal job partition.
+ *
+ * `artifacts` runs after `fragments` (so fragment/injected steps carrying
+ * `artifacts:` also expand) and before `retry` (so a retried step fans out only
+ * its run, not a duplicate uploader per attempt).
  */
 export const builtinPasses: Pass[] = [
   params,
@@ -45,6 +50,7 @@ export const builtinPasses: Pass[] = [
   forEach,
   whenCompile,
   fragments,
+  artifacts,
   share,
   retry,
   fallback,
@@ -89,6 +95,7 @@ export {
 export {
   applyDefaults,
   applyExecutor,
+  artifacts,
   CALL_TEMPLATE_KEYS,
   type CallTemplateKey,
   callTemplates,

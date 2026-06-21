@@ -36,6 +36,8 @@ export interface BuildOptions {
   target: ActioTarget;
   /** Severity for dead-code diagnostics on unused params/fragments/executors. Default "warn". */
   unusedSymbols?: "off" | "warn" | "error";
+  /** Inline `artifacts:` macro config; `uploader` is the upload action ref to emit. */
+  artifacts?: { uploader?: string };
   /** YAML type-coercion guard mode (`off | warn | fix`). Default `fix`. */
   coercion: CoercionMode;
   /** actionlint output-lint severity (`off | warn | error`). Default `off`. */
@@ -601,6 +603,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     annotate: opts.annotate,
     target: opts.target,
     unusedSymbols: opts.unusedSymbols,
+    artifacts: opts.artifacts,
     coercion: opts.coercion,
     lint: opts.lint,
   };
