@@ -14,6 +14,7 @@ import { isObject, pushDiagnostic } from "./passes/helpers.js";
 import { createRegistry, type Pass, runPasses } from "./passes/index.js";
 import { applyPins, type PinOptions, type PinTarget } from "./passes/pin.js";
 import { buildSourceMap, resolveGeneratedLine, type SourceMap } from "./sourcemap.js";
+import { collectMergeKeyDiagnostics } from "./strict.js";
 import { collectUnusedSymbolDiagnostics, type UnusedSymbolsMode } from "./unusedSymbols.js";
 import { validateWorkflowYaml } from "./validate.js";
 
@@ -70,6 +71,13 @@ export interface TranspileOptions {
    * single symbol with a `# actio-keep` comment on its declaration.
    */
   unusedSymbols?: UnusedSymbolsMode;
+  /**
+   * Opt-in strict YAML 1.2.2 source lint. When true, every YAML 1.1 merge key
+   * (`<<`) in source is reported as a `yaml-merge-key` warning so repos can keep
+   * `.actio.yml` to a pure 1.2.2 style. Default false (permissive). Lint-only:
+   * `<<` is still resolved and erased at parse, so emitted YAML is unchanged.
+   */
+  strict?: boolean;
   /**
    * YAML type-coercion guard mode. `fix` force-quotes emitted string scalars
    * that a YAML-1.1 consumer (per-action `action.yml` parsing, the `on:` key,
@@ -211,6 +219,9 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
   // and rewrite the references that prove a symbol is live.
   const unusedDiagnostics = collectUnusedSymbolDiagnostics(ctx, options.unusedSymbols ?? "warn");
 
+  // Strict mode reads source tokens only; it never mutates the model or output.
+  const mergeKeyDiagnostics = options.strict ? collectMergeKeyDiagnostics(ctx) : [];
+
   runPasses(ctx, passes);
 
   if (
@@ -250,6 +261,7 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
     diagnostics.push(...(map ? lint.map((d) => remapDiagnostic(d, map)) : lint));
   }
   diagnostics.push(...unusedDiagnostics);
+  diagnostics.push(...mergeKeyDiagnostics);
 
   const ok = !diagnostics.some((d) => d.severity === "error");
   return { ok, yaml, diagnostics, map, pinTargets };

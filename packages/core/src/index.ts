@@ -121,6 +121,7 @@ export {
   type SourceMap,
   type SourceMapping,
 } from "./sourcemap.js";
+export { collectMergeKeyDiagnostics } from "./strict.js";
 export {
   type NativeDependencies,
   type NativeDependencyEntry,

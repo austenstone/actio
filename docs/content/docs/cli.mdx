@@ -28,6 +28,7 @@ actio schema             # Print the Actio JSON Schema (--out <file> to save loc
 | `--pin` / `--no-pin` | Force pinning of `uses:`/`docker://` refs on or off (overrides config) |
 | `--pin-github` (`--pin-first-party`) | Also pin first-party `actions/*` and `github/*` refs |
 | `--offline` | Resolve pins from the lockfile only; fail (exit `2`) if anything is unresolved |
+| `--strict` | Flag YAML 1.1 merge keys (`<<`) in source for strict YAML 1.2.2 (default off, overrides config) |
 
 ## Watch mode
 
