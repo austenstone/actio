@@ -60,10 +60,11 @@ export interface TranspileOptions {
   unusedSymbols?: UnusedSymbolsMode;
   /**
    * YAML type-coercion guard mode. `fix` force-quotes emitted string scalars
-   * that a YAML-1.1 consumer (the Actions runner) would silently coerce
-   * (e.g. `no`→false, `1:30`→90, `2024-01-01`→Date); `warn` leaves them
-   * unquoted and emits a `yaml-coercion-trap` warning; `off` disables the
-   * guard. An in-source root `coercion:` key overrides this. Default "fix".
+   * that a YAML-1.1 consumer (per-action `action.yml` parsing, the `on:` key,
+   * downstream tooling) would coerce (e.g. `no`→false, `1:30`→90,
+   * `2024-01-01`→Date, `1_000`→1000); `warn` leaves them unquoted and emits a
+   * `yaml-coercion-trap` warning; `off` disables the guard. An in-source root
+   * `coercion:` key overrides this. Default "fix".
    */
   coercion?: CoercionMode;
 }

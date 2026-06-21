@@ -66,10 +66,12 @@ fragments:
 
 ## YAML coercion guard
 
-Actio parses your source with the YAML **1.2** core schema, but the GitHub Actions
-runner re-reads the generated workflow with a **1.1**-style schema that silently
-coerces bare scalars — `no`→`false`, `1:30`→`90`, `2024-01-01`→a date. A string you
-wrote stays a string in Actio yet flips type on the runner. The guard force-quotes
+Actio parses your source with the YAML **1.2** core schema, so bare scalars like
+`no`, `1:30`, `2024-01-01`, and `1_000` survive as plain strings. A downstream YAML
+**1.1** consumer — per-action `action.yml` input parsing, the truthy `on:` key, or
+other tooling that reads the generated workflow — then coerces them (`no`→`false`,
+`1:30`→`90`, `2024-01-01`→a date, `1_000`→`1000`). A string you wrote stays a string
+in Actio yet can flip type once a 1.1 consumer reads it. The guard force-quotes
 exactly the emitted scalars a 1.1 consumer would mis-type. Tune it with `coercion`:
 
 ```ts title="actio.config.ts"
@@ -82,7 +84,19 @@ export default defineConfig({
 `yaml-coercion-trap` warning pointing at the offending value, and `off` disables the
 guard. An in-source root `coercion:` key overrides the config. Genuine booleans and
 numbers are never touched — only JS **strings** whose text matches a 1.1 trap
-(the Norway booleans, binary `0b…`, sexagesimal `1:30`, and ISO timestamps).
+(the Norway booleans, binary `0b…`, sexagesimal `1:30`, ISO timestamps, and
+underscore-grouped numerics like `1_000`).
+
+This is defensive hardening against 1.1 consumers, not a fix for the Actions
+*workflow* parser — that parser largely preserves these as strings in string
+positions and rejects an unquoted trap loudly in strictly-typed positions (e.g.
+`timeout-minutes`) rather than silently coercing your file.
+
+> **Invalid-mode asymmetry.** An invalid `coercion` value supplied via the CLI
+> (`--coercion bogus`) or the config file throws — it is a tooling-level error. An
+> invalid in-source root `coercion:` key instead emits a `coercion-mode-invalid`
+> warning and falls back to the inherited mode, so one stray source file never
+> breaks a whole build.
 
 ## Custom passes
 

@@ -340,11 +340,17 @@ Full guide: [injection-hoist](/docs/macros/injection-hoist).
 ### `coercion` [#coercion]
 
 Guards against YAML type-coercion footguns. Actio parses your source with the YAML 1.2
-core schema, so tokens like `no`, `on`, `1:30`, and `2024-01-01` survive as plain
-strings. GitHub Actions re-reads the generated workflow with a YAML 1.1-ish schema that
-silently coerces them (`no` → `false`, `1:30` → `90`, `2024-01-01` → a date). In `fix`
+core schema, so tokens like `no`, `on`, `1:30`, `2024-01-01`, and `1_000` survive as
+plain strings. A downstream YAML 1.1 consumer — per-action `action.yml` input parsing,
+the truthy `on:` key, or other tooling that reads the generated workflow — then coerces
+them (`no` → `false`, `1:30` → `90`, `2024-01-01` → a date, `1_000` → `1000`). In `fix`
 mode (the default) Actio single-quotes any emitted string scalar a 1.1 consumer would
 mis-type, so it stays a string. Genuine booleans and numbers are never touched.
+
+> The Actions *workflow* parser itself largely preserves these as strings in string
+> positions (and rejects an unquoted trap loudly in strictly-typed positions like
+> `timeout-minutes`), so this is defensive hardening against 1.1 consumers rather than a
+> fix for the runner silently rewriting your file.
 
 - **Valid in:** top level
 - **Type:** string enum
