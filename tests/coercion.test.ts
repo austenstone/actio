@@ -6,16 +6,16 @@ import {
   transpile,
 } from "actio-core";
 import { describe, expect, it } from "vitest";
-import { parse } from "yaml";
+import { Document, parse } from "yaml";
 
 /**
  * #137 — emit-side YAML 1.1 coercion guard.
  *
- * Actio parses with YAML 1.2-core, so author tokens like `no`/`1:30`/`2024-01-01`
- * survive as JS strings. GitHub Actions re-reads the generated workflow with a
- * 1.1-ish schema that coerces those plain tokens. These tests pin the guard to
- * exactly the four gap categories (boolean/binary/sexagesimal/timestamp) and
- * prove genuine booleans/numbers are never touched.
+ * Actio parses with YAML 1.2-core, so author tokens like `no`/`1:30`/`1_000`
+ * survive as JS strings. A YAML 1.1 consumer (per-action `action.yml` parsing,
+ * the `on:` key, downstream tools) then coerces those plain tokens. These tests
+ * pin the guard to exactly the five gap categories (boolean/binary/sexagesimal/
+ * timestamp/underscore) and prove genuine booleans/numbers are never touched.
  */
 
 /** Compile a workflow whose single `env` value is `raw`, spliced verbatim into source. */
@@ -59,6 +59,7 @@ const GAP_CASES: ReadonlyArray<{
   { category: "binary", raw: "0b101", string: "0b101" },
   { category: "sexagesimal", raw: "1:30", string: "1:30" },
   { category: "timestamp", raw: "2024-01-01", string: "2024-01-01" },
+  { category: "underscore", raw: "1_000", string: "1_000" },
 ];
 
 describe("coercion guard — fix mode (default)", () => {
@@ -227,6 +228,9 @@ const TRAP_CATALOG: ReadonlyArray<readonly [string, CoercionCategory]> = [
   ...["2024-01-01", "2024-1-1", "2024-01-01T00:00:00Z", "2024-01-01 10:00:00"].map(
     (v) => [v, "timestamp"] as const,
   ),
+  ...["1_000", "10_000", "1_0", "1000_", "1__0", "+1_0", "0x1_F", ".5_0", "1_2.3_4", "1_0e3"].map(
+    (v) => [v, "underscore"] as const,
+  ),
 ];
 
 // Plain-emitting tokens that a YAML 1.1 consumer nonetheless reads as strings —
@@ -265,7 +269,59 @@ const SAFE_CATALOG: readonly string[] = [
   "develop",
   "v1.2.3",
   "release/1.0",
+  // Underscore-adjacent shapes a 1.1 consumer still reads as strings.
+  "_1000",
+  "_",
+  "0X1_F",
+  "0o1_7",
+  "1_0:3_0",
+  "node_20",
+  "ubuntu_20_04",
+  "my_var",
 ];
+
+// Generate-and-oracle completeness: instead of asserting the hand-curated catalog
+// matches the regexes (circular — a *missing* category is invisible), drive the
+// yaml-1.1 oracle over a generated token space. Any token yaml-core emits PLAIN
+// that a 1.1 consumer then mis-types is a real trap the predicate MUST flag — so
+// a future missing category surfaces as an un-flagged generated trap.
+function oracleTokenSpace(): string[] {
+  const tokens = new Set<string>();
+  const add = (...xs: string[]) => {
+    for (const x of xs) tokens.add(x);
+  };
+  for (const d of ["0", "1", "9", "12", "100", "755", "000"]) {
+    add(d, `_${d}`, `${d}_`, d.split("").join("_"));
+  }
+  for (const a of ["0", "1", "12", "100"]) {
+    for (const b of ["0", "30", "45", "60", "99"]) add(`${a}:${b}`, `${a}_0:${b}`, `${a}:${b}_0`);
+  }
+  for (const h of ["1A", "ff", "1_F", "A_B", "0"]) add(`0x${h}`, `0X${h}`, `0o${h}`, `0b${h}`);
+  for (const f of ["1.0", "1.20", ".5", "1.2_3", "1_0.0", ".5_0", "1e3", "1E5", "1e1_0", "1_0e3"]) {
+    add(f, `-${f}`, `+${f}`);
+  }
+  for (const dt of ["2024-01-01", "2024-1-1", "2024-01-01T00:00:00Z", "2024_01_01", "20240101"]) {
+    add(dt);
+  }
+  for (const w of ["no", "On", "YES", "true", "False", "null", "~", "yES", "oN"]) add(w);
+  for (const id of ["node_20", "ubuntu_20_04", "my_var", "release/1.0", "v1.2.3", "_", "x_1_y"]) {
+    add(id);
+  }
+  return [...tokens];
+}
+
+/** Oracle: yaml-core emits `token` PLAIN, and a 1.1 consumer reads it as a non-string. */
+function oracleMistypes(token: string): boolean {
+  const out = new Document({ U: token }).toString();
+  if (out !== `U: ${token}\n`) return false; // yaml-core already quoted it → safe
+  let read: unknown;
+  try {
+    read = (parse(out, { version: "1.1" }) as { U: unknown }).U;
+  } catch {
+    return false;
+  }
+  return typeof read !== "string";
+}
 
 describe("coercion predicate — catalog cross-check", () => {
   it("flags every catalog trap with the right category (completeness + soundness)", () => {
@@ -277,6 +333,18 @@ describe("coercion predicate — catalog cross-check", () => {
   it("flags no safe string (no false positives)", () => {
     for (const value of SAFE_CATALOG) {
       expect(coercionTrapCategory(value), value).toBeUndefined();
+    }
+  });
+
+  it("flags every YAML-1.1 trap in a generated token space (generate-and-oracle)", () => {
+    const traps = oracleTokenSpace().filter(oracleMistypes);
+    // Guard the generator itself against silently covering nothing, and prove the
+    // underscore category is load-bearing (real oracle traps land in it).
+    expect(traps.length).toBeGreaterThan(20);
+    const underscoreTraps = traps.filter((t) => coercionTrapCategory(t) === "underscore");
+    expect(underscoreTraps.length).toBeGreaterThan(0);
+    for (const token of traps) {
+      expect(coercionTrapCategory(token), `oracle trap not flagged: ${token}`).toBeDefined();
     }
   });
 });
