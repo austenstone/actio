@@ -1,0 +1,13 @@
+name: Soft Fail
+on: [push]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tolerate known codes
+        run: ./flaky-check.sh
+        soft_fail: [0, 42]
+      - name: Tolerate any failure
+        run: ./best-effort.sh
+        soft_fail: true
