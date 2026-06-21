@@ -10,10 +10,14 @@ import {
   formatGithubAnnotation,
   type NativeDependencies,
   type Pass,
+  type PinPolicy,
+  type PinResolution,
+  type PinTarget,
   transpile,
 } from "actio-core";
 import pc from "picocolors";
 import { glob } from "tinyglobby";
+import { type LockState, type PinCacheEntry, readLock, writeLock } from "./lock.js";
 
 export interface BuildOptions {
   outDir: string;
@@ -43,6 +47,17 @@ export interface BuildOptions {
    * to avoid network calls).
    */
   importIntegrityResolver?: ImportIntegrityResolver;
+  /**
+   * Resolved pin policy. When `enabled`, tag/branch `uses:` refs are rewritten
+   * to their immutable sha/digest at build time. Absent means pinning is off.
+   */
+  pin?: PinPolicy;
+  /** Resolve pins from the lock only; error (exit 2) on a cache miss. */
+  offline?: boolean;
+  /** Injectable digest resolver (tests provide this to avoid network calls). */
+  pinResolver?: PinRefResolver;
+  /** Lockfile path for the pin cache (defaults to `actio.lock`). */
+  lockPath?: string;
 }
 
 const DEFAULT_GLOBS = ["**/*.actio.yml"];
@@ -238,6 +253,133 @@ const createGitHubImportIntegrityResolver = (): ImportIntegrityResolver => ({
   },
 });
 
+interface PinRefResolver {
+  /** Resolve a pinnable target to its immutable digest (40-hex sha / `sha256:…`). */
+  resolve(target: PinTarget): Promise<string>;
+}
+
+class PinUnresolvedError extends Error {
+  constructor(readonly keys: string[]) {
+    super(`cannot pin offline; lock is missing entries for: ${keys.join(", ")}`);
+    this.name = "PinUnresolvedError";
+  }
+}
+
+const DOCKER_MANIFEST_ACCEPT = [
+  "application/vnd.oci.image.index.v1+json",
+  "application/vnd.oci.image.manifest.v1+json",
+  "application/vnd.docker.distribution.manifest.list.v2+json",
+  "application/vnd.docker.distribution.manifest.v2+json",
+].join(", ");
+
+// Only Docker Hub is auto-resolvable; a registry host (dot/port in the first
+// path segment) is out of scope and must be pinned by hand.
+const resolveDockerDigest = async (id: string, ref: string): Promise<string> => {
+  const firstSegment = id.split("/")[0] ?? "";
+  if (firstSegment.includes(".") || firstSegment.includes(":")) {
+    throw new Error(
+      `unsupported docker registry "${firstSegment}" for ${id}; pin the digest manually`,
+    );
+  }
+  const repo = id.includes("/") ? id : `library/${id}`;
+  const tokenResponse = await fetch(
+    `https://auth.docker.io/token?service=registry.docker.io&scope=repository:${repo}:pull`,
+  );
+  if (!tokenResponse.ok) {
+    throw new Error(`cannot authenticate to Docker Hub for ${id} (${tokenResponse.status})`);
+  }
+  const { token } = (await tokenResponse.json()) as { token?: string };
+  const manifestResponse = await fetch(
+    `https://registry-1.docker.io/v2/${repo}/manifests/${encodeURIComponent(ref)}`,
+    {
+      headers: {
+        Accept: DOCKER_MANIFEST_ACCEPT,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    },
+  );
+  if (!manifestResponse.ok) {
+    throw new Error(
+      `cannot resolve docker digest for ${id}:${ref} (${manifestResponse.status} ${manifestResponse.statusText})`,
+    );
+  }
+  const digest = manifestResponse.headers.get("docker-content-digest");
+  if (!digest) {
+    throw new Error(`Docker Hub returned no digest for ${id}:${ref}`);
+  }
+  return digest;
+};
+
+const createGitHubPinResolver = (): PinRefResolver => ({
+  async resolve(target) {
+    if (target.kind === "docker") return resolveDockerDigest(target.id, target.ref);
+    const { owner, repo } = parseActionRepo(target.id);
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(target.ref)}`,
+      { headers: githubHeaders() },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `cannot resolve action: ${target.id}@${target.ref} (${response.status} ${response.statusText})`,
+      );
+    }
+    const payload = (await response.json()) as { sha?: string };
+    if (!payload.sha || !PINNED_SHA_RE.test(payload.sha)) {
+      throw new Error(`GitHub did not return a commit SHA for ${target.id}@${target.ref}`);
+    }
+    return payload.sha;
+  },
+});
+
+const pinResolutionsFromLock = (lock: LockState): Record<string, PinResolution> => {
+  const cache = lock.data.pins ?? {};
+  const resolutions: Record<string, PinResolution> = {};
+  for (const [key, entry] of Object.entries(cache)) {
+    resolutions[key] = { digest: entry.digest, resolvedAt: entry.resolvedAt };
+  }
+  return resolutions;
+};
+
+type TranspileResult = ReturnType<typeof transpile>;
+
+/**
+ * Two-pass pin resolution: transpile with the lock's known digests, discover any
+ * still-unresolved targets, fetch them (unless offline/check), persist the cache,
+ * and re-transpile so every pinnable `uses:` lands on its digest.
+ */
+const pinBuild = async (
+  source: string,
+  baseOptions: Parameters<typeof transpile>[1],
+  policy: PinPolicy,
+  opts: BuildOptions,
+  cwd: string,
+): Promise<TranspileResult> => {
+  const lock = await readLock(cwd, opts.lockPath);
+  const resolutions = pinResolutionsFromLock(lock);
+  const result = transpile(source, { ...baseOptions, pin: { policy, resolutions } });
+  if (!result.ok) return result;
+
+  const unresolved = (result.pinTargets ?? []).filter((t) => !resolutions[t.key]);
+  if (unresolved.length === 0) return result;
+
+  // check mode never reaches the network: an unresolved target simply means the
+  // committed output/lock is stale, which the drift compare reports.
+  if (opts.check) return result;
+  if (opts.offline) throw new PinUnresolvedError(unresolved.map((t) => t.key));
+
+  const resolver = opts.pinResolver ?? createGitHubPinResolver();
+  const resolvedAt = new Date().toISOString();
+  const pins: Record<string, PinCacheEntry> = { ...(lock.data.pins ?? {}) };
+  for (const target of unresolved) {
+    const digest = await resolver.resolve(target);
+    resolutions[target.key] = { digest, resolvedAt };
+    pins[target.key] = { ref: target.ref, digest, resolvedAt };
+  }
+  lock.data.pins = pins;
+  await writeLock(lock);
+  return transpile(source, { ...baseOptions, pin: { policy, resolutions } });
+};
+
 const parseImportUseLine = (line: string): { spec: string; trailingComment: string } | null => {
   const match = line.match(/^\s*-\s*import:\s*(?<spec>[^\s#]+)(?<comment>\s+#.*)?\s*$/);
   if (!match?.groups?.spec) return null;
@@ -376,7 +518,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
   const importIntegrityResolver =
     opts.importIntegrityResolver ?? createGitHubImportIntegrityResolver();
   await verifyRemoteImportIntegrities(source, importIntegrityResolver);
-  let result = transpile(source, {
+  const baseOptions = {
     fileName: file,
     header: opts.header,
     validate: opts.validate,
@@ -386,27 +528,23 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     target: opts.target,
     unusedSymbols: opts.unusedSymbols,
     coercion: opts.coercion,
-  });
+  };
+  let result = transpile(source, baseOptions);
 
   if (result.ok && opts.target === "github-actions-native-dependencies-preview") {
     const resolver = opts.nativeDependencyResolver ?? createGitHubNativeDependencyResolver();
     const nativeDependencies = await resolveNativeDependencies(result.yaml, resolver);
     if (Object.keys(nativeDependencies).length > 0) {
       result = transpile(source, {
-        fileName: file,
-        header: opts.header,
+        ...baseOptions,
         // TODO(native-deps-schema): re-enable validation once upstream schema includes workflow dependencies.
         validate: false,
-        passes: opts.passes,
-        sourceMap: opts.sourceMap,
-        annotate: opts.annotate,
-        target: opts.target,
-        unusedSymbols: opts.unusedSymbols,
-        coercion: opts.coercion,
         // TODO(native-deps-schema): update this payload shape once GitHub finalizes preview docs.
         nativeDependencies,
       });
     }
+  } else if (result.ok && opts.pin?.enabled) {
+    result = await pinBuild(source, baseOptions, opts.pin, opts, cwd);
   }
 
   if (result.diagnostics.length > 0) {
@@ -494,6 +632,7 @@ export async function runBuild(patterns: string[], opts: BuildOptions): Promise<
     } catch (err) {
       process.stderr.write(`${pc.red("error")}: ${file}: ${(err as Error).message}\n`);
       if (err instanceof ImportIntegrityMismatchError) return 2;
+      if (err instanceof PinUnresolvedError) return 2;
       results.push({ file, wrote: false, drift: false, errored: true });
     }
   }
