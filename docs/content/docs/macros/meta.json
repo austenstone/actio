@@ -17,6 +17,7 @@
     "fallback",
     "lifecycle",
     "if-changed",
+    "artifacts",
     "injection-hoist"
   ]
 }

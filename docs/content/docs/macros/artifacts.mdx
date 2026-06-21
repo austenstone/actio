@@ -1,0 +1,216 @@
+---
+title: artifacts
+description: Inline upload-artifact sugar — attach an artifacts block to a step and Actio emits the upload step for you, with a collision-free name.
+---
+
+Publishing build output normally means hand-writing a second
+`actions/upload-artifact` step after the one that produced the files, remembering
+its `with:` shape, and inventing a unique `name:` so it doesn't clash with another
+upload in the same run. `artifacts:` collapses that into a block on the step that
+makes the output. At compile time the step expands into **two** steps — the
+original, followed by a generated upload step — so nothing new runs on the runner
+that you couldn't have written by hand.
+
+## Basic upload
+
+Attach `artifacts:` to any `run` or `uses` step. `paths` is the only required key;
+it maps to upload-artifact's multiline `path` input. Give it a `name:` when you want
+a stable, human-meaningful artifact, or omit it and let Actio derive one.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: CI
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        run: npm run build
+        artifacts:
+          paths: dist/**
+          name: build-output
+          retention-days: 7
+      - name: Test
+        run: npm test
+        artifacts:
+          paths:
+            - coverage/**
+            - reports/junit.xml
+```
+
+```yaml title="generated .yml"
+name: CI
+on:
+  - push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        run: npm run build
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: dist/**
+          retention-days: 7
+      - name: Test
+        run: npm test
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build_test
+          path: |-
+            coverage/**
+            reports/junit.xml
+```
+
+</CodeCompare>
+
+The upload defaults to `if: always()` so artifacts publish even when the producing
+step failed — exactly when you want the logs and partial output for debugging.
+A list of `paths` joins into the action's multiline `path` input.
+
+## Derived names
+
+`actions/upload-artifact@v4` hard-fails at runtime when two uploads in the same run
+share a name (its own default is the literal `artifact`). So when you omit `name:`,
+Actio derives a deterministic one instead of leaving it to chance: it slugifies the
+job id and the step's label (its `name`, else `uses`, else the first line of `run`).
+In the example above the `Test` step in job `build` became `build_test`.
+
+Collisions are still possible — two unnamed steps in the same job, say — so the
+deriver dedups by appending `-2`, `-3`, … to later names. Every **explicit** name in
+the workflow is pre-seeded into that pool first, so a derived name can never silently
+shadow one you wrote yourself.
+
+<Callout title="Set an explicit name when it matters">
+  Derived names are stable for a given source but read like `build_test`. When you
+  need a name other jobs or downstream `download-artifact` steps will reference, set
+  `name:` explicitly.
+</Callout>
+
+## Matrix jobs
+
+Every leg of a `strategy.matrix` is part of the **same run**, so one derived name —
+or a *static* explicit one — collides across legs. The name has to carry a per-leg
+expression:
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: CI
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - run: npm run build
+        artifacts:
+          paths: dist/**
+          name: build-${{ matrix.os }}
+```
+
+```yaml title="generated .yml"
+name: CI
+on:
+  - push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      - run: npm run build
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}
+          path: dist/**
+```
+
+</CodeCompare>
+
+`${{ ... }}` is runtime passthrough — Actio emits it verbatim and the runner fills in
+each leg's value, so the two legs upload to `build-ubuntu-latest` and
+`build-windows-latest` instead of fighting over one name.
+
+## Compile-time warnings
+
+Actio can't see runtime matrix values, but it can spot the two shapes that reliably
+fail on the runner and warn at build time. Neither breaks the build — they stop a
+silent runtime failure:
+
+- **`artifacts-matrix-unnamed`** — an unnamed `artifacts:` step in a matrix job. The
+  single derived name is shared by every leg and collides:
+
+  ```text
+  warning: [artifacts-matrix-unnamed] artifacts: unnamed upload in matrix job "build"
+  derives one name ("build_npm_run_build") shared by every matrix leg, which collides
+  at runtime
+    hint: set `name:` with a per-leg expression, e.g. `name: build-${{ matrix.os }}`
+  ```
+
+- **`artifacts-duplicate-name`** — two or more emitted upload steps share an identical,
+  expression-free literal `name:` (in the same job or across jobs). Names that carry a
+  `${{ ... }}` expression are skipped, since the runner disambiguates those per leg.
+
+## Pinning
+
+The emitted `uses:` is an ordinary action reference, so it flows through the
+[pin](/docs/supply-chain) pass like anything else. Under the default policy,
+first-party `actions/*` refs stay on their tag; switch the uploader to a third-party
+action or set `pin: "all"` and the upload step is SHA-pinned with the rest:
+
+```yaml title="generated .yml (pin: all)"
+- name: Upload artifacts
+  if: always()
+  uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+```
+
+## Type
+
+<TypeTable
+  type={{
+    paths: { type: 'string | string[]', description: "Glob, or list of globs, to upload. A list joins into upload-artifact's multiline path input.", required: true },
+    name: { type: 'string', description: 'Artifact name. Omit to let Actio derive a unique, deterministic name from the job id and step.' },
+    if: { type: 'string', description: 'Condition on the upload step.', default: 'always()' },
+    'retention-days': { type: 'number', description: 'Days to retain the artifact (1-90).' },
+  }}
+/>
+
+## Configuration
+
+The action used for the upload defaults to `actions/upload-artifact@v4`. Override it
+globally with the [`artifacts.uploader`](/docs/configuration#artifacts) config key —
+useful for pinning a fork or a self-hosted uploader.
+
+```ts title="actio.config.ts"
+import { defineConfig } from "actio-core";
+
+export default defineConfig({
+  artifacts: { uploader: "actions/upload-artifact@v4" },
+});
+```
+
+## Gotchas
+
+<Callout type="warn" title="paths is required and non-empty">
+  An empty or missing `paths` is a **compile error** (`artifacts-paths`). So is a
+  `retention-days` that isn't a positive integer in 1–90 (`artifacts-retention`), or an
+  `artifacts:` value that isn't a mapping (`artifacts-shape`).
+</Callout>
+
+See the [`artifacts`](/docs/syntax#artifacts) entry in the syntax reference for the
+condensed keyword summary.
