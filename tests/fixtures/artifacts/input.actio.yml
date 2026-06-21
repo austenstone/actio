@@ -1,0 +1,18 @@
+name: Artifacts
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        run: npm run build
+        artifacts:
+          paths: dist/**
+          name: build-output
+          retention-days: 7
+      - name: Test
+        run: npm test
+        artifacts:
+          paths:
+            - coverage/**
+            - reports/junit.xml

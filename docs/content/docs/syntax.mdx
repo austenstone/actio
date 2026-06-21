@@ -37,6 +37,7 @@ build` leaves behind.
 | [`share`](#share) | step | map of outputs | `job.outputs` + `needs` wiring |
 | [`fallback`](#fallback) | job, step | list or map | try/catch wiring |
 | [`soft_fail`](#soft_fail) | step | boolean or list | `continue-on-error`, or a build-time exit-code wrapper |
+| [`artifacts`](#artifacts) | step | map | trailing `actions/upload-artifact` step |
 | [`unsafe`](#unsafe) | step | boolean | stripped; step left un-hoisted |
 | [`trust`](#trust) | step | list of paths | stripped; listed paths left inline |
 | [`force`](#force) | step | list of paths | stripped; listed paths hoisted to `env` |
@@ -895,6 +896,60 @@ steps:
       case "$__actio_sf_code" in 0|42) exit 0 ;; *) exit "$__actio_sf_code" ;; esac
     shell: bash
 ```
+
+{/* macro:artifacts */}
+### `jobs.<job_id>.steps[*].artifacts` [#artifacts]
+
+Upload a step's build output inline. Expands into a trailing `actions/upload-artifact` step
+right after the one it is attached to, mapping `paths` → the action's multiline `path` input.
+The upload defaults to `if: always()` so artifacts publish even when the step failed (handy for
+debugging). The emitted `uses:` flows through the [pin](/docs/supply-chain) pass like any other
+action ref.
+
+- **Valid in:** `jobs.<job_id>.steps[*]`
+- **Type:** map. `paths` (string or list of globs) is required.
+- **Compiles to:** the original step plus a trailing `actions/upload-artifact` step
+
+<TypeTable
+  type={{
+    paths: { type: 'string | string[]', description: "Glob, or list of globs, to upload. A list joins into upload-artifact's multiline path input.", required: true },
+    name: { type: 'string', description: 'Artifact name. Omit to let Actio derive a unique, deterministic name from the job id and step.' },
+    if: { type: 'string', description: 'Condition on the upload step.', default: 'always()' },
+    'retention-days': { type: 'number', description: 'Days to retain the artifact (1-90).' },
+  }}
+/>
+
+When `name` is omitted, Actio derives a deterministic, collision-free name from the job id and
+the step. This matters because `actions/upload-artifact@v4` hard-fails at runtime when two
+uploads in the same run share a name (its default is the literal `artifact`), so two unnamed
+`artifacts:` steps would otherwise compile into a workflow that dies on the runner. Set an
+explicit `name:` whenever you need a stable, human-meaningful artifact name, or when a runtime
+`matrix` fans the same step out across legs (the compiler cannot see runtime legs, so it cannot
+disambiguate them for you).
+
+```yaml title=".actio.yml"
+steps:
+  - run: npm run build
+    artifacts:
+      paths: dist/**
+      name: build-output
+      retention-days: 7
+```
+
+```yaml title="generated workflow"
+steps:
+  - run: npm run build
+  - name: Upload artifacts
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: build-output
+      path: dist/**
+      retention-days: 7
+```
+
+The configured uploader (default `actions/upload-artifact@v4`) is set with
+[`artifacts.uploader`](/docs/configuration#artifacts).
 
 {/* macro:if-changed */}
 ### `jobs.<job_id>.steps[*].if-changed` [#if-changed]

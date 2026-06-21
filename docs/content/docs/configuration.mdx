@@ -183,6 +183,26 @@ export default defineConfig({
 Sugar: `pin: "all"` pins everything (first-party included); `pin: "off"` disables
 pinning entirely.
 
+## Artifact uploads (`artifacts.uploader`) [#artifacts]
+
+The [`artifacts:`](/docs/syntax#artifacts) step macro expands into a trailing
+`actions/upload-artifact` step. `artifacts.uploader` sets which action ref that
+expanded step uses. The default is `actions/upload-artifact@v4`.
+
+```ts title="actio.config.ts"
+export default defineConfig({
+  artifacts: {
+    uploader: "actions/upload-artifact@v4", // action ref the macro emits
+  },
+});
+```
+
+The ref is emitted verbatim, then flows through [pinning](/docs/supply-chain) like
+any other `uses:`, so under a pin policy it is rewritten to a SHA. Pin a tagged ref
+(not a bare `actions/upload-artifact`): a versionless `uses:` floats to the action's
+default branch and cannot be pinned. Point `uploader` at a fork or a mirror when you
+need a different uploader, and it will be pinned the same way.
+
 ## Custom passes
 
 The `passes` field is the headline feature: a pass you supply is **merged** into

@@ -33,6 +33,8 @@ export interface ParseContextInternal {
   forEachShareContracts?: ForEachShareContract[];
   /** Global default mode for the injection-hoist security pass (per-block knobs override). */
   injectionHoist?: "fix" | "warn" | "error" | "off";
+  /** Inline `artifacts:` macro config; `uploader` is the upload action ref to emit. */
+  artifacts?: { uploader?: string };
 }
 
 /**
