@@ -1,0 +1,124 @@
+---
+title: lifecycle
+description: Attach teardown and outcome-conditional steps to a step, a job, or the whole workflow.
+---
+
+Cleanup and outcome handling in raw YAML means smearing `if: always()`,
+`if: failure()`, and `steps.<id>.outcome` guards across your steps and remembering
+to give each guarded step an `id`. The lifecycle hooks — `ensure`, `on-success`,
+`on-failure`, and `on-abort` — declare those steps next to the work they guard, and
+Actio stamps in the right condition (and any needed `id`) at compile time. The same
+vocabulary scales up to a workflow-level [`finally:`](#workflow-teardown-finally).
+
+## Step and job hooks
+
+| Hook | Step-level guard | Job-level guard | Runs when |
+|---|---|---|---|
+| `ensure` | `if: always()` | `if: always()` | always (teardown) |
+| `on-success` | `success() && steps.<id>.outcome == 'success'` | `if: success()` | target succeeded |
+| `on-failure` | `!cancelled() && steps.<id>.outcome == 'failure'` | `if: failure()` | target failed |
+| `on-abort` | step-level cancellation | `if: cancelled()` | target was cancelled |
+
+At **step** scope the hook steps are spliced in right after the target step; at
+**job** scope they are appended to the job. Either way the hook key is stripped from
+the output.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: CI
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./start-db.sh
+        ensure:
+          - run: ./stop-db.sh
+      - run: ./build.sh
+        on-failure:
+          - run: ./upload-logs.sh
+```
+
+```yaml title="generated .yml"
+name: CI
+on:
+  - push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./start-db.sh
+      - run: ./stop-db.sh
+        if: always()
+      - run: ./build.sh
+        id: actio_test_step_2
+      - run: ./upload-logs.sh
+        if: "!cancelled() && steps.actio_test_step_2.outcome == 'failure'"
+```
+
+</CodeCompare>
+
+`./stop-db.sh` gets `if: always()`. The guarded `./build.sh` step is given a
+synthetic `id` so the `on-failure` step can key off its `outcome` _before_ any
+`continue-on-error` remapping.
+
+## Workflow teardown (`finally`)
+
+`finally:` declares jobs that run after the rest of the workflow, gated on overall
+outcome. Actio injects `needs:` over every real job plus the matching outcome guard.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: Deploy
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+finally:
+  on-failure:
+    page:
+      runs-on: ubuntu-latest
+      steps:
+        - run: ./page-oncall.sh
+```
+
+```yaml title="generated .yml"
+name: Deploy
+on:
+  - push
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+  page:
+    runs-on: ubuntu-latest
+    needs:
+      - deploy
+    if: failure()
+    steps:
+      - run: ./page-oncall.sh
+```
+
+</CodeCompare>
+
+## Gotchas
+
+<Callout title="on-abort scope">
+  At step scope `on-abort` only sees **step-level** cancellation. Whole-run
+  cancellation (the user hitting cancel) is a workflow concern — handle it with a
+  `finally.on-abort` job, not a step hook.
+</Callout>
+
+<Callout type="info" title="when: sugar on finally jobs">
+  A teardown job declared directly under `finally:` may use `when:` to gate on
+  another job's result (e.g. `when: deploy.failed`) instead of an outcome branch
+  group.
+</Callout>
+
+See the [lifecycle hooks](/docs/syntax#ensure) and [`finally`](/docs/syntax#finally)
+entries in the syntax reference for the full guard table.

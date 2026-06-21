@@ -1,0 +1,93 @@
+---
+title: share
+description: Publish step outputs across jobs without hand-wiring job.outputs and needs.
+---
+
+Passing a value from one job to another in raw YAML is a three-part chore: give the
+step an `id`, echo the value to `$GITHUB_OUTPUT`, declare it under the producing
+job's `outputs:`, add the consuming job to `needs:`, then read it back through
+`${{ needs.<job>.outputs.<name> }}`. `share` collapses all of that. Attach it to the
+producing step, reference the value anywhere as `${{ share.<name> }}`, and Actio
+wires `id`, `job.outputs`, `needs`, and the runtime reference for you.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: Release
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build.sh
+        share:
+          version:
+            run: cat VERSION
+            required: true
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh ${{ share.version }}
+```
+
+```yaml title="generated .yml"
+name: Release
+on:
+  - push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |-
+          ./build.sh
+          {
+            __ACTIO_EOF="ACTIO_EOF_version_$(openssl rand -hex 8 2>/dev/null || echo ${RANDOM}${RANDOM})"
+            echo "version<<${__ACTIO_EOF}"
+            cat VERSION
+            echo "${__ACTIO_EOF}"
+          } >> "$GITHUB_OUTPUT"
+        id: step_version
+    outputs:
+      version: ${{ steps.step_version.outputs.version }}
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh ${{ needs.build.outputs.version }}
+    needs:
+      - build
+```
+
+</CodeCompare>
+
+The `${{ share.version }}` reference in `deploy` is resolved to
+`${{ needs.build.outputs.version }}`, and `needs: [build]` is added automatically.
+The capture uses a randomized heredoc delimiter so multi-line values can't break the
+`$GITHUB_OUTPUT` file format.
+
+## Forms
+
+`share` accepts a map of `<name>` → output definition in one of two forms:
+
+- **value-form** (`value:`) — publish a static or expression value directly.
+- **capture-form** (`run:`) — run a command and capture its stdout as the output.
+
+<TypeTable
+  type={{
+    value: { type: 'string', description: 'Static value or expression to publish (value-form).' },
+    run: { type: 'string', description: "Command whose stdout is captured and published (capture-form)." },
+    required: { type: 'boolean', description: 'Fail the build wiring if the output ends up empty.' },
+    json: { type: 'boolean', description: 'Parse the captured value as JSON before exposing it.' },
+    type: { type: 'string', description: 'Assert the output type: string, number, boolean, enum, or object.' },
+  }}
+/>
+
+## Gotchas
+
+<Callout title="needs is merged, not replaced">
+  Every job that reads `${{ share.<name> }}` gains a `needs:` edge on the producing
+  job, merged with any `needs:` you already declared. A share reference therefore
+  also defines job ordering — a consumer always runs after its producer.
+</Callout>
+
+See the [`share`](/docs/syntax#share) entry in the syntax reference for the full
+option list.

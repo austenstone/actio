@@ -106,45 +106,9 @@ jobs:
 
 ## executors
 
-Named runner presets — a companion to `job-defaults` for extracting repeated
-runner configuration into a reusable template.
+Where `job-defaults` applies to every job, **executors** are named runner presets
+a job opts into with `executor:` — for the cases where only *some* jobs need a
+hardened runner, a container, or a service block. They share the same merge model
+as `job-defaults` (inline job keys win) and compose left-to-right when listed.
 
-<CodeCompare>
-
-```yaml title=".actio.yml"
-name: CI
-on: [push]
-executors:
-  hardened:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      HARDENED: "true"
-jobs:
-  test:
-    executor: hardened
-    steps:
-      - run: npm test
-```
-
-```yaml title="generated .yml"
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      HARDENED: "true"
-    steps:
-      - run: npm test
-```
-
-</CodeCompare>
-
-Compose multiple executors by passing a list — they are merged left-to-right,
-with later entries overriding earlier ones for scalar keys:
-
-```yaml title=".actio.yml"
-executor: [base, gpu]
-```
-
-An inline runner key on the job always wins over what the executor provides.
+See the dedicated [executors](/docs/macros/executors) page for the full guide.
