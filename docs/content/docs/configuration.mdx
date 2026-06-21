@@ -64,6 +64,26 @@ fragments:
     - uses: actions/checkout@v4
 ```
 
+## YAML coercion guard
+
+Actio parses your source with the YAML **1.2** core schema, but the GitHub Actions
+runner re-reads the generated workflow with a **1.1**-style schema that silently
+coerces bare scalars — `no`→`false`, `1:30`→`90`, `2024-01-01`→a date. A string you
+wrote stays a string in Actio yet flips type on the runner. The guard force-quotes
+exactly the emitted scalars a 1.1 consumer would mis-type. Tune it with `coercion`:
+
+```ts title="actio.config.ts"
+export default defineConfig({
+  coercion: "warn", // off | warn | fix (default)
+});
+```
+
+`fix` single-quotes trap scalars on emit, `warn` leaves them unquoted and reports a
+`yaml-coercion-trap` warning pointing at the offending value, and `off` disables the
+guard. An in-source root `coercion:` key overrides the config. Genuine booleans and
+numbers are never touched — only JS **strings** whose text matches a 1.1 trap
+(the Norway booleans, binary `0b…`, sexagesimal `1:30`, and ISO timestamps).
+
 ## Custom passes
 
 The `passes` field is the headline feature: a pass you supply is **merged** into
