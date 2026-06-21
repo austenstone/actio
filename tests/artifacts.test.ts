@@ -189,4 +189,113 @@ describe("artifacts macro", () => {
       expect(steps).toEqual([{ run: "make" }]);
     });
   });
+
+  describe("collision warnings", () => {
+    const warnings = (r: ReturnType<typeof compile>["result"], code: string) =>
+      r.diagnostics.filter((d) => d.severity === "warning" && d.code === code);
+
+    function compileJob(job: string, opts: Parameters<typeof transpile>[1] = {}) {
+      const source = `
+name: ci
+on: push
+jobs:
+${job}
+`;
+      return transpile(source, { header: false, validate: false, ...opts });
+    }
+
+    it("warns when two emitted upload steps share an explicit literal name", () => {
+      const { result } = compile({ run: "make", artifacts: { paths: "a/**", name: "dup" } }, {}, [
+        { run: "make", artifacts: { paths: "b/**", name: "dup" } },
+      ]);
+      const hits = warnings(result, "artifacts-duplicate-name");
+      expect(hits.length).toBeGreaterThanOrEqual(2);
+      expect(hits[0].message).toContain('"dup"');
+    });
+
+    it("warns on duplicate names that collide across different jobs", () => {
+      const result = compileJob(
+        `  a:
+    runs-on: ubuntu-latest
+    steps:
+      - {"run":"make","artifacts":{"paths":"a/**","name":"shared"}}
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - {"run":"make","artifacts":{"paths":"b/**","name":"shared"}}`,
+      );
+      expect(warnings(result, "artifacts-duplicate-name").length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("does not warn when explicit names are distinct", () => {
+      const { result } = compile({ run: "make", artifacts: { paths: "a/**", name: "one" } }, {}, [
+        { run: "make", artifacts: { paths: "b/**", name: "two" } },
+      ]);
+      expect(warnings(result, "artifacts-duplicate-name")).toEqual([]);
+    });
+
+    it("does not warn when collided names carry a per-leg expression", () => {
+      const { result } = compile(
+        { run: "make", artifacts: { paths: "a/**", name: "build-${{ matrix.os }}" } },
+        {},
+        [{ run: "make", artifacts: { paths: "b/**", name: "build-${{ matrix.os }}" } }],
+      );
+      expect(warnings(result, "artifacts-duplicate-name")).toEqual([]);
+    });
+
+    it("does not warn on collision-free derived names", () => {
+      const { result } = compile({ run: "make", artifacts: { paths: "a/**" } }, {}, [
+        { run: "make", artifacts: { paths: "b/**" } },
+      ]);
+      expect(warnings(result, "artifacts-duplicate-name")).toEqual([]);
+    });
+
+    it("warns on an unnamed artifacts step inside a matrix job", () => {
+      const result = compileJob(
+        `  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - {"run":"make","artifacts":{"paths":"dist/**"}}`,
+      );
+      const hits = warnings(result, "artifacts-matrix-unnamed");
+      expect(hits).toHaveLength(1);
+      expect(hits[0].message).toContain('"build"');
+    });
+
+    it("warns on an unnamed artifacts step in an include-only matrix job", () => {
+      const result = compileJob(
+        `  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest }
+          - { os: macos-latest }
+    steps:
+      - {"run":"make","artifacts":{"paths":"dist/**"}}`,
+      );
+      expect(warnings(result, "artifacts-matrix-unnamed")).toHaveLength(1);
+    });
+
+    it("does not warn on a NAMED artifacts step inside a matrix job", () => {
+      const result = compileJob(
+        `  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - {"run":"make","artifacts":{"paths":"dist/**","name":"out-\${{ matrix.os }}"}}`,
+      );
+      expect(warnings(result, "artifacts-matrix-unnamed")).toEqual([]);
+    });
+
+    it("does not warn on an unnamed artifacts step in a non-matrix job", () => {
+      const { result } = compile({ run: "make", artifacts: { paths: "dist/**" } });
+      expect(warnings(result, "artifacts-matrix-unnamed")).toEqual([]);
+    });
+  });
 });

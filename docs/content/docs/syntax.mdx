@@ -923,9 +923,14 @@ When `name` is omitted, Actio derives a deterministic, collision-free name from 
 the step. This matters because `actions/upload-artifact@v4` hard-fails at runtime when two
 uploads in the same run share a name (its default is the literal `artifact`), so two unnamed
 `artifacts:` steps would otherwise compile into a workflow that dies on the runner. Set an
-explicit `name:` whenever you need a stable, human-meaningful artifact name, or when a runtime
-`matrix` fans the same step out across legs (the compiler cannot see runtime legs, so it cannot
-disambiguate them for you).
+explicit `name:` whenever you need a stable, human-meaningful artifact name.
+
+Under a `matrix`, every leg is part of the same run, so a single derived name (or a *static*
+explicit one) collides across legs. The fix is an explicit `name:` that carries a per-leg
+expression, e.g. `name: build-${{ matrix.os }}`. Actio surfaces compile-time warnings for both
+footguns: an unnamed `artifacts:` step in a matrix job (`artifacts-matrix-unnamed`), and two
+emitted upload steps that share an identical expression-free name (`artifacts-duplicate-name`).
+Neither breaks the build; they just stop a silent runtime failure.
 
 ```yaml title=".actio.yml"
 steps:

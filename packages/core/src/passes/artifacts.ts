@@ -16,6 +16,14 @@ type ArtifactsSpec = {
   retentionDays?: number;
 };
 
+/** An emitted upload's artifact name plus where it came from, for collision checks. */
+type EmittedName = { name: string; path?: Path };
+
+/** A literal that carries a `${{ ... }}` expression may differ per matrix leg at runtime. */
+function hasExpression(value: string): boolean {
+  return value.includes("${{");
+}
+
 function stepLabel(step: Step): string {
   if (typeof step.name === "string" && step.name.trim()) return step.name.trim();
   if (typeof step.uses === "string" && step.uses.trim()) return step.uses.trim();
@@ -120,14 +128,67 @@ function expandStep(
   idx: number,
   uploader: string,
   used: Set<string>,
+  hasMatrix: boolean,
+  emitted: EmittedName[],
 ): Step[] {
   if (!isObject(step) || step.artifacts === undefined) return [step];
   const path = sourcePathFor(ctx, step, ["jobs", jobId, "steps", idx], ["artifacts"]);
   const spec = normalizeSpec(ctx, step.artifacts, path);
   delete step.artifacts;
   if (spec === null) return [step];
-  const name = spec.name ?? deriveName(jobId, step, idx, used);
+
+  let name: string;
+  if (spec.name !== undefined) {
+    name = spec.name;
+    const namePath = sourcePathFor(ctx, step, ["jobs", jobId, "steps", idx], ["artifacts", "name"]);
+    emitted.push({ name, path: namePath });
+  } else {
+    name = deriveName(jobId, step, idx, used);
+    // One derived name is shared by every matrix leg (legs are one run), so an
+    // unnamed upload in a matrix job collides at runtime. The author must add a
+    // per-leg expression; warn rather than ship a silent footgun.
+    if (hasMatrix) {
+      pushDiagnostic(
+        ctx,
+        "warning",
+        `artifacts: unnamed upload in matrix job "${jobId}" derives one name ("${name}") shared by every matrix leg, which collides at runtime`,
+        path,
+        {
+          hint: "set `name:` with a per-leg expression, e.g. `name: build-${{ matrix.os }}`",
+          code: "artifacts-matrix-unnamed",
+        },
+      );
+    }
+  }
   return [step, buildUploadStep(ctx, step, uploader, spec, name)];
+}
+
+/**
+ * upload-artifact@v4 hard-fails at runtime when two uploads in the same run share
+ * a name, and the collision boundary is the whole workflow run (across jobs).
+ * Derived names dedup themselves, so the only silent collision left is two explicit
+ * literal names. Skip expression-bearing names: they may differ per matrix leg.
+ */
+function warnDuplicateNames(ctx: ParseContext, emitted: EmittedName[]): void {
+  const groups = new Map<string, (Path | undefined)[]>();
+  for (const { name, path } of emitted) {
+    if (hasExpression(name)) continue;
+    const paths = groups.get(name) ?? [];
+    paths.push(path);
+    groups.set(name, paths);
+  }
+  for (const [name, paths] of groups) {
+    if (paths.length < 2) continue;
+    for (const path of paths) {
+      pushDiagnostic(
+        ctx,
+        "warning",
+        `artifacts: ${paths.length} upload steps emit the same artifact name "${name}"; upload-artifact@v4 hard-fails at runtime when uploads in a run share a name`,
+        path,
+        { hint: "give each `artifacts:` step a unique `name:`", code: "artifacts-duplicate-name" },
+      );
+    }
+  }
 }
 
 function explicitNamesIn(job: Job): string[] {
@@ -157,12 +218,16 @@ export function artifactsPass(ctx: ParseContext): void {
     for (const n of explicitNamesIn(job)) used.add(n);
   });
 
+  const emitted: EmittedName[] = [];
   visitJobs(ctx, ({ id: jobId, job }) => {
     if (!Array.isArray(job.steps)) return;
+    const hasMatrix = isObject(job.strategy) && job.strategy.matrix !== undefined;
     transformSteps(ctx, jobId, job, (step, idx) =>
-      expandStep(ctx, jobId, step, idx, uploader, used),
+      expandStep(ctx, jobId, step, idx, uploader, used, hasMatrix, emitted),
     );
   });
+
+  warnDuplicateNames(ctx, emitted);
 }
 
 export const artifacts: Pass = {
