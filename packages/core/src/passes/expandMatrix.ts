@@ -198,8 +198,15 @@ function resolveMatrixRef(ref: string, props: LegValues): { value: unknown } | u
     } else {
       return undefined;
     }
-    if (!isObject(current) || !(key in current)) return undefined;
-    current = current[key];
+    if (Array.isArray(current)) {
+      const idx = Number(key);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= current.length) return undefined;
+      current = current[idx];
+    } else if (isObject(current) && key in current) {
+      current = current[key];
+    } else {
+      return undefined;
+    }
     resolvedAny = true;
   }
   return resolvedAny ? { value: current } : undefined;
