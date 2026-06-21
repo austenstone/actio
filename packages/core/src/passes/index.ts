@@ -21,6 +21,7 @@ import { lifecycle } from "./lifecycle.js";
 import { params } from "./params.js";
 import { type Pass, PassRegistry, runCompletePassPipeline } from "./registry.js";
 import { retry } from "./retry.js";
+import { reusable } from "./reusable.js";
 import { share } from "./share.js";
 import { whenCompile } from "./whenCompile.js";
 
@@ -29,11 +30,15 @@ import { whenCompile } from "./whenCompile.js";
  * (see registry.ts), not this array, so the effective pipeline is:
  *   params → call-templates → job-defaults → for-each → when-compile → fragments → share → retry → fallback → dynamic-matrix → expand-matrix → lifecycle → if-changed → injection-hoist
  *
+ * `reusable` runs right after `params` so its input-reference normalization sees
+ * fully resolved compile-time text before the call/normal job partition.
+ *
  * `call-templates` slots in immediately after `params` (and before `job-defaults`)
  * so `extends:` materializes `uses` before the call/normal job partition.
  */
 export const builtinPasses: Pass[] = [
   params,
+  reusable,
   callTemplates,
   jobDefaults,
   forEach,
@@ -101,6 +106,7 @@ export {
   lifecycle,
   params,
   retry,
+  reusable,
   share,
   whenCompile,
 };

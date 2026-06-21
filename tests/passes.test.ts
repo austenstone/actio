@@ -108,6 +108,7 @@ describe("sortPasses", () => {
   it("resolves the built-in pipeline to the documented order", () => {
     expect(sortPasses(builtinPasses).map((p) => p.name)).toEqual([
       "params",
+      "reusable",
       "call-templates",
       "job-defaults",
       "for-each",
@@ -157,6 +158,7 @@ describe("PassRegistry", () => {
     registry.register(recorder("post", ["dynamic-matrix"], log));
     expect(registry.list().map((p) => p.name)).toEqual([
       "params",
+      "reusable",
       "call-templates",
       "job-defaults",
       "for-each",
@@ -205,6 +207,7 @@ describe("createRegistry", () => {
         .map((p) => p.name),
     ).toEqual([
       "params",
+      "reusable",
       "call-templates",
       "job-defaults",
       "for-each",

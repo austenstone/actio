@@ -111,6 +111,84 @@ jobs:
 
 Full guide: [params](/docs/macros/params).
 
+{/* macro:reusable */}
+### `reusable` [#reusable]
+
+Declare a workflow as both callable (`on: workflow_call`) and dispatchable
+(`on: workflow_dispatch`) in one place. Actio emits both trigger blocks, derives
+the `workflow_dispatch` inputs from the `workflow_call` inputs so you define them
+once, and normalizes input references to a single canonical runtime form.
+
+A callable workflow reads an input as `${{ inputs.x }}`, but a dispatched one
+reads the same value as `${{ github.event.inputs.x }}`. Authoring one workflow
+that is both forces a hand-written wrapper and careful dual-reference juggling.
+With `reusable` you write `${{ inputs.x }}` everywhere; Actio rewrites any
+`${{ github.event.inputs.x }}` it finds back to that canonical form, which is
+valid under either trigger.
+
+- **Valid in:** top level
+- **Type:** object with `inputs`, `secrets`, `outputs`, and `dispatch` keys
+- **Compiles to:** `on.workflow_call` (always) plus `on.workflow_dispatch`
+  (unless `dispatch: false`); the `reusable` key is stripped
+
+Input `type` is restricted to the `workflow_call` subset (`string`, `boolean`,
+`number`) and defaults to `string`. Set `dispatch: false` to emit only the
+callable trigger. A hand-written `workflow_call` or `workflow_dispatch` trigger
+is a compile error, because Actio owns those blocks when `reusable` is present.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+on: push
+reusable:
+  inputs:
+    target:
+      type: string
+      required: true
+    verbose:
+      type: boolean
+      default: false
+  secrets:
+    token:
+      required: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "deploying to ${{ github.event.inputs.target }}"
+```
+
+```yaml title="generated .yml"
+on:
+  push: null
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: true
+      verbose:
+        type: boolean
+        default: false
+    secrets:
+      token:
+        required: true
+  workflow_dispatch:
+    inputs:
+      target:
+        type: string
+        required: true
+      verbose:
+        type: boolean
+        default: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "deploying to ${{ inputs.target }}"
+```
+
+</CodeCompare>
+
 {/* macro:fragments */}
 ### `fragments` [#fragments]
 
