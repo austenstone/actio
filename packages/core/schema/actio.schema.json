@@ -681,6 +681,9 @@
         "retry": {
           "$ref": "#/definitions/retry"
         },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
         "fallback": {
           "$ref": "#/definitions/fallback"
         },
@@ -1922,6 +1925,51 @@
           }
         }
       ]
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paths"
+      ],
+      "title": "artifacts (Actio macro)",
+      "description": "Actio macro. Upload build output from this step. Expands into a trailing `actions/upload-artifact` step right after this one, mapping `paths`->`path`, `name`->`name`, and `retention-days`. When `name` is omitted a deterministic, collision-free name is derived (so two uploads never crash upload-artifact@v4 at runtime). The upload step defaults to `if: always()` so artifacts publish even when the step failed.",
+      "markdownDescription": "**Actio macro**: upload build output from this step.\n\nExpands into a trailing `actions/upload-artifact` step right after this one. `paths` (a glob string or list of globs) maps to the action's multiline `path` input. `name` and `retention-days` are optional; when `name` is omitted Actio derives a deterministic, collision-free name so two uploads never share the default name (which makes upload-artifact@v4 hard-fail at runtime). The upload defaults to `if: always()` so artifacts publish even on failure (handy for debugging).\n\n```yaml\nsteps:\n  - run: npm run build\n    artifacts:\n      paths: dist/**\n      name: build-output\n      retention-days: 7\n```",
+      "properties": {
+        "paths": {
+          "title": "paths",
+          "description": "A glob string or a list of globs to upload. Maps to upload-artifact's `path` input (a list joins into the multiline form).",
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Artifact name. Omit to let Actio derive a unique, deterministic name from the job id and step."
+        },
+        "if": {
+          "type": "string",
+          "description": "Runtime condition for the upload step. Default `always()` so artifacts publish even when the step failed."
+        },
+        "retention-days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90,
+          "description": "Days to retain the artifact (GitHub allows 1-90)."
+        }
+      }
     },
     "softFail": {
       "title": "soft_fail (Actio macro)",

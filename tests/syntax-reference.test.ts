@@ -114,6 +114,7 @@ const OPTION_DEFS: Record<string, string> = {
   retry: "retry",
   fallback: "fallback",
   share: "sharedOutput",
+  artifacts: "artifacts",
 };
 
 /** Union of `properties` keys across a definition's `oneOf` arms (or the def itself). */
