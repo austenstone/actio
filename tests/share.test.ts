@@ -483,6 +483,51 @@ jobs:
     expect(result.ok).toBe(true);
   });
 
+  it("5.8c hard-errors when dynamic-matrix injects a matrix onto a shared output (#158)", () => {
+    const { result } = build(`
+name: clobber-repro
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    dynamic-matrix:
+      script: echo '["1.0.0","2.0.0"]'
+    steps:
+      - name: emit
+        run: VERSION=$(echo "done")
+        share:
+          version: $VERSION
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "publishing v\${{ share.version }}"
+`);
+    // Without the late re-check this clobber shipped with zero diagnostics.
+    expect(hasCode(result, "share-matrix-output-clobber")).toBe(true);
+    expect(result.ok).toBe(false);
+  });
+
+  it("5.8d still allows a dynamic-matrix job that shares nothing cross-job", () => {
+    const { result } = build(`
+name: ok
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    dynamic-matrix:
+      script: echo '["1.0.0","2.0.0"]'
+    steps:
+      - run: echo build
+  publish:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - run: echo publish
+`);
+    expect(hasCode(result, "share-matrix-output-clobber")).toBe(false);
+    expect(result.ok).toBe(true);
+  });
+
   it("5.9 warns when a shared value derives from a secret", () => {
     const { result } = build(`
 name: e

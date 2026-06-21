@@ -507,6 +507,28 @@ function hasNeedsCycle(jobs: Record<string, Job>): boolean {
 }
 
 /**
+ * Emit the hard error for a share output that escapes a matrix job. GitHub
+ * collapses a matrix job's entire `outputs:` map down to whichever leg finishes
+ * last, so a cross-job-referenced matrix output silently loses every other leg's
+ * value. Shared by the early guard (literal matrices) and the late check (#158,
+ * matrices injected by `dynamic-matrix` after the share pass has already run).
+ */
+function reportMatrixOutputClobber(
+  ctx: ParseContext,
+  jobId: string,
+  name: string,
+  path: Path,
+): void {
+  pushDiagnostic(
+    ctx,
+    "error",
+    `share output "${name}" escapes matrix job "${jobId}" via job outputs, but GitHub collapses a matrix job's outputs map to a single leg — only the last leg's value survives. Use distinct output names within one serial job, N distinct (non-matrix) jobs for static parallelism, or artifact fan-in for the dynamic case.`,
+    path,
+    { code: "share-matrix-output-clobber" },
+  );
+}
+
+/**
  * share pass: lowers `share:` producers on steps into `$GITHUB_OUTPUT` writers,
  * rewrites `${{ share.* }}` consumers to `steps`/`needs` expressions, and infers
  * the `needs` edges + `job.outputs` wiring that makes cross-job sharing work.
@@ -537,20 +559,21 @@ export function sharePass(ctx: ParseContext): void {
     for (const p of list) {
       if (!p.referencedCrossJob) continue;
       if (p.isMatrix) {
-        // GitHub collapses a matrix job's entire `outputs:` map down to whichever
-        // leg finishes last, so a cross-job-referenced matrix output silently loses
-        // every other leg's value. Hard-fail instead of emitting lossy YAML.
-        pushDiagnostic(
-          ctx,
-          "error",
-          `share output "${p.name}" escapes matrix job "${p.jobId}" via job outputs, but GitHub collapses a matrix job's outputs map to a single leg — only the last leg's value survives. Use distinct output names within one serial job, N distinct (non-matrix) jobs for static parallelism, or artifact fan-in for the dynamic case.`,
-          p.path,
-          { code: "share-matrix-output-clobber" },
-        );
+        reportMatrixOutputClobber(ctx, p.jobId, p.name, p.path);
         continue;
       }
       if (!isObject(p.job.outputs)) p.job.outputs = {};
       p.job.outputs[p.name] = `\${{ steps.${p.stepId}.outputs.${p.name} }}`;
+      // The job has no matrix now, but `dynamic-matrix` runs later and can inject
+      // one, which would turn this wiring into a silent clobber. Defer a re-check
+      // until the final matrix shape is known (#158).
+      ctx.internal.share ??= { matrixClobberChecks: [] };
+      ctx.internal.share.matrixClobberChecks.push({
+        jobId: p.jobId,
+        job: p.job,
+        name: p.name,
+        path: p.path,
+      });
     }
   }
   for (const [consumerJobId, producers] of edges) {
@@ -576,4 +599,28 @@ export const share: Pass = {
   name: "share",
   runsAfter: ["fragments"],
   apply: sharePass,
+};
+
+/**
+ * Late re-run of the matrix-output clobber guard. The share pass wires cross-job
+ * outputs while a job has no matrix, but `dynamic-matrix` injects `strategy.matrix`
+ * afterward. This pass runs once both matrix passes have settled and fires the
+ * guard for any wired output whose job now carries a matrix, then unwires the
+ * lossy output so we never emit silently-corrupt YAML (#158).
+ */
+export function shareMatrixCheckPass(ctx: ParseContext): void {
+  const checks = ctx.internal.share?.matrixClobberChecks;
+  if (!checks) return;
+  for (const { jobId, job, name, path } of checks) {
+    const strategy = job.strategy;
+    if (!isObject(strategy) || strategy.matrix === undefined) continue;
+    reportMatrixOutputClobber(ctx, jobId, name, path);
+    if (isObject(job.outputs)) delete job.outputs[name];
+  }
+}
+
+export const shareMatrixCheck: Pass = {
+  name: "share-matrix-check",
+  runsAfter: ["dynamic-matrix", "expand-matrix"],
+  apply: shareMatrixCheckPass,
 };

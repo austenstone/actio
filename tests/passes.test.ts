@@ -127,6 +127,7 @@ describe("sortPasses", () => {
       "lifecycle",
       "if-changed",
       "injection-hoist",
+      "share-matrix-check",
     ]);
   });
 });
@@ -179,6 +180,7 @@ describe("PassRegistry", () => {
       "lifecycle",
       "if-changed",
       "injection-hoist",
+      "share-matrix-check",
       "post",
     ]);
   });
@@ -230,6 +232,7 @@ describe("createRegistry", () => {
       "lifecycle",
       "if-changed",
       "injection-hoist",
+      "share-matrix-check",
     ]);
   });
 
