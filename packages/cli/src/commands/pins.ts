@@ -4,6 +4,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import pc from "picocolors";
 import { discover, outputPathFor } from "./build.js";
+import { type ImportLockEntry, readLock, serializeLock, writeLock } from "./lock.js";
+
+export type { ActioLock, ActionLockEntry, ImportLockEntry } from "./lock.js";
 
 export type PinsExitCode = 0 | 1 | 2;
 
@@ -32,34 +35,6 @@ interface ParsedImportSpec {
   fragment?: string;
   ref: string;
 }
-
-export interface ActionLockEntry {
-  action: string;
-  sourceRef: string;
-  digest: string;
-  integrity: string;
-  resolvedAt: string;
-}
-
-export interface ImportLockEntry {
-  source: string;
-  immutableRef: string;
-  integrity: string;
-  resolvedAt: string;
-}
-
-export interface ActioLock {
-  version: 1;
-  actions: Record<string, ActionLockEntry>;
-  imports: Record<string, ImportLockEntry>;
-}
-
-interface LockState {
-  path: string;
-  data: LockFileData;
-}
-
-type LockFileData = ActioLock & Record<string, unknown>;
 
 type ResolverKind = "action" | "import";
 
@@ -316,33 +291,6 @@ export const createGitHubResolver = (): PinResolver => ({
     return new TextEncoder().encode(await response.text());
   },
 });
-
-const defaultLock = (): LockFileData => ({ version: 1, actions: {}, imports: {} });
-
-const serializeLock = (lock: LockState): string => `${JSON.stringify(lock.data, null, 2)}\n`;
-
-const readLock = async (cwd: string, lockPath?: string): Promise<LockState> => {
-  const fullPath = path.resolve(cwd, lockPath ?? "actio.lock");
-  if (!existsSync(fullPath)) {
-    return { path: fullPath, data: defaultLock() };
-  }
-  const text = await readFile(fullPath, "utf8");
-  const parsed = JSON.parse(text) as Partial<ActioLock> & Record<string, unknown>;
-  return {
-    path: fullPath,
-    data: {
-      ...parsed,
-      version: 1,
-      actions: parsed.actions ?? {},
-      imports: parsed.imports ?? {},
-    },
-  };
-};
-
-const writeLock = async (lock: LockState): Promise<void> => {
-  await mkdir(path.dirname(lock.path), { recursive: true });
-  await writeFile(lock.path, serializeLock(lock), "utf8");
-};
 
 const resolveAndHashAction = async (
   resolver: PinResolver,

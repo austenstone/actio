@@ -1,4 +1,4 @@
-import { Document, Scalar, type ToStringOptions, visit } from "yaml";
+import { Document, isNode, Scalar, type ToStringOptions, visit } from "yaml";
 import { type CoercionMode, coercionTrapCategory } from "./coercion.js";
 import { KEY_ORDER, type WorkflowData } from "./parser.js";
 
@@ -60,6 +60,9 @@ function quoteCoercionTraps(doc: Document): void {
  * Pass-created objects lack KEY_ORDER and fall back to their own key order.
  */
 function toOrdered(value: unknown): unknown {
+  // Pass-built yaml nodes (e.g. a pinned Scalar carrying a trailing comment) are
+  // already emit-ready; recursing would re-key their internals and drop the comment.
+  if (isNode(value)) return value;
   if (Array.isArray(value)) return value.map(toOrdered);
   if (value && typeof value === "object") {
     const obj = value as Record<string, unknown>;

@@ -25,6 +25,9 @@ actio schema             # Print the Actio JSON Schema (--out <file> to save loc
 | `--no-header` | Omit the generated-by-Actio banner |
 | `--no-source-map` | Do not write a `.yml.map` source map beside each workflow |
 | `--no-annotate` | Do not inject the `actio-annotate` runtime failure-mapping job |
+| `--pin` / `--no-pin` | Force pinning of `uses:`/`docker://` refs on or off (overrides config) |
+| `--pin-github` (`--pin-first-party`) | Also pin first-party `actions/*` and `github/*` refs |
+| `--offline` | Resolve pins from the lockfile only; fail (exit `2`) if anything is unresolved |
 
 ## Watch mode
 

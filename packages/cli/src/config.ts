@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { ActioConfig, ActioTarget, CoercionMode } from "actio-core";
+import type { ActioConfig, ActioTarget, CoercionMode, PinPolicy } from "actio-core";
 import { createJiti } from "jiti";
 import type { BuildOptions } from "./commands/build.js";
 
@@ -88,6 +88,40 @@ export async function loadActioConfig(
 }
 
 /**
+ * Resolve the concrete pin policy from config sugar/object, then apply flag
+ * overrides. Defaults (#19 §2.1): third-party + docker pinned, first-party
+ * (`actions/*`, `github/*`) left on its tag.
+ */
+function resolvePinPolicy(raw: ActioConfig["pin"], passed: (name: string) => boolean): PinPolicy {
+  const base: PinPolicy =
+    raw === "all"
+      ? { enabled: true, thirdParty: true, github: true, docker: true, allow: [], comment: "tag" }
+      : raw === "off"
+        ? {
+            enabled: false,
+            thirdParty: true,
+            github: false,
+            docker: true,
+            allow: [],
+            comment: "tag",
+          }
+        : {
+            enabled: raw?.enabled ?? true,
+            thirdParty: raw?.thirdParty ?? true,
+            github: raw?.github ?? false,
+            docker: raw?.docker ?? true,
+            allow: raw?.allow ?? [],
+            comment: raw?.comment ?? "tag",
+          };
+
+  let enabled = base.enabled;
+  if (passed("--no-pin")) enabled = false;
+  else if (passed("--pin")) enabled = true;
+  const github = base.github || passed("--pin-github") || passed("--pin-first-party");
+  return { ...base, enabled, github };
+}
+
+/**
  * Resolve build options with precedence: explicit CLI flag > config file > default.
  * Pure (argv and config are injected) so precedence is unit-testable. cac can't
  * distinguish a defaulted negated boolean from an explicit one, hence the argv scan.
@@ -112,6 +146,8 @@ export function resolveBuildOptions(args: {
     sourceMap: passed("--no-source-map") ? false : (config.sourceMap ?? true),
     annotate: passed("--no-annotate") ? false : (config.annotate ?? true),
     passes: config.passes,
+    pin: resolvePinPolicy(config.pin, passed),
+    offline: passed("--offline"),
     target: passed("--target")
       ? parseActioTarget(flags.target, "CLI")
       : config.target !== undefined

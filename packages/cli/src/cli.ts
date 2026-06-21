@@ -27,6 +27,10 @@ interface CliBuildFlags {
   validate: boolean;
   header: boolean;
   watch?: boolean;
+  pin?: boolean;
+  pinGithub?: boolean;
+  pinFirstParty?: boolean;
+  offline?: boolean;
 }
 
 interface CliPinsCheckFlags {
@@ -209,6 +213,11 @@ const createCli = () => {
     .option("--no-header", "Omit the generated-by-Actio banner")
     .option("--no-source-map", "Do not write a .yml.map source map beside each workflow")
     .option("--no-annotate", "Do not inject the actio-annotate runtime failure-mapping job")
+    .option("--pin", "Pin uses: refs to immutable SHAs/digests (default on)")
+    .option("--no-pin", "Leave uses: refs on their tags (disable pinning)")
+    .option("--pin-github", "Also pin first-party actions/* and github/* refs")
+    .option("--pin-first-party", "Alias for --pin-github")
+    .option("--offline", "Resolve pins only from the lock cache; never hit the network")
     .action(async (files: string[], flags: CliBuildFlags) => {
       if (flags.watch) {
         await startWatch(files, flags);
@@ -251,6 +260,11 @@ const createCli = () => {
     .option("--no-header", "Omit the generated-by-Actio banner")
     .option("--no-source-map", "Ignore the .yml.map source map in the drift check")
     .option("--no-annotate", "Do not inject the actio-annotate runtime failure-mapping job")
+    .option("--pin", "Pin uses: refs to immutable SHAs/digests (default on)")
+    .option("--no-pin", "Leave uses: refs on their tags (disable pinning)")
+    .option("--pin-github", "Also pin first-party actions/* and github/* refs")
+    .option("--pin-first-party", "Alias for --pin-github")
+    .option("--offline", "Resolve pins only from the lock cache; never hit the network")
     .action(async (files: string[], flags: CliBuildFlags) => {
       const { patterns, options } = await resolveOptions(files, flags, true);
       process.exitCode = await runBuild(patterns, options);
