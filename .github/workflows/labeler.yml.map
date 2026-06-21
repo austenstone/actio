@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "generator": "actio",
+  "file": ".github/actio/labeler.yml",
+  "sources": [
+    ".github/actio/labeler.actio.yml"
+  ],
+  "mappings": [
+    {
+      "generated": {
+        "line": 5
+      },
+      "source": 0,
+      "original": {
+        "line": 3,
+        "col": 7
+      },
+      "path": "name"
+    },
+    {
+      "generated": {
+        "line": 7
+      },
+      "source": 0,
+      "original": {
+        "line": 5,
+        "col": 16
+      },
+      "path": "on.pull_request"
+    },
+    {
+      "generated": {
+        "line": 9
+      },
+      "source": 0,
+      "original": {
+        "line": 8,
+        "col": 13
+      },
+      "path": "permissions.contents"
+    },
+    {
+      "generated": {
+        "line": 11
+      },
+      "source": 0,
+      "original": {
+        "line": 11,
+        "col": 3
+      },
+      "path": "jobs"
+    },
+    {
+      "generated": {
+        "line": 12
+      },
+      "source": 0,
+      "original": {
+        "line": 12,
+        "col": 14
+      },
+      "path": "jobs.label.runs-on"
+    },
+    {
+      "generated": {
+        "line": 14
+      },
+      "source": 0,
+      "original": {
+        "line": 14,
+        "col": 17
+      },
+      "path": "jobs.label.permissions.contents"
+    },
+    {
+      "generated": {
+        "line": 15
+      },
+      "source": 0,
+      "original": {
+        "line": 15,
+        "col": 22
+      },
+      "path": "jobs.label.permissions.pull-requests"
+    },
+    {
+      "generated": {
+        "line": 17
+      },
+      "source": 0,
+      "original": {
+        "line": 17,
+        "col": 15
+      },
+      "path": "jobs.label.steps.0.uses"
+    }
+  ]
+}

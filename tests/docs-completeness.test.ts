@@ -67,14 +67,26 @@ describe("docs completeness", () => {
       .filter((name) => !internalPassAllowlist.has(name))
       .filter((name) => !existsSync(macroPagePath(name)));
 
-    expect(missing).toEqual([]);
+    const fix = missing
+      .map((name) => `${name} -> docs/content/docs/macros/${passPageSlug[name] ?? name}.mdx`)
+      .join(", ");
+    expect(
+      missing,
+      `Built-in pass(es) without a macro doc page: ${fix}. ` +
+        "Fix: run `npm run docs:new <name>` to scaffold the page (note: the `when-compile` pass " +
+        "ships as the `static-if` slug), then add the slug to docs/content/docs/macros/meta.json.",
+    ).toEqual([]);
   });
 
   it("documents every ActioConfig key in configuration.mdx", () => {
     const config = readDoc("configuration.mdx");
     const missing = extractActioConfigKeys().filter((key) => !config.includes(key));
 
-    expect(missing).toEqual([]);
+    expect(
+      missing,
+      `ActioConfig key(s) missing from configuration.mdx: ${missing.join(", ")}. ` +
+        "Fix: document each key literally (by name) in docs/content/docs/configuration.mdx.",
+    ).toEqual([]);
   });
 
   it("documents every CLI command in cli.mdx (pins on the supply-chain page)", () => {
@@ -89,6 +101,11 @@ describe("docs completeness", () => {
       return !docFor(file).includes(command);
     });
 
-    expect(missing).toEqual([]);
+    expect(
+      missing,
+      `CLI command(s) missing from the docs: ${missing.join(", ")}. ` +
+        "Fix: document each command in docs/content/docs/cli.mdx (the `pins` command lives in " +
+        "docs/content/docs/supply-chain.mdx instead).",
+    ).toEqual([]);
   });
 });
