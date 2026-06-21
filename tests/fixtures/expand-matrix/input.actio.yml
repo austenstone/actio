@@ -1,0 +1,17 @@
+name: Expand Matrix
+on: [push]
+jobs:
+  build:
+    expand_matrix: true
+    runs-on: ${{ matrix.os }}-latest
+    strategy:
+      matrix:
+        os: [ubuntu, windows]
+        arch: [x64, arm64]
+    steps:
+      - run: ./build --os ${{ matrix.os }} --arch ${{ matrix.arch }}
+  deploy:
+    needs: build(os=ubuntu, arch=x64)
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
