@@ -78,6 +78,15 @@ export interface ActioConfig {
    */
   unusedSymbols?: "off" | "warn" | "error";
   /**
+   * Opt-in strict YAML 1.2.2 source lint. When `true`, every YAML 1.1 merge key
+   * (`<<`) in `.actio.yml` source is reported as a `yaml-merge-key` warning so a
+   * repo can keep its source to a pure 1.2.2 style. Default `false` (permissive).
+   * Lint-only: `<<` is still resolved and erased at parse, so emitted YAML is
+   * identical with or without strict mode. Anchors and aliases (`&`/`*`) are
+   * valid 1.2.2 and never flagged. The `--strict` CLI flag overrides this.
+   */
+  strict?: boolean;
+  /**
    * Global default mode for the YAML type-coercion guard that defends emitted
    * string scalars against YAML-1.1 coercion on the Actions runner (`no`→false,
    * `1:30`→90, `2024-01-01`→Date). `fix` single-quotes them, `warn` reports a

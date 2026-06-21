@@ -117,6 +117,29 @@ positions and rejects an unquoted trap loudly in strictly-typed positions (e.g.
 > warning and falls back to the inherited mode, so one stray source file never
 > breaks a whole build.
 
+## Strict YAML 1.2.2 source
+
+Actio opts into YAML **1.1** merge keys (`<<:`) when parsing, so you can fold one
+mapping into another. They resolve and are erased at parse, so the emitted workflow
+is already a pure YAML 1.2.2 subset with no `<<:` left in it. If you want your
+`.actio.yml` *source* to stay pure 1.2.2 as well, turn on `strict`:
+
+```ts title="actio.config.ts"
+export default defineConfig({
+  strict: true, // off by default
+});
+```
+
+When enabled, every `<<:` merge key in source gets a `yaml-merge-key` warning that
+points at the line and suggests an Actio reuse macro (`fragments` + `inject`,
+`job-defaults`, `executors`, or `extends`) in its place. The `--strict` CLI flag
+turns it on for a single run and overrides the config value.
+
+This is a source linter only: it never changes the emitted YAML, and the default
+stays permissive, so `<<:` keeps working unless you opt in. Plain YAML anchors and
+aliases (`&name` / `*name`) are valid 1.2.2 core and are never flagged. Only the
+1.1 merge key is.
+
 ## Output linting (`lint` → actionlint)
 
 `validate` checks the generated workflow against GitHub's JSON Schema (a structural

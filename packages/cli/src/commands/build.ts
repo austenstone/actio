@@ -36,6 +36,8 @@ export interface BuildOptions {
   target: ActioTarget;
   /** Severity for dead-code diagnostics on unused params/fragments/executors. Default "warn". */
   unusedSymbols?: "off" | "warn" | "error";
+  /** Opt-in strict YAML 1.2.2 lint flagging `<<` merge keys in source. Default false. */
+  strict?: boolean;
   /** Inline `artifacts:` macro config; `uploader` is the upload action ref to emit. */
   artifacts?: { uploader?: string };
   /** YAML type-coercion guard mode (`off | warn | fix`). Default `fix`. */
@@ -603,6 +605,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     annotate: opts.annotate,
     target: opts.target,
     unusedSymbols: opts.unusedSymbols,
+    strict: opts.strict,
     artifacts: opts.artifacts,
     coercion: opts.coercion,
     lint: opts.lint,

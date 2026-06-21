@@ -19,6 +19,7 @@ export default defineConfig({
         "packages/core/src/transpile.ts",
         "packages/core/src/validate.ts",
         "packages/core/src/lint.ts",
+        "packages/core/src/strict.ts",
         "packages/core/src/diagnostics.ts",
       ],
       reporter: ["text", "json-summary"],

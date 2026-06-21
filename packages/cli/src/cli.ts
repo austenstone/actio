@@ -32,6 +32,7 @@ interface CliBuildFlags {
   pinGithub?: boolean;
   pinFirstParty?: boolean;
   offline?: boolean;
+  strict?: boolean;
 }
 
 interface CliPinsCheckFlags {
@@ -220,6 +221,10 @@ const createCli = () => {
     .option("--pin-github", "Also pin first-party actions/* and github/* refs")
     .option("--pin-first-party", "Alias for --pin-github")
     .option("--offline", "Resolve pins only from the lock cache; never hit the network")
+    .option(
+      "--strict",
+      "Flag YAML 1.1 merge keys (<<) in source for strict YAML 1.2.2 (default off)",
+    )
     .action(async (files: string[], flags: CliBuildFlags) => {
       if (flags.watch) {
         await startWatch(files, flags);
@@ -243,6 +248,10 @@ const createCli = () => {
     .option("--lint <mode>", "actionlint output lint (off | warn | error, default off)")
     .option("--no-validate", "Skip schema validation of generated workflows")
     .option("--no-header", "Omit the generated-by-Actio banner")
+    .option(
+      "--strict",
+      "Flag YAML 1.1 merge keys (<<) in source for strict YAML 1.2.2 (default off)",
+    )
     .action(async (files: string[], flags: CliBuildFlags) => {
       await startWatch(files, flags);
     });
@@ -269,6 +278,10 @@ const createCli = () => {
     .option("--pin-github", "Also pin first-party actions/* and github/* refs")
     .option("--pin-first-party", "Alias for --pin-github")
     .option("--offline", "Resolve pins only from the lock cache; never hit the network")
+    .option(
+      "--strict",
+      "Flag YAML 1.1 merge keys (<<) in source for strict YAML 1.2.2 (default off)",
+    )
     .action(async (files: string[], flags: CliBuildFlags) => {
       const { patterns, options } = await resolveOptions(files, flags, true);
       process.exitCode = await runBuild(patterns, options);

@@ -166,6 +166,7 @@ export function resolveBuildOptions(args: {
         ? parseActioTarget(config.target, "Config")
         : DEFAULT_TARGET,
     unusedSymbols: config.unusedSymbols,
+    strict: passed("--strict") ? true : (config.strict ?? false),
     artifacts: config.artifacts,
     coercion: passed("--coercion")
       ? parseCoercionMode(flags.coercion, "CLI")
