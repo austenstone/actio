@@ -267,11 +267,16 @@ class PinUnresolvedError extends Error {
 }
 
 /**
- * A docker image could not be auto-resolved to a digest — a registry other than
- * Docker Hub, an auth/manifest failure, or a transient network blip. Per #96 this
- * is skip-with-warning, not fail-closed: the image is left on its tag and the build
- * still exits 0. A *malformed* digest from a registry that DID respond is corruption,
- * which throws a plain Error so it keeps hard-failing.
+ * A docker image lives on a registry we structurally cannot auto-resolve — i.e. a
+ * host other than Docker Hub (ghcr.io, private/internal). Per #96 this is the only
+ * skip-with-warning case: the image is left on its tag and the build still exits 0.
+ *
+ * Every other failure is a real failure and throws a plain Error so it propagates
+ * and hard-fails (exit 1): auth/manifest/missing-digest HTTP errors on a registry
+ * we DO support (401/403/404/429/5xx), connection/TLS blips (already a bare fetch
+ * rejection), and a *malformed* digest from a registry that responded. Narrowing
+ * to the structural case keeps a Docker Hub 429 from silently shipping unpinned and
+ * restores symmetry with the connection-error path, which has always failed closed.
  */
 export class DockerRegistryUnresolvableError extends Error {
   constructor(
@@ -299,9 +304,11 @@ const DOCKER_MANIFEST_ACCEPT = [
   "application/vnd.docker.distribution.manifest.v2+json",
 ].join(", ");
 
-// Only Docker Hub is auto-resolvable; a registry host (dot/port in the first
-// path segment) is out of scope and must be pinned by hand.
-const resolveDockerDigest = async (id: string, ref: string): Promise<string> => {
+// Only Docker Hub is auto-resolvable. A registry host (dot/port in the first path
+// segment) is structurally out of scope and is skip-with-warning; every failure on
+// Docker Hub itself (auth/manifest/missing/malformed digest) is a hard error so a
+// transient 429 can never silently ship the image unpinned.
+export const resolveDockerDigest = async (id: string, ref: string): Promise<string> => {
   const firstSegment = id.split("/")[0] ?? "";
   if (firstSegment.includes(".") || firstSegment.includes(":")) {
     throw new DockerRegistryUnresolvableError(
@@ -314,10 +321,7 @@ const resolveDockerDigest = async (id: string, ref: string): Promise<string> => 
     `https://auth.docker.io/token?service=registry.docker.io&scope=repository:${repo}:pull`,
   );
   if (!tokenResponse.ok) {
-    throw new DockerRegistryUnresolvableError(
-      `docker://${id}:${ref}`,
-      `cannot authenticate to Docker Hub for ${id} (${tokenResponse.status})`,
-    );
+    throw new Error(`cannot authenticate to Docker Hub for ${id} (${tokenResponse.status})`);
   }
   const { token } = (await tokenResponse.json()) as { token?: string };
   const manifestResponse = await fetch(
@@ -330,17 +334,13 @@ const resolveDockerDigest = async (id: string, ref: string): Promise<string> => 
     },
   );
   if (!manifestResponse.ok) {
-    throw new DockerRegistryUnresolvableError(
-      `docker://${id}:${ref}`,
+    throw new Error(
       `cannot resolve docker digest for ${id}:${ref} (${manifestResponse.status} ${manifestResponse.statusText})`,
     );
   }
   const digest = manifestResponse.headers.get("docker-content-digest");
   if (!digest) {
-    throw new DockerRegistryUnresolvableError(
-      `docker://${id}:${ref}`,
-      `Docker Hub returned no digest for ${id}:${ref}`,
-    );
+    throw new Error(`Docker Hub returned no digest for ${id}:${ref}`);
   }
   // The header is used verbatim in `uses:`; reject a malformed digest rather than emit a bad pin.
   // This is corruption from a registry that DID respond — a hard error, not a skip-with-warning.
@@ -424,11 +424,12 @@ const pinBuild = async (
     try {
       digest = await resolver.resolve(target);
     } catch (err) {
-      // Austen's call (#96): a docker registry we can't auto-resolve (non-Docker-Hub,
-      // private, or a network/resolve blip) is skip-with-warning — leave the image on its
-      // tag and keep building (exit 0). Corruption (a malformed digest from a registry that
-      // DID respond) and every action-ref failure stay hard errors, so only this typed
-      // docker signal is swallowed; everything else propagates.
+      // Austen's call (#96), narrowed: skip-with-warning applies ONLY to a structurally
+      // unsupported registry (non-Docker-Hub, private, ghcr.io) — that's the typed
+      // DockerRegistryUnresolvableError. Every other failure (auth/manifest/missing/
+      // malformed digest or a 429/5xx on Docker Hub, connection blips, and all action-ref
+      // failures) throws a plain Error and propagates so it hard-fails: a registry we
+      // support failing to resolve must never silently ship the image unpinned.
       if (err instanceof DockerRegistryUnresolvableError) {
         warnings.push(pinUnresolvableWarning(target, err.reason, baseOptions?.fileName));
         continue;

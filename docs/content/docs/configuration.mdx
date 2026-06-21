@@ -119,13 +119,19 @@ Resolved digests are cached in `actio.lock`, so repeat builds are deterministic
 and `--offline` works without touching the network. Re-pinning an already-pinned
 ref is a no-op.
 
-Only Docker Hub registry images auto-resolve. A `docker://` image on any other
-registry (`ghcr.io`, a private/internal registry, or one that can't be reached)
-is **left on its tag** and the build continues with a `pin-unresolvable-registry`
-warning rather than hard-failing — so a private registry never becomes an exit-1
-cliff, while you're still told what wasn't locked down. The exception is
-`--offline`: if the lock can't satisfy a ref it stays **fail-closed** (exit `2`),
-because offline determinism is the whole point of the flag.
+Only Docker Hub registry images auto-resolve. A `docker://` image on an
+**unsupported registry host** — `ghcr.io`, a private/internal registry, anything
+with a host segment we can't auto-resolve — is **left on its tag** and the build
+continues with a `pin-unresolvable-registry` warning rather than hard-failing, so
+a private registry never becomes an exit-1 cliff while you're still told what
+wasn't locked down.
+
+This skip is narrow on purpose: a failure to resolve an image on a registry we
+*do* support (a Docker Hub auth error, missing tag, rate-limit `429`, or `5xx`)
+is a **real failure and hard-fails** (exit `1`) — it is never silently shipped
+unpinned, which would be a worse outcome than no pin. `--offline` likewise stays
+**fail-closed** (exit `2`) when the lock can't satisfy a ref, because offline
+determinism is the whole point of the flag.
 
 Pinning is **on by default** for third-party actions and `docker://` images;
 first-party `actions/*` and `github/*` refs are left on their tag. Override with

@@ -8,6 +8,7 @@ import {
   buildOne,
   DockerRegistryUnresolvableError,
   outputPathFor,
+  resolveDockerDigest,
   runBuild,
 } from "../packages/cli/src/commands/build.js";
 import { readLock } from "../packages/cli/src/commands/lock.js";
@@ -81,6 +82,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -233,5 +235,92 @@ describe("pin build orchestration", () => {
     await expect(buildOne(file, dir, opts({ pinResolver: resolver }))).rejects.toThrow(
       /malformed digest/,
     );
+  });
+});
+
+type FakeResponse = {
+  ok: boolean;
+  status?: number;
+  statusText?: string;
+  json?: unknown;
+  digest?: string | null;
+};
+
+const fakeResponse = (init: FakeResponse) => ({
+  ok: init.ok,
+  status: init.status ?? (init.ok ? 200 : 500),
+  statusText: init.statusText ?? "",
+  json: async () => init.json ?? {},
+  headers: {
+    get: (name: string) =>
+      name.toLowerCase() === "docker-content-digest" ? (init.digest ?? null) : null,
+  },
+});
+
+const stubDockerFetch = (token: FakeResponse, manifest: FakeResponse) =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string | URL) =>
+      String(url).includes("auth.docker.io") ? fakeResponse(token) : fakeResponse(manifest),
+    ),
+  );
+
+// Skip-with-warning is narrowed to a structurally unsupported registry; any failure on
+// Docker Hub itself must surface as a plain Error so it propagates and hard-fails rather
+// than silently shipping the image unpinned (a transient 429 is the headline case).
+describe("resolveDockerDigest registry failures", () => {
+  const tokenOk: FakeResponse = { ok: true, json: { token: "t" } };
+
+  const expectHardFail = async (id: string, ref: string, pattern: RegExp) => {
+    const caught = await resolveDockerDigest(id, ref).catch((e) => e);
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(DockerRegistryUnresolvableError);
+    expect(String((caught as Error).message)).toMatch(pattern);
+  };
+
+  it("flags an unsupported registry host as the typed skip signal (no network)", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const caught = await resolveDockerDigest("ghcr.io/acme/tool", "1.2.3").catch((e) => e);
+
+    expect(caught).toBeInstanceOf(DockerRegistryUnresolvableError);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("hard-fails (not the skip signal) on a Docker Hub manifest 429", async () => {
+    stubDockerFetch(tokenOk, { ok: false, status: 429, statusText: "Too Many Requests" });
+    await expectHardFail("alpine", "3.18", /429/);
+  });
+
+  it("hard-fails on Docker Hub manifest 500 and 503", async () => {
+    stubDockerFetch(tokenOk, { ok: false, status: 503, statusText: "Service Unavailable" });
+    await expectHardFail("alpine", "3.18", /503/);
+
+    stubDockerFetch(tokenOk, { ok: false, status: 500, statusText: "Internal Server Error" });
+    await expectHardFail("alpine", "3.18", /500/);
+  });
+
+  it("hard-fails on Docker Hub auth 401/403", async () => {
+    stubDockerFetch({ ok: false, status: 401, statusText: "Unauthorized" }, tokenOk);
+    await expectHardFail("alpine", "3.18", /401/);
+
+    stubDockerFetch({ ok: false, status: 403, statusText: "Forbidden" }, tokenOk);
+    await expectHardFail("alpine", "3.18", /403/);
+  });
+
+  it("hard-fails on a genuinely missing tag (Docker Hub 404)", async () => {
+    stubDockerFetch(tokenOk, { ok: false, status: 404, statusText: "Not Found" });
+    await expectHardFail("alpine", "nope", /404/);
+  });
+
+  it("hard-fails when a responding Docker Hub returns a malformed digest", async () => {
+    stubDockerFetch(tokenOk, { ok: true, digest: "sha256:nothex" });
+    await expectHardFail("alpine", "3.18", /malformed digest/);
+  });
+
+  it("returns the digest when Docker Hub resolves cleanly", async () => {
+    stubDockerFetch(tokenOk, { ok: true, digest: DIGEST });
+    expect(await resolveDockerDigest("alpine", "3.18")).toBe(DIGEST);
   });
 });
