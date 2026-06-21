@@ -72,10 +72,11 @@ describe("parseUsesRef", () => {
     expect(parseUsesRef("docker://node@sha256:abc")).toBeNull();
   });
 
-  it("skips local and bare refs", () => {
+  it("skips local, bare, and single-segment refs", () => {
     expect(parseUsesRef("./local")).toBeNull();
     expect(parseUsesRef("../up")).toBeNull();
     expect(parseUsesRef("owner/action")).toBeNull();
+    expect(parseUsesRef("bare@v1")).toBeNull();
     expect(parseUsesRef("docker://node")).toBeNull();
   });
 });
