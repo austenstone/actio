@@ -142,6 +142,13 @@ describe.skipIf(!HAS_PWSH)("execution oracle (pwsh)", () => {
   it("(f) disallowed exit 7 -> 7", () => {
     expect(run("exit 7", [0, 42]).code).toBe(7);
   });
+
+  it("(d) multi-line failing partway with an allowed code -> 0 and stdout flows", () => {
+    const r = run("Write-Output first\nexit 42\nWrite-Output second", [0, 42]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("first");
+    expect(r.stdout).not.toContain("second");
+  });
 });
 
 describe("emission: shells and wrapper shape", () => {

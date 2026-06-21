@@ -113,6 +113,12 @@ function posixWrapper(script: string, codes: number[], inner: "bash" | "sh"): st
  * guarded `exit $LASTEXITCODE`) so the user's own cmdlet/native fail-fast and
  * final exit code are identical to a normal pwsh step; the outer then remaps that
  * child exit. The script is embedded as a single-quoted literal so any byte is safe.
+ *
+ * The remap uses `[System.Environment]::Exit`, not `exit`: GitHub invokes pwsh as
+ * `pwsh -command ". '{0}'"`, and a dot-sourced *file* that calls `exit N` collapses
+ * the process code to 1 for any non-zero N. `[System.Environment]::Exit` terminates
+ * the process with the exact code, surviving that dot-source quirk so a disallowed
+ * code re-exits faithfully (and the allowed branch exits a clean 0).
  */
 function pwshWrapper(script: string, codes: number[]): string {
   const childScript = [
@@ -130,7 +136,7 @@ function pwshWrapper(script: string, codes: number[]): string {
     "$__actio_sf_code = $LASTEXITCODE",
     "Remove-Item -LiteralPath $__actio_sf_ps1 -ErrorAction SilentlyContinue",
     "if ($null -eq $__actio_sf_code) { $__actio_sf_code = 0 }",
-    `if (@(${codes.join(", ")}) -contains $__actio_sf_code) { exit 0 } else { exit $__actio_sf_code }`,
+    `if (@(${codes.join(", ")}) -contains $__actio_sf_code) { [System.Environment]::Exit(0) } else { [System.Environment]::Exit($__actio_sf_code) }`,
   ].join("\n");
 }
 
