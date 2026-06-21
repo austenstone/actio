@@ -158,4 +158,36 @@ describe("pin build orchestration", () => {
     const result = await buildOne(file, dir, opts({ check: true, offline: true }));
     expect(result.drift).toBe(false);
   });
+
+  const seedLock = (pins: Record<string, { ref: string; digest: string }>) => {
+    const data = {
+      version: 1,
+      actions: {},
+      imports: {},
+      pins: Object.fromEntries(
+        Object.entries(pins).map(([k, v]) => [k, { ...v, resolvedAt: "2025-01-01T00:00:00Z" }]),
+      ),
+    };
+    writeFileSync(path.join(dir, "actio.lock"), `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  };
+
+  it("rejects a corrupt action digest in the lock instead of emitting a wrong pin", async () => {
+    const file = write();
+    seedLock({
+      "pnpm/action-setup@v2": { ref: "v2", digest: "abc123" },
+      "docker://alpine:3.18": { ref: "3.18", digest: DIGEST },
+    });
+
+    await expect(buildOne(file, dir, opts({ offline: true }))).rejects.toThrow(/corrupt pin/);
+  });
+
+  it("rejects a docker key holding an action-shaped SHA in the lock", async () => {
+    const file = write();
+    seedLock({
+      "pnpm/action-setup@v2": { ref: "v2", digest: SHA },
+      "docker://alpine:3.18": { ref: "3.18", digest: SHA },
+    });
+
+    await expect(buildOne(file, dir, opts({ offline: true }))).rejects.toThrow(/corrupt pin/);
+  });
 });

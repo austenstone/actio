@@ -74,6 +74,7 @@ const DEFAULT_IGNORE = [
 ];
 
 const PINNED_SHA_RE = /^[0-9a-f]{40}$/i;
+const DOCKER_DIGEST_RE = /^sha256:[0-9a-f]{64}$/i;
 const IMPORT_INTEGRITY_RE = /sha256:[0-9a-f]{64}/i;
 
 interface NativeDependencyResolverRequest {
@@ -307,6 +308,10 @@ const resolveDockerDigest = async (id: string, ref: string): Promise<string> => 
   if (!digest) {
     throw new Error(`Docker Hub returned no digest for ${id}:${ref}`);
   }
+  // The header is used verbatim in `uses:`; reject a malformed digest rather than emit a bad pin.
+  if (!DOCKER_DIGEST_RE.test(digest)) {
+    throw new Error(`Docker Hub returned a malformed digest for ${id}:${ref}: ${digest}`);
+  }
   return digest;
 };
 
@@ -335,6 +340,13 @@ const pinResolutionsFromLock = (lock: LockState): Record<string, PinResolution> 
   const cache = lock.data.pins ?? {};
   const resolutions: Record<string, PinResolution> = {};
   for (const [key, entry] of Object.entries(cache)) {
+    // The lock is the trust anchor: a corrupt or hand-edited digest would be concatenated
+    // straight into `uses:` as a *wrong* pin (worse than no pin), so reject by kind instead
+    // of substituting blind — docker keys carry a `sha256:` digest, action keys a 40-hex SHA.
+    const expected = key.startsWith("docker://") ? DOCKER_DIGEST_RE : PINNED_SHA_RE;
+    if (!expected.test(entry.digest)) {
+      throw new Error(`corrupt pin in ${lock.path}: ${key} → ${entry.digest}`);
+    }
     resolutions[key] = { digest: entry.digest, resolvedAt: entry.resolvedAt };
   }
   return resolutions;
@@ -543,6 +555,8 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
         nativeDependencies,
       });
     }
+    // `else if`: the native-deps preview target emits its own top-level `dependencies:`
+    // lockfile, which supersedes uses:-level pinning — so pinning is intentionally skipped there.
   } else if (result.ok && opts.pin?.enabled) {
     result = await pinBuild(source, baseOptions, opts.pin, opts, cwd);
   }
