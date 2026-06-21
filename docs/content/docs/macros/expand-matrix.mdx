@@ -1,0 +1,173 @@
+---
+title: expand-matrix
+description: Unroll a compile-time matrix into discrete named jobs you can needs: a single leg of.
+---
+
+A native GitHub Actions matrix fans out one **anonymous** job — there's no way for a
+downstream job to `needs:` a single leg (e.g. "deploy only after the `linux/x64`
+build"). `expand_matrix` unrolls a **compile-time-known** `strategy.matrix` into one
+real, named job per leg, so you can target legs individually with a `needs:` selector.
+
+It's a pure compile-time transform: the `strategy`/`matrix` and the `expand_matrix`
+key never reach the generated workflow. Every `${{ matrix.* }}` reference is rewritten
+to the concrete leg value.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+jobs:
+  build:
+    expand_matrix: true
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [linux, windows]
+        arch: [x64, arm64]
+    steps:
+      - run: ./build --arch ${{ matrix.arch }}
+  deploy:
+    needs: build(os=linux, arch=x64)
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+```
+
+```yaml title="generated .yml"
+jobs:
+  build-linux-x64:
+    runs-on: linux
+    steps:
+      - run: ./build --arch x64
+  build-linux-arm64:
+    runs-on: linux
+    steps:
+      - run: ./build --arch arm64
+  build-windows-x64:
+    runs-on: windows
+    steps:
+      - run: ./build --arch x64
+  build-windows-arm64:
+    runs-on: windows
+    steps:
+      - run: ./build --arch arm64
+  deploy:
+    needs: build-linux-x64
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+```
+
+</CodeCompare>
+
+## When to reach for it
+
+Use `expand_matrix` when a **later job depends on a specific leg**, not the whole
+fan-out — staged deploys, leg-specific gates, collecting one leg's artifact. If you
+just want N identical runs and a single barrier, a plain native matrix is simpler;
+keep using that. For a matrix whose shape isn't known until the run starts, use
+[`dynamic-matrix`](/docs/macros/dynamic-matrix) — that stays a native runtime matrix
+and is **out of scope** here (see [Limits](#limits)).
+
+## Slugs
+
+Each leg becomes a job named `${jobId}-${values…}`, joining the **axis values in
+declared key order**, lowercased with non-alphanumerics collapsed to `_`:
+
+| matrix | job id |
+| --- | --- |
+| `os: linux, arch: x64` | `build-linux-x64` |
+| `os: windows, arch: arm64` | `build-windows-arm64` |
+| `node: 20` | `build-20` |
+
+Ordering is the cartesian product in declared key order, values in declared order, so
+slugs are stable across builds. Only **axis** values form the slug —
+[`include`](#include--exclude)-injected extra props don't. If two legs slug to the
+same id (or a slug collides with another job), Actio hard-errors
+(`expand-matrix-slug-collision`) rather than silently dropping a job.
+
+## `needs:` selectors
+
+Target a leg with `jobId(key=value, …)`:
+
+```yaml
+needs: build(os=linux, arch=x64)   # → build-linux-x64 (exactly one leg)
+```
+
+- **Full selector** (all axes pinned) → exactly one slug.
+- **Partial selector** (a subset of axes) → **every** matching leg. `build(os=linux)`
+  on an `os × arch` matrix expands to `[build-linux-x64, build-linux-arm64]`.
+- **Multiple selectors** in a `needs:` array are each resolved and the results unioned
+  (order preserved, deduped).
+- A plain job id with no `(` passes through untouched, so ordinary `needs:` still work.
+
+Values may be unquoted (run up to `,`/`)`) or single/double-quoted to allow spaces and
+commas. Whitespace around tokens is ignored.
+
+```yaml
+needs:
+  - build(os=linux)            # all linux legs
+  - build(os=windows, arch=x64) # one specific leg
+```
+
+Selectors are validated against the expanded set: an unknown base job, an unknown axis
+key, or a selector that matches **zero** legs is a hard error
+(`expand-matrix-unknown-selector` / `-unknown-key` / `-no-match`) — a typo never
+silently compiles to a missing dependency.
+
+## `matrix.*` rewriting
+
+After expansion there's no matrix context, so every `${{ matrix.<path> }}` is replaced
+with that leg's value, everywhere it appears (`runs-on`, `env`, `if`, `name`, step
+`run`/`uses`/`with`/`env`/`if`, container, services, outputs, …):
+
+- A field that is a **sole** reference keeps the value's **type** —
+  `node-version: ${{ matrix.node }}` with `node: [18, 20]` emits the number `18`, not
+  `"18"`.
+- Inside larger strings the value is interpolated as text —
+  `name: build on ${{ matrix.os }}` → `build on linux`.
+- Inside a **compound** expression each ref becomes an expression literal —
+  `if: ${{ matrix.os == 'linux' }}` → `${{ 'linux' == 'linux' }}` (objects/arrays
+  become `fromJSON('…')`).
+
+## `include` / `exclude`
+
+Standard [GitHub matrix](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow#using-a-matrix-strategy)
+semantics, evaluated at compile time:
+
+```yaml
+strategy:
+  matrix:
+    os: [linux, windows]
+    arch: [x64, arm64]
+    exclude:
+      - os: windows
+        arch: arm64        # drop just that leg → 3 jobs
+    include:
+      - os: linux
+        sku: pro           # adds matrix.sku=pro to the linux legs
+      - os: mac            # no matching leg → appended as a new build-mac job
+```
+
+`exclude` drops every base leg containing **all** the entry's `key=value` pairs (a
+partial exclude like `{os: windows}` drops the whole windows column). `include` merges
+into every compatible leg without overwriting an axis value; an entry that matches no
+leg is appended as a standalone leg (and later includes see earlier additions) — exactly
+as native GitHub Actions resolves it.
+
+## Limits
+
+The matrix must be **compile-time known**. A runtime matrix —
+`matrix: ${{ fromJSON(...) }}` or any `${{ }}` in an axis value — is rejected
+(`expand-matrix-runtime`); that's what [`dynamic-matrix`](/docs/macros/dynamic-matrix)
+is for, and it stays native.
+
+GitHub caps a run at
+[256 jobs](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow#using-a-matrix-strategy).
+Because `expand_matrix` emits one **real job** per leg, more than 256 legs is caught at
+compile time (`expand-matrix-too-many-legs`) instead of failing at runtime.
+
+<Callout type="warn">
+  Every expanded leg is a distinct job in the run graph. A 4-leg build is 4 jobs; a
+  big matrix can crowd the Actions UI fast. Reach for `expand_matrix` when you need to
+  address legs individually — not as a default replacement for a native matrix.
+</Callout>

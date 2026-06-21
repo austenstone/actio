@@ -8,6 +8,7 @@
     "static-if",
     "retry",
     "dynamic-matrix",
+    "expand-matrix",
     "fallback",
     "if-changed",
     "injection-hoist"
