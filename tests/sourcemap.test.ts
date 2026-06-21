@@ -181,7 +181,7 @@ describe("source map", () => {
 
     const { yaml, map } = transpile(src, { fileName: "static.actio.yml", sourceMap: true });
     const m = map as SourceMap;
-    expect(sourceLineOf(m, genLineOf(yaml, "FROM_STATIC: yes"))).toBe(8);
-    expect(sourceLineOf(m, genLineOf(yaml, "FROM_STATIC: yes"))).not.toBe(4);
+    expect(sourceLineOf(m, genLineOf(yaml, "FROM_STATIC: 'yes'"))).toBe(8);
+    expect(sourceLineOf(m, genLineOf(yaml, "FROM_STATIC: 'yes'"))).not.toBe(4);
   });
 });

@@ -31,6 +31,7 @@ function options(cwd: string, overrides: Partial<BuildOptions> = {}): BuildOptio
     sourceMap: true,
     annotate: false,
     target: "legacy",
+    coercion: "fix",
     cwd,
     ...overrides,
   };

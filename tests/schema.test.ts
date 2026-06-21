@@ -558,6 +558,7 @@ jobs:
   it("starter still transpiles cleanly with the modeline present", () => {
     const result = transpile(STARTER_ACTIO, { fileName: "ci.actio.yml" });
     expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
   });
 
   it("validates the playground sample source", () => {
@@ -588,6 +589,28 @@ jobs:
     steps:
       - run: echo hi
         injection-hoist: defuse`);
+    expect(validate(doc)).toBe(false);
+  });
+
+  it("accepts a root coercion mode", () => {
+    const doc = load(`on: [push]
+coercion: warn
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("rejects an invalid coercion mode", () => {
+    const doc = load(`on: [push]
+coercion: quote
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi`);
     expect(validate(doc)).toBe(false);
   });
 
