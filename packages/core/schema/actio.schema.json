@@ -2077,6 +2077,16 @@
       "title": "injection-hoist mode (Actio macro)",
       "description": "Actio macro. Injection-hoist behavior for `run:` `${{ }}` interpolation: `fix` (hoist untrusted values into env and rewrite the body, default), `warn`, `error`, or `off`. Stripped from generated workflow YAML."
     },
+    "coercionMode": {
+      "type": "string",
+      "enum": [
+        "off",
+        "warn",
+        "fix"
+      ],
+      "title": "coercion mode (Actio macro)",
+      "description": "Actio macro. YAML type-coercion guard: `fix` (single-quote emitted string scalars a YAML 1.1 consumer would mis-type, default), `warn` (diagnose, leave unquoted), or `off`. Stripped from generated workflow YAML."
+    },
     "lifecycleHook": {
       "type": "array",
       "title": "lifecycle hook (Actio macro)",
@@ -3395,6 +3405,10 @@
     "injection-hoist": {
       "$ref": "#/definitions/injectionHoistMode",
       "description": "Actio macro. Global default injection-hoist mode for every `run:` in the workflow. Overridden by job- and step-level `injection-hoist`. Stripped from generated workflow YAML."
+    },
+    "coercion": {
+      "$ref": "#/definitions/coercionMode",
+      "description": "Actio macro. YAML type-coercion guard mode: `fix` (single-quote emitted string scalars that a YAML 1.1 consumer would mis-type, e.g. `no`/`on`/`1:30`/`2024-01-01`, default), `warn` (diagnose but leave unquoted), or `off`. Stripped from generated workflow YAML."
     },
     "finally": {
       "$ref": "#/definitions/finallyBlock",

@@ -1,3 +1,11 @@
+export {
+  COERCION_CATEGORY_HINTS,
+  COERCION_MODES,
+  type CoercionCategory,
+  type CoercionMode,
+  coercionTrapCategory,
+  coercionWarning,
+} from "./coercion.js";
 export { type ActioConfig, type ActioTarget, defineConfig } from "./config.js";
 export {
   ActioError,

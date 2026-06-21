@@ -1,3 +1,4 @@
+import type { CoercionMode } from "./coercion.js";
 import type { Pass } from "./passes/index.js";
 
 export type ActioTarget = "legacy" | "github-actions-native-dependencies-preview";
@@ -48,6 +49,14 @@ export interface ActioConfig {
    * comment on its declaration.
    */
   unusedSymbols?: "off" | "warn" | "error";
+  /**
+   * Global default mode for the YAML type-coercion guard that defends emitted
+   * string scalars against YAML-1.1 coercion on the Actions runner (`no`→false,
+   * `1:30`→90, `2024-01-01`→Date). `fix` single-quotes them, `warn` reports a
+   * `yaml-coercion-trap` diagnostic, `off` disables it. An in-source root
+   * `coercion:` key overrides this. Default "fix".
+   */
+  coercion?: CoercionMode;
 }
 
 /** Identity helper that gives `actio.config.ts` authors full type-checking and inference. */

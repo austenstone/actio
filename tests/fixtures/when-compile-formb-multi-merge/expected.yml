@@ -11,7 +11,7 @@ jobs:
     steps:
       - run: echo hi
         env:
-          BASE: yes
+          BASE: 'yes'
           MODE: one
           SHARED: second
           EXTRA: true

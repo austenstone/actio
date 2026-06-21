@@ -21,6 +21,7 @@ interface CliBuildFlags {
   config?: string;
   outDir?: string;
   target?: string;
+  coercion?: string;
   check?: boolean;
   stdout?: boolean;
   validate: boolean;
@@ -200,6 +201,7 @@ const createCli = () => {
       "--target <profile>",
       "Output target profile (legacy | github-actions-native-dependencies-preview)",
     )
+    .option("--coercion <mode>", "YAML type-coercion guard (off | warn | fix, default fix)")
     .option("--check", "Verify generated output is up to date without writing (CI drift check)")
     .option("--stdout", "Write generated YAML to stdout instead of files")
     .option("-w, --watch", "Rebuild on change and keep running (like tsc --watch)")
@@ -226,6 +228,7 @@ const createCli = () => {
       "--target <profile>",
       "Output target profile (legacy | github-actions-native-dependencies-preview)",
     )
+    .option("--coercion <mode>", "YAML type-coercion guard (off | warn | fix, default fix)")
     .option("--no-validate", "Skip schema validation of generated workflows")
     .option("--no-header", "Omit the generated-by-Actio banner")
     .action(async (files: string[], flags: CliBuildFlags) => {
@@ -243,6 +246,7 @@ const createCli = () => {
       "--target <profile>",
       "Output target profile (legacy | github-actions-native-dependencies-preview)",
     )
+    .option("--coercion <mode>", "YAML type-coercion guard (off | warn | fix, default fix)")
     .option("--no-validate", "Skip schema validation of generated workflows")
     .option("--no-header", "Omit the generated-by-Actio banner")
     .option("--no-source-map", "Ignore the .yml.map source map in the drift check")

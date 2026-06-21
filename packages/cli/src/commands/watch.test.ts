@@ -32,6 +32,7 @@ const baseOpts = (cwd: string): BuildOptions => ({
   sourceMap: false,
   annotate: false,
   target: "legacy",
+  coercion: "fix",
   cwd,
 });
 

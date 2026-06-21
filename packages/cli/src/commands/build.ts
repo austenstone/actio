@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   type ActioTarget,
+  type CoercionMode,
   type Diagnostic,
   formatDiagnostic,
   formatGithubAnnotation,
@@ -30,6 +31,8 @@ export interface BuildOptions {
   target: ActioTarget;
   /** Severity for dead-code diagnostics on unused params/fragments/executors. Default "warn". */
   unusedSymbols?: "off" | "warn" | "error";
+  /** YAML type-coercion guard mode (`off | warn | fix`). Default `fix`. */
+  coercion: CoercionMode;
   /**
    * Optional override for native dependency resolution (tests inject this to
    * avoid network calls).
@@ -382,6 +385,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     annotate: opts.annotate,
     target: opts.target,
     unusedSymbols: opts.unusedSymbols,
+    coercion: opts.coercion,
   });
 
   if (result.ok && opts.target === "github-actions-native-dependencies-preview") {
@@ -398,6 +402,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
         annotate: opts.annotate,
         target: opts.target,
         unusedSymbols: opts.unusedSymbols,
+        coercion: opts.coercion,
         // TODO(native-deps-schema): update this payload shape once GitHub finalizes preview docs.
         nativeDependencies,
       });
