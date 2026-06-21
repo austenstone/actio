@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type BuildOptions,
   buildOne,
+  DockerRegistryUnresolvableError,
   outputPathFor,
   runBuild,
 } from "../packages/cli/src/commands/build.js";
@@ -23,6 +24,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2
       - uses: docker://alpine:3.18
+`;
+
+const GHCR_SOURCE = `name: ci
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker://ghcr.io/acme/tool:1.2.3
 `;
 
 const defaultPolicy = (over: Partial<PinPolicy> = {}): PinPolicy => ({
@@ -189,5 +199,39 @@ describe("pin build orchestration", () => {
     });
 
     await expect(buildOne(file, dir, opts({ offline: true }))).rejects.toThrow(/corrupt pin/);
+  });
+
+  it("skips an unresolvable docker registry with a warning instead of failing", async () => {
+    const file = write(GHCR_SOURCE);
+    const resolver = {
+      resolve: vi.fn(async (t: PinTarget) => {
+        throw new DockerRegistryUnresolvableError(t.key, `unsupported docker registry "ghcr.io"`);
+      }),
+    };
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+    const result = await buildOne(file, dir, opts({ pinResolver: resolver }));
+    const out = readOutput(file, opts());
+
+    expect(result.errored).toBe(false);
+    expect(out).toContain("docker://ghcr.io/acme/tool:1.2.3");
+    expect(out).not.toContain("@sha256:");
+    const warnings = stderr.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.includes("pin-unresolvable-registry"));
+    expect(warnings).toHaveLength(1);
+  });
+
+  it("still hard-fails when a responding registry returns a corrupt digest", async () => {
+    const file = write(GHCR_SOURCE);
+    const resolver = {
+      resolve: vi.fn(async () => {
+        throw new Error("Docker Hub returned a malformed digest");
+      }),
+    };
+
+    await expect(buildOne(file, dir, opts({ pinResolver: resolver }))).rejects.toThrow(
+      /malformed digest/,
+    );
   });
 });

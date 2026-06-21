@@ -1,6 +1,7 @@
 import { Scalar } from "yaml";
+import type { Range } from "../diagnostics.js";
 import { visitJobs, visitSteps } from "../ir.js";
-import type { ParseContext } from "../parser.js";
+import { type ParseContext, type Path, rangeOfPath } from "../parser.js";
 
 /** Trailing-comment style for a pinned ref. */
 export type PinCommentStyle = "tag" | "tag+date" | "none";
@@ -34,6 +35,8 @@ export interface PinTarget {
   ref: string;
   /** Action owner (`actions`, `github`, …); undefined for docker. */
   owner?: string;
+  /** Source range of the `uses:` node, for diagnostics that point back at it. */
+  range?: Range;
 }
 
 export interface PinOptions {
@@ -123,13 +126,14 @@ export function applyPins(ctx: ParseContext, options: PinOptions): PinTarget[] {
   const seen = new Set<string>();
   const resolutions = options.resolutions ?? {};
 
-  const handle = (container: { uses?: unknown }): void => {
+  const handle = (container: { uses?: unknown }, path: Path): void => {
     const uses = container.uses;
     if (typeof uses !== "string") return;
     const target = parseUsesRef(uses);
     if (!target || !shouldPinTarget(target, options.policy)) return;
     if (!seen.has(target.key)) {
       seen.add(target.key);
+      target.range = rangeOfPath(ctx, [...path, "uses"]);
       targets.push(target);
     }
     const resolution = resolutions[target.key];
@@ -140,7 +144,7 @@ export function applyPins(ctx: ParseContext, options: PinOptions): PinTarget[] {
     (container as Record<string, unknown>).uses = scalar;
   };
 
-  visitSteps(ctx, ({ step }) => handle(step));
-  visitJobs(ctx, ({ job }) => handle(job));
+  visitSteps(ctx, ({ step, path }) => handle(step, path));
+  visitJobs(ctx, ({ job, path }) => handle(job, path));
   return targets;
 }

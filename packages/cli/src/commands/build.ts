@@ -266,6 +266,32 @@ class PinUnresolvedError extends Error {
   }
 }
 
+/**
+ * A docker image could not be auto-resolved to a digest — a registry other than
+ * Docker Hub, an auth/manifest failure, or a transient network blip. Per #96 this
+ * is skip-with-warning, not fail-closed: the image is left on its tag and the build
+ * still exits 0. A *malformed* digest from a registry that DID respond is corruption,
+ * which throws a plain Error so it keeps hard-failing.
+ */
+export class DockerRegistryUnresolvableError extends Error {
+  constructor(
+    readonly target: string,
+    readonly reason: string,
+  ) {
+    super(reason);
+    this.name = "DockerRegistryUnresolvableError";
+  }
+}
+
+const pinUnresolvableWarning = (target: PinTarget, reason: string, file?: string): Diagnostic => ({
+  severity: "warning",
+  source: "actio",
+  code: "pin-unresolvable-registry",
+  message: `left ${target.key} unpinned: ${reason}`,
+  file,
+  range: target.range,
+});
+
 const DOCKER_MANIFEST_ACCEPT = [
   "application/vnd.oci.image.index.v1+json",
   "application/vnd.oci.image.manifest.v1+json",
@@ -278,8 +304,9 @@ const DOCKER_MANIFEST_ACCEPT = [
 const resolveDockerDigest = async (id: string, ref: string): Promise<string> => {
   const firstSegment = id.split("/")[0] ?? "";
   if (firstSegment.includes(".") || firstSegment.includes(":")) {
-    throw new Error(
-      `unsupported docker registry "${firstSegment}" for ${id}; pin the digest manually`,
+    throw new DockerRegistryUnresolvableError(
+      `docker://${id}:${ref}`,
+      `unsupported docker registry "${firstSegment}"; only Docker Hub auto-resolves, so pin the digest manually`,
     );
   }
   const repo = id.includes("/") ? id : `library/${id}`;
@@ -287,7 +314,10 @@ const resolveDockerDigest = async (id: string, ref: string): Promise<string> => 
     `https://auth.docker.io/token?service=registry.docker.io&scope=repository:${repo}:pull`,
   );
   if (!tokenResponse.ok) {
-    throw new Error(`cannot authenticate to Docker Hub for ${id} (${tokenResponse.status})`);
+    throw new DockerRegistryUnresolvableError(
+      `docker://${id}:${ref}`,
+      `cannot authenticate to Docker Hub for ${id} (${tokenResponse.status})`,
+    );
   }
   const { token } = (await tokenResponse.json()) as { token?: string };
   const manifestResponse = await fetch(
@@ -300,15 +330,20 @@ const resolveDockerDigest = async (id: string, ref: string): Promise<string> => 
     },
   );
   if (!manifestResponse.ok) {
-    throw new Error(
+    throw new DockerRegistryUnresolvableError(
+      `docker://${id}:${ref}`,
       `cannot resolve docker digest for ${id}:${ref} (${manifestResponse.status} ${manifestResponse.statusText})`,
     );
   }
   const digest = manifestResponse.headers.get("docker-content-digest");
   if (!digest) {
-    throw new Error(`Docker Hub returned no digest for ${id}:${ref}`);
+    throw new DockerRegistryUnresolvableError(
+      `docker://${id}:${ref}`,
+      `Docker Hub returned no digest for ${id}:${ref}`,
+    );
   }
   // The header is used verbatim in `uses:`; reject a malformed digest rather than emit a bad pin.
+  // This is corruption from a registry that DID respond — a hard error, not a skip-with-warning.
   if (!DOCKER_DIGEST_RE.test(digest)) {
     throw new Error(`Docker Hub returned a malformed digest for ${id}:${ref}: ${digest}`);
   }
@@ -382,14 +417,37 @@ const pinBuild = async (
   const resolver = opts.pinResolver ?? createGitHubPinResolver();
   const resolvedAt = new Date().toISOString();
   const pins: Record<string, PinCacheEntry> = { ...(lock.data.pins ?? {}) };
+  const warnings: Diagnostic[] = [];
+  let resolvedAny = false;
   for (const target of unresolved) {
-    const digest = await resolver.resolve(target);
+    let digest: string;
+    try {
+      digest = await resolver.resolve(target);
+    } catch (err) {
+      // Austen's call (#96): a docker registry we can't auto-resolve (non-Docker-Hub,
+      // private, or a network/resolve blip) is skip-with-warning — leave the image on its
+      // tag and keep building (exit 0). Corruption (a malformed digest from a registry that
+      // DID respond) and every action-ref failure stay hard errors, so only this typed
+      // docker signal is swallowed; everything else propagates.
+      if (err instanceof DockerRegistryUnresolvableError) {
+        warnings.push(pinUnresolvableWarning(target, err.reason, baseOptions?.fileName));
+        continue;
+      }
+      throw err;
+    }
     resolutions[target.key] = { digest, resolvedAt };
     pins[target.key] = { ref: target.ref, digest, resolvedAt };
+    resolvedAny = true;
+  }
+  if (!resolvedAny) {
+    result.diagnostics.push(...warnings);
+    return result;
   }
   lock.data.pins = pins;
   await writeLock(lock);
-  return transpile(source, { ...baseOptions, pin: { policy, resolutions } });
+  const final = transpile(source, { ...baseOptions, pin: { policy, resolutions } });
+  final.diagnostics.push(...warnings);
+  return final;
 };
 
 const parseImportUseLine = (line: string): { spec: string; trailingComment: string } | null => {
