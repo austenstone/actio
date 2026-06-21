@@ -22,9 +22,10 @@ const passPageSlug: Record<string, string> = {
 
 // Internal-only passes that intentionally ship WITHOUT a user-facing macro page.
 // Adding a pass here is an explicit, reviewed decision to leave it undocumented.
-// Keep it tiny and justified. Currently empty: every shipped pass is user-facing
-// and has a page (injection-hoist is documented as a security guard).
-const internalPassAllowlist: ReadonlySet<string> = new Set<string>([]);
+// Keep it tiny and justified. `share-matrix-check` is not a keyword: it is the
+// deferred half of the `share` macro's clobber guard, re-run after the matrix
+// passes settle (#158), and is documented on the share page.
+const internalPassAllowlist: ReadonlySet<string> = new Set<string>(["share-matrix-check"]);
 
 const macroPagePath = (passName: string): string =>
   join(macrosDir, `${passPageSlug[passName] ?? passName}.mdx`);

@@ -23,14 +23,14 @@ import { params } from "./params.js";
 import { type Pass, PassRegistry, runCompletePassPipeline } from "./registry.js";
 import { retry } from "./retry.js";
 import { reusable } from "./reusable.js";
-import { share } from "./share.js";
+import { share, shareMatrixCheck } from "./share.js";
 import { softFail } from "./softFail.js";
 import { whenCompile } from "./whenCompile.js";
 
 /**
  * The transforms Actio ships with. Order is derived from each pass's `runsAfter`
  * (see registry.ts), not this array, so the effective pipeline is:
- *   params → call-templates → job-defaults → for-each → when-compile → fragments → artifacts → share → retry → fallback → soft-fail → dynamic-matrix → expand-matrix → lifecycle → if-changed → injection-hoist
+ *   params → call-templates → job-defaults → for-each → when-compile → fragments → artifacts → share → retry → fallback → soft-fail → dynamic-matrix → expand-matrix → lifecycle → if-changed → injection-hoist → share-matrix-check
  *
  * `reusable` runs right after `params` so its input-reference normalization sees
  * fully resolved compile-time text before the call/normal job partition.
@@ -41,6 +41,10 @@ import { whenCompile } from "./whenCompile.js";
  * `artifacts` runs after `fragments` (so fragment/injected steps carrying
  * `artifacts:` also expand) and before `retry` (so a retried step fans out only
  * its run, not a duplicate uploader per attempt).
+ *
+ * `share-matrix-check` runs after both matrix passes so the matrix-output clobber
+ * guard sees the final matrix shape, including matrices injected by `dynamic-matrix`
+ * after `share` already wired the outputs (#158).
  */
 export const builtinPasses: Pass[] = [
   params,
@@ -60,6 +64,7 @@ export const builtinPasses: Pass[] = [
   lifecycle,
   ifChanged,
   injectionHoist,
+  shareMatrixCheck,
 ];
 
 /**
@@ -117,6 +122,7 @@ export {
   retry,
   reusable,
   share,
+  shareMatrixCheck,
   softFail,
   whenCompile,
 };

@@ -26,6 +26,20 @@ export interface ForEachShareContract {
   entries: ForEachShareContractEntry[];
 }
 
+/**
+ * A cross-job share output that the share pass wired into `job.outputs` while the
+ * job had no matrix. A later matrix-introducing pass (dynamic-matrix) can inject
+ * `strategy.matrix` into that same job, turning the wiring into a silent
+ * last-leg-wins clobber. The share pass records these so the late check re-runs
+ * the matrix guard once the final matrix shape is known (#158).
+ */
+export interface ShareMatrixClobberCheck {
+  jobId: string;
+  job: Record<string, unknown>;
+  name: string;
+  path: Path;
+}
+
 export interface ParseContextInternal {
   /** Preserved macro templates stripped from `ctx.data` after the job-defaults pass. */
   jobDefaults?: JobDefaultsInternalSnapshot;
@@ -35,6 +49,8 @@ export interface ParseContextInternal {
   injectionHoist?: "fix" | "warn" | "error" | "off";
   /** Inline `artifacts:` macro config; `uploader` is the upload action ref to emit. */
   artifacts?: { uploader?: string };
+  /** Deferred matrix-output clobber checks re-run after late matrix passes (#158). */
+  share?: { matrixClobberChecks: ShareMatrixClobberCheck[] };
 }
 
 /**

@@ -45,6 +45,16 @@ const fixtureDirsByPassName: Record<string, string[]> = {
     "share-required",
     "share-escape",
   ],
+  // The late clobber re-check is driven by the same share fixtures: each cross-job
+  // share fixture records a deferred check that this pass iterates (#158).
+  "share-matrix-check": [
+    "share-simple-single",
+    "share-same-job",
+    "share-multiline",
+    "share-json-fanout",
+    "share-required",
+    "share-escape",
+  ],
 };
 
 const hasGoldenPair = (fixtureDir: string): boolean =>
