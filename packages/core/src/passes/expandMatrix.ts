@@ -99,24 +99,27 @@ function applyExclude(legs: LegValues[], excludes: LegValues[]): LegValues[] {
 
 /**
  * Apply GHA include semantics (after exclude). An include entry merges its props
- * into every existing leg it doesn't overwrite; if it merges into none, it is
- * appended as a new standalone leg. Later includes observe earlier additions.
+ * into every base leg it doesn't overwrite; "overwrite" is judged against the
+ * leg's ORIGINAL axis values only — include-added keys are not original matrix
+ * values and may be overwritten by later includes. If an entry merges into no
+ * base leg it is appended as a new standalone leg. Appended legs are not merge
+ * targets for later includes (matches GitHub's documented algorithm).
  */
 function applyInclude(base: Leg[], includes: LegValues[]): Leg[] {
-  const legs = base;
+  const appended: Leg[] = [];
   for (const inc of includes) {
     let merged = false;
-    for (const leg of legs) {
+    for (const leg of base) {
       const overwrites = Object.entries(inc).some(
-        ([k, v]) => k in leg.props && !deepEqual(leg.props[k], v),
+        ([k, v]) => k in leg.axes && !deepEqual(leg.axes[k], v),
       );
       if (overwrites) continue;
       for (const [k, v] of Object.entries(inc)) leg.props[k] = v;
       merged = true;
     }
-    if (!merged) legs.push({ axes: { ...inc }, props: { ...inc } });
+    if (!merged) appended.push({ axes: { ...inc }, props: { ...inc } });
   }
-  return legs;
+  return [...base, ...appended];
 }
 
 /** Compute the ordered leg list for a job's matrix, or `undefined` on hard error. */
@@ -150,7 +153,13 @@ function computeLegs(
   const includes = Array.isArray(includeRaw) ? includeRaw.filter(isObject) : [];
 
   const product = applyExclude(cartesian(axes), excludes);
-  const base: Leg[] = product.map((axesVals) => ({ axes: axesVals, props: { ...axesVals } }));
+  // A matrix with no axes has no base configuration to merge includes into, so
+  // the synthetic single empty leg from `cartesian([])` is dropped — every
+  // include entry then stands alone (GHA's include-only semantics).
+  const base: Leg[] =
+    axisKeys.length === 0
+      ? []
+      : product.map((axesVals) => ({ axes: axesVals, props: { ...axesVals } }));
   const legs = applyInclude(base, includes);
 
   if (legs.length === 0) {
@@ -165,9 +174,21 @@ function computeLegs(
   return { legs, axisKeys };
 }
 
+/**
+ * Slug from the declared axis values present on this leg, in declared order.
+ * Axes the leg does not define (an include-appended leg that omits a base axis)
+ * are skipped rather than stringified — `String(undefined)` would emit a literal
+ * "undefined" segment and silently collide. A leg that defines none of the
+ * declared axes falls back to slugging its own props (include-only matrices and
+ * appended non-axis legs). Any residual collision is caught downstream as a hard
+ * error, so a slug never silently overwrites another job.
+ */
 function legSlug(jobId: string, leg: Leg, axisKeys: string[]): string {
   const keys = axisKeys.length > 0 ? axisKeys : Object.keys(leg.props);
-  const parts = keys.map((k) => slugify(String(leg.props[k])));
+  const parts = keys.filter((k) => k in leg.props).map((k) => slugify(String(leg.props[k])));
+  if (parts.length === 0) {
+    for (const k of Object.keys(leg.props)) parts.push(slugify(String(leg.props[k])));
+  }
   return [jobId, ...parts].join("-");
 }
 
@@ -438,7 +459,15 @@ function rewriteNeeds(ctx: ParseContext, jobId: string, job: Job, registry: LegR
     }
     const selector = parseSelector(entry);
     if (!selector) {
-      if (!out.includes(entry)) out.push(entry);
+      // A plain id naming an expanded base job no longer exists post-expansion;
+      // expand it to every leg (consistent with partial-selector semantics).
+      const expandedBase = registry.get(entry);
+      if (expandedBase) {
+        changed = true;
+        for (const ej of expandedBase.legs) if (!out.includes(ej.slug)) out.push(ej.slug);
+      } else if (!out.includes(entry)) {
+        out.push(entry);
+      }
       continue;
     }
     changed = true;

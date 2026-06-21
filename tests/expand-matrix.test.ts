@@ -1056,3 +1056,119 @@ jobs:
     expect(jobsOf(doc).deploy.needs).toEqual(["setup", "build-linux-x64"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: code-review blocking bugs (#144)
+// ---------------------------------------------------------------------------
+
+describe("expand_matrix: include/needs regressions", () => {
+  // Bug 1: an include must only be blocked by an ORIGINAL axis value, and must
+  // merge into base legs only — never into a leg appended by an earlier include.
+  it("lets a later include overwrite an earlier include's added key", () => {
+    const { errors, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    expand_matrix: true
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux]
+        include:
+          - color: green
+          - color: pink
+    steps:
+      - run: echo ${"${{ matrix.color }}"}
+`);
+    expect(errors).toEqual([]);
+    const jobs = jobsOf(doc);
+    expect(Object.keys(jobs)).toEqual(["build-linux"]);
+    const steps = jobs["build-linux"].steps as { run: string }[];
+    expect(steps[0].run).toBe("echo pink");
+  });
+
+  it("matches GitHub's fruit/animal include example exactly", () => {
+    const { errors, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    expand_matrix: true
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        fruit: [apple, pear]
+        animal: [cat, dog]
+        include:
+          - color: green
+          - color: pink
+            animal: cat
+          - fruit: apple
+            shape: circle
+          - fruit: banana
+          - fruit: banana
+            animal: cat
+    steps:
+      - run: ./build.sh
+`);
+    expect(errors).toEqual([]);
+    expect(Object.keys(jobsOf(doc))).toEqual([
+      "build-apple-cat",
+      "build-apple-dog",
+      "build-pear-cat",
+      "build-pear-dog",
+      "build-banana",
+      "build-banana-cat",
+    ]);
+  });
+
+  // Bug 2: an include-appended leg that omits a declared axis must not produce a
+  // literal "undefined" slug segment; absent axes are skipped deterministically.
+  it("slugs an axis-incomplete appended leg without 'undefined'", () => {
+    const { errors, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  build:
+    expand_matrix: true
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        fruit: [apple]
+        animal: [cat]
+        include:
+          - fruit: banana
+          - fruit: cherry
+    steps:
+      - run: ./build.sh
+`);
+    expect(errors).toEqual([]);
+    const keys = Object.keys(jobsOf(doc));
+    expect(keys).toEqual(["build-apple-cat", "build-banana", "build-cherry"]);
+    expect(keys.some((k) => k.includes("undefined"))).toBe(false);
+  });
+
+  // Bug 3: a plain `needs: <expandedBase>` (no selector) must expand to all legs
+  // instead of dangling on a job id that no longer exists post-expansion.
+  it("expands a plain needs on an expanded base to every leg", () => {
+    const { errors, doc } = build(`
+name: ci
+on: [push]
+jobs:
+  build:${FANOUT}
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+`);
+    expect(errors).toEqual([]);
+    expect(jobsOf(doc).deploy.needs).toEqual([
+      "build-linux-x64",
+      "build-linux-arm64",
+      "build-windows-x64",
+      "build-windows-arm64",
+    ]);
+  });
+});
