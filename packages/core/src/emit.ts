@@ -1,4 +1,5 @@
-import { stringify, type ToStringOptions } from "yaml";
+import { Document, Scalar, type ToStringOptions, visit } from "yaml";
+import { type CoercionMode, coercionTrapCategory } from "./coercion.js";
 import { KEY_ORDER, type WorkflowData } from "./parser.js";
 
 export interface EmitOptions {
@@ -6,6 +7,8 @@ export interface EmitOptions {
   header?: boolean;
   /** Source file name, referenced in the banner. */
   fileName?: string;
+  /** YAML 1.1 coercion-trap handling. `fix` (default) single-quotes trap scalars. */
+  coercion?: CoercionMode;
 }
 
 const STRINGIFY_OPTIONS: ToStringOptions = {
@@ -27,9 +30,28 @@ export function generatedHeader(fileName?: string): string {
 }
 
 export function emitYaml(data: WorkflowData, options: EmitOptions = {}): string {
-  const body = stringify(toOrdered(data), STRINGIFY_OPTIONS);
+  const doc = new Document(toOrdered(data));
+  if ((options.coercion ?? "fix") === "fix") quoteCoercionTraps(doc);
+  const body = doc.toString(STRINGIFY_OPTIONS);
   if (options.header === false) return body;
   return generatedHeader(options.fileName) + body;
+}
+
+/**
+ * Single-quote every emitted string scalar a YAML 1.1 consumer would mis-type.
+ * Only mapping VALUES and sequence ITEMS are touched — mapping KEYS are skipped
+ * so a legitimate `on:` events key is never quoted. `typeof value === "string"`
+ * excludes genuine booleans/numbers for free.
+ */
+function quoteCoercionTraps(doc: Document): void {
+  visit(doc, {
+    Scalar(key, node) {
+      const atValue = key === "value" || typeof key === "number";
+      if (atValue && typeof node.value === "string" && coercionTrapCategory(node.value)) {
+        node.type = Scalar.QUOTE_SINGLE;
+      }
+    },
+  });
 }
 
 /**
