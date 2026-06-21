@@ -1,0 +1,8 @@
+needs-docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/core/src/passes/**
+          - packages/core/src/config.ts
+          - packages/cli/src/config.ts
+          - packages/cli/src/commands/**
+          - packages/cli/src/cli.ts
