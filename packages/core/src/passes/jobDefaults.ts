@@ -49,6 +49,7 @@ const MACRO_KEYS = new Set([
   "fallback",
   "dynamic-matrix",
   "for-each",
+  "expand_matrix",
   "executor",
 ]);
 

@@ -60,6 +60,7 @@ export interface Job {
   retry?: unknown;
   fallback?: unknown;
   "dynamic-matrix"?: unknown;
+  expand_matrix?: unknown;
   [key: string]: unknown;
 }
 

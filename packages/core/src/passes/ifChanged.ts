@@ -178,6 +178,6 @@ function buildSetupJob(
 /** Gate steps/jobs on changed files via one shared paths-filter setup job. */
 export const ifChanged: Pass = {
   name: "if-changed",
-  runsAfter: ["fragments", "retry", "fallback", "dynamic-matrix", "lifecycle"],
+  runsAfter: ["fragments", "retry", "fallback", "dynamic-matrix", "expand-matrix", "lifecycle"],
   apply: ifChangedPass,
 };

@@ -28,6 +28,7 @@ build` leaves behind.
 | [`finally`](#finally) | workflow | map | stripped; teardown jobs with `needs` + guards |
 | [`executor`](#executor) | job | string or list | stripped; preset merged into the job |
 | [`dynamic-matrix`](#dynamic-matrix) | job | map | setup job + matrix wiring |
+| [`expand_matrix`](#expand-matrix) | job | boolean | literal matrix unrolled into named jobs |
 | [`static-if`](#static-if) | job, step | string (bare expr) | node kept or omitted at compile time |
 | [`static-if(<expr>)`](#static-if-merge) | job, step | keyed map | merged into parent when true |
 | [`inject`](#inject) | step | string | replaced by the fragment's steps |
@@ -462,6 +463,46 @@ jobs:
 ```
 
 `script` may be a path **or** an inline command. Full guide: [dynamic-matrix](/docs/macros/dynamic-matrix).
+
+{/* macro:expand_matrix */}
+### `jobs.<job_id>.expand_matrix` [#expand-matrix]
+
+Unroll a **compile-time-known** `strategy.matrix` into one named job per leg, so a
+downstream job can `needs:` a single leg — which a native (anonymous) matrix can't
+express. Set `expand_matrix: true` on a job with a literal matrix.
+
+- **Valid in:** `jobs.<job_id>`
+- **Type:** boolean
+- **Compiles to:** one job per matrix leg, slugged `${job}-${values…}`; `strategy` and
+  the macro key are stripped and every `${{ matrix.* }}` reference is resolved to the
+  concrete leg value
+
+Target a leg from another job's `needs:` with a `job(key=value, …)` selector. A full
+selector resolves to one slug; a **partial** selector (subset of axes) resolves to
+every matching leg; multiple selectors are unioned.
+
+```yaml title=".actio.yml"
+jobs:
+  build:
+    expand_matrix: true
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [linux, windows]
+        arch: [x64, arm64]
+    steps:
+      - run: ./build --arch ${{ matrix.arch }}
+  deploy:
+    needs: build(os=linux, arch=x64)  # → build-linux-x64
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+```
+
+`include`/`exclude` follow native matrix semantics. The matrix must be literal — a
+runtime `${{ fromJSON(...) }}` matrix is rejected (use
+[`dynamic-matrix`](#dynamic-matrix)), and >256 legs is a compile-time error (GitHub's
+per-run cap). Full guide: [expand-matrix](/docs/macros/expand-matrix).
 
 {/* macro:static-if */}
 ### `jobs.<job_id>.static-if` [#static-if]
