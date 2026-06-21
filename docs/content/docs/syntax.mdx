@@ -191,6 +191,8 @@ jobs:
 
 </CodeCompare>
 
+Full guide: [reusable](/docs/macros/reusable).
+
 {/* macro:fragments */}
 ### `fragments` [#fragments]
 
@@ -314,7 +316,7 @@ jobs:
       - run: npm test
 ```
 
-See [`executor`](#executor) for the call site. Full guide: [executors](/docs/macros/job-defaults#executors).
+See [`executor`](#executor) for the call site. Full guide: [executors](/docs/macros/executors).
 
 {/* macro:call-templates */}
 ### `call-templates` [#call-templates]
@@ -516,7 +518,7 @@ jobs:
       - run: ./build.sh
 ```
 
-Full guide: [executors](/docs/macros/job-defaults#executors).
+Full guide: [executors](/docs/macros/executors).
 
 {/* macro:extends */}
 ### `jobs.<job_id>.extends` [#extends]
@@ -757,6 +759,8 @@ steps:
   `max-parallel` stay authoritative and any loop-level copies are ignored with a warning.
 </Callout>
 
+Full guide: [for-each](/docs/macros/for-each).
+
 {/* macro:retry */}
 ### `jobs.<job_id>.steps[*].retry` [#retry]
 
@@ -819,6 +823,8 @@ jobs:
     steps:
       - run: ./deploy.sh ${{ share.version }}
 ```
+
+Full guide: [share](/docs/macros/share).
 
 {/* macro:fallback */}
 ### `jobs.<job_id>.steps[*].fallback` [#fallback]
@@ -897,6 +903,8 @@ steps:
     shell: bash
 ```
 
+Full guide: [soft_fail](/docs/macros/soft-fail).
+
 {/* macro:artifacts */}
 ### `jobs.<job_id>.steps[*].artifacts` [#artifacts]
 
@@ -920,41 +928,13 @@ action ref.
 />
 
 When `name` is omitted, Actio derives a deterministic, collision-free name from the job id and
-the step. This matters because `actions/upload-artifact@v4` hard-fails at runtime when two
-uploads in the same run share a name (its default is the literal `artifact`), so two unnamed
-`artifacts:` steps would otherwise compile into a workflow that dies on the runner. Set an
-explicit `name:` whenever you need a stable, human-meaningful artifact name.
+step, so two unnamed uploads can't clash at runtime. Under a `matrix`, a static name still
+collides across legs — carry a per-leg expression like `name: build-${{ matrix.os }}`.
+Compile-time warnings flag both footguns (`artifacts-matrix-unnamed`,
+`artifacts-duplicate-name`). The configured uploader (default `actions/upload-artifact@v4`) is
+set with [`artifacts.uploader`](/docs/configuration#artifacts).
 
-Under a `matrix`, every leg is part of the same run, so a single derived name (or a *static*
-explicit one) collides across legs. The fix is an explicit `name:` that carries a per-leg
-expression, e.g. `name: build-${{ matrix.os }}`. Actio surfaces compile-time warnings for both
-footguns: an unnamed `artifacts:` step in a matrix job (`artifacts-matrix-unnamed`), and two
-emitted upload steps that share an identical expression-free name (`artifacts-duplicate-name`).
-Neither breaks the build; they just stop a silent runtime failure.
-
-```yaml title=".actio.yml"
-steps:
-  - run: npm run build
-    artifacts:
-      paths: dist/**
-      name: build-output
-      retention-days: 7
-```
-
-```yaml title="generated workflow"
-steps:
-  - run: npm run build
-  - name: Upload artifacts
-    if: always()
-    uses: actions/upload-artifact@v4
-    with:
-      name: build-output
-      path: dist/**
-      retention-days: 7
-```
-
-The configured uploader (default `actions/upload-artifact@v4`) is set with
-[`artifacts.uploader`](/docs/configuration#artifacts).
+Full guide: [artifacts](/docs/macros/artifacts).
 
 {/* macro:if-changed */}
 ### `jobs.<job_id>.steps[*].if-changed` [#if-changed]
@@ -1066,6 +1046,8 @@ steps:
       - run: ./stop-db.sh
 ```
 
+Full guide: [lifecycle](/docs/macros/lifecycle).
+
 {/* macro:on-success */}
 ### `on-success` [#on-success]
 
@@ -1081,6 +1063,8 @@ steps:
     on-success:
       - run: ./publish-artifact.sh
 ```
+
+Full guide: [lifecycle](/docs/macros/lifecycle).
 
 {/* macro:on-failure */}
 ### `on-failure` [#on-failure]
@@ -1099,6 +1083,8 @@ steps:
       - run: ./upload-logs.sh
 ```
 
+Full guide: [lifecycle](/docs/macros/lifecycle).
+
 {/* macro:on-abort */}
 ### `on-abort` [#on-abort]
 
@@ -1115,6 +1101,8 @@ steps:
     on-abort:
       - run: ./cleanup.sh
 ```
+
+Full guide: [lifecycle](/docs/macros/lifecycle).
 
 ## See also
 

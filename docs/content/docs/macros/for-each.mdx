@@ -1,0 +1,115 @@
+---
+title: for-each
+description: Expand one step or job into many by looping over a list at compile time.
+---
+
+Repeating the same step for a handful of services, regions, or shards means
+copy-pasting it and keeping every copy in sync. `for-each` writes the step once
+and loops over a list at **compile time**, stamping out one concrete step per
+element. Reference the loop variable with the compile-time token `{{ <var> }}`
+(or `{{ <var>.<field> }}` for object elements).
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: Deploy
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - for-each:
+          var: svc
+          in: [api, web, worker]
+        steps:
+          - run: ./deploy.sh {{ svc }}
+```
+
+```yaml title="generated .yml"
+name: Deploy
+on:
+  - push
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh api
+      - run: ./deploy.sh web
+      - run: ./deploy.sh worker
+```
+
+</CodeCompare>
+
+## Parallel: fan out into a matrix
+
+A **job-level** loop with `parallel: true` becomes a `strategy.matrix` instead of
+inline serial steps, so each element runs as its own parallel leg. The
+compile-time `{{ var }}` token is rewritten to the runtime `${{ matrix.var }}`:
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: Test
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    for-each:
+      var: version
+      in: [18, 20, 22]
+      parallel: true
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "{{ version }}"
+      - run: npm test
+```
+
+```yaml title="generated .yml"
+name: Test
+on:
+  - push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.version }}
+      - run: npm test
+    strategy:
+      matrix:
+        version:
+          - 18
+          - 20
+          - 22
+      fail-fast: false
+```
+
+</CodeCompare>
+
+## Options
+
+<TypeTable
+  type={{
+    var: { type: 'string', description: 'Loop variable name.', required: true },
+    in: { type: 'list | object | params.* | output expr', description: 'Source to iterate.', required: true },
+    parallel: { type: 'boolean', description: 'Job-level only: expand to a strategy.matrix instead of inline serial steps.', default: 'false' },
+  }}
+/>
+
+## Gotchas
+
+<Callout type="info" title="Coexists with an explicit strategy.matrix">
+  A job-level `parallel` loop can sit on a job that **also** declares its own
+  `strategy.matrix`. Instead of overwriting the matrix, Actio fans the job out into
+  one job **per variant** (`test-turbopack`, `test-rspack`, …), each carrying a clone
+  of the full author matrix — a variant axis × a shard matrix with clean, separate
+  status checks. If the loop `var` (or its `as` alias) collides with a matrix key,
+  the build fails with `for-each-matrix-key-collision`; the matrix's own `fail-fast`
+  / `max-parallel` stay authoritative and any loop-level copies are ignored with a
+  warning.
+</Callout>
+
+See the [`for-each`](/docs/syntax#for-each) entry in the syntax reference for the
+valid scopes and source forms.

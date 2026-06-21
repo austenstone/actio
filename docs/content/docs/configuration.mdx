@@ -32,6 +32,25 @@ this table can never drift from the code:
 
 <AutoTypeTable path="../packages/core/src/config.ts" name="ActioConfig" />
 
+### Output toggles
+
+Three booleans control the extra material Actio emits alongside the workflow, each
+with a matching `--no-*` CLI flag and each defaulting to **on**:
+
+- **`header`** — write the generated-by banner comment at the top of each file
+  (`--no-header`).
+- **`sourceMap`** — emit the [source map](/docs/source-maps) sidecar next to the
+  workflow, the file that lets `lint` and runtime annotations blame the `.actio.yml`
+  line instead of the generated YAML (`--no-source-map`).
+- **`annotate`** — inject the runtime annotation job that surfaces failures back on
+  your source lines in the Actions UI; it requires the source map (`--no-annotate`).
+
+Separately, **`injectionHoist`** is a *mode* (`fix` (default) | `warn` | `error` |
+`off`), not a boolean — it sets the global default for the
+[injection-hoist](/docs/macros/injection-hoist) security pass that defuses
+`${{ }}` script-injection in `run:` blocks. Per-block `injection-hoist:` knobs
+override it.
+
 ## Precedence
 
 Settings resolve **explicit CLI flag → config file → built-in default**, in that

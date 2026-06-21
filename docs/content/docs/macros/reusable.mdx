@@ -1,0 +1,99 @@
+---
+title: reusable
+description: Declare a workflow as callable and dispatchable once, and normalize input references.
+---
+
+A reusable workflow needs a `workflow_call` trigger; making the same workflow
+manually runnable needs a parallel `workflow_dispatch` trigger with a duplicated
+input list. Worse, `workflow_dispatch` reads inputs as `${{ github.event.inputs.x }}`
+while `workflow_call` reads them as `${{ inputs.x }}` — and the dispatch form is
+`null` under a call. `reusable:` declares the inputs once, emits both triggers, and
+rewrites every input reference to the single canonical `${{ inputs.x }}` form.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: Reusable
+on: push
+reusable:
+  inputs:
+    target:
+      type: string
+      required: true
+    verbose:
+      type: boolean
+      default: false
+  secrets:
+    token:
+      required: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "deploying to ${{ github.event.inputs.target }}"
+```
+
+```yaml title="generated .yml"
+name: Reusable
+on:
+  push: null
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: true
+      verbose:
+        type: boolean
+        default: false
+    secrets:
+      token:
+        required: true
+  workflow_dispatch:
+    inputs:
+      target:
+        type: string
+        required: true
+      verbose:
+        type: boolean
+        default: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "deploying to ${{ inputs.target }}"
+```
+
+</CodeCompare>
+
+The `github.event.inputs.target` reference in the source is rewritten to
+`inputs.target` in the output, so the same body works whether the workflow is
+called or dispatched.
+
+## Options
+
+<TypeTable
+  type={{
+    inputs: { type: 'map', description: 'Input definitions, shared across both triggers. Each input type must be string, boolean, or number (the workflow_call-compatible subset); type defaults to string.' },
+    secrets: { type: 'map', description: 'Secret definitions, emitted under workflow_call.' },
+    outputs: { type: 'map', description: 'Workflow outputs, emitted under workflow_call.' },
+    dispatch: { type: 'boolean', description: 'Also emit a workflow_dispatch trigger. Set false to emit workflow_call only.', default: 'true' },
+  }}
+/>
+
+## Gotchas
+
+<Callout title="Input reference rewriting">
+  Actio rewrites `${{ github.event.inputs.x }}` to `${{ inputs.x }}` across the
+  whole workflow body. Referencing an input that is **not** declared under
+  `reusable.inputs` is a build warning — that reference is `null` under
+  `workflow_call`, which is almost always a bug.
+</Callout>
+
+<Callout type="warn" title="Shared input types">
+  `workflow_call` only accepts `string`, `boolean`, and `number` inputs. Because a
+  `reusable` input feeds both triggers, those are the only valid types. Choice/enum
+  dropdowns are a dispatch-only feature and are not supported here.
+</Callout>
+
+See the [`reusable`](/docs/syntax#reusable) entry in the syntax reference for the
+full key list.

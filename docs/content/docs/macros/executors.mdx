@@ -1,0 +1,77 @@
+---
+title: executors
+description: Named runner presets — extract repeated runner, container, and service config into reusable templates.
+---
+
+[`job-defaults`](/docs/macros/job-defaults) applies one set of defaults to *every*
+job. `executors` is the opt-in companion: named presets that a job pulls in by name
+with `executor:`. Use it when some jobs need a hardened runner, a container, or a
+service block and others don't — define the preset once, reference it where it
+applies. Both `executors` and the `executor:` key are stripped from the output.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: CI
+on: [push]
+executors:
+  hardened:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+jobs:
+  test:
+    executor: hardened
+    steps:
+      - run: npm test
+```
+
+```yaml title="generated .yml"
+name: CI
+on:
+  - push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - run: npm test
+```
+
+</CodeCompare>
+
+## Composing executors
+
+`executor:` accepts an ordered list of names. Presets are merged left-to-right, so
+later entries win for scalar keys and `env`-style maps are deep-merged:
+
+```yaml title=".actio.yml"
+jobs:
+  build:
+    executor: [base, gpu]
+    steps:
+      - run: ./build.sh
+```
+
+An inline runner key on the job always wins over what the executor provides, so a
+job can adopt a preset and still override one field locally.
+
+## Gotchas
+
+<Callout title="Precedence">
+  Within a job the resolution order is: `job-defaults` (lowest) → `executor`
+  presets (left-to-right) → inline job keys (highest). The most specific value
+  wins.
+</Callout>
+
+<Callout type="warn" title="Not supported on call jobs">
+  `executor:` is not supported on reusable-workflow call jobs (`uses:`), which only
+  accept the call-compatible subset of defaults. See the
+  [`job-defaults` callout](/docs/macros/job-defaults) for what call jobs inherit.
+</Callout>
+
+See the [`executors`](/docs/syntax#executors) and [`executor`](/docs/syntax#executor)
+entries in the syntax reference for the full preset and composition rules.

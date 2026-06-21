@@ -2,15 +2,22 @@
   "title": "Macros",
   "pages": [
     "params",
+    "reusable",
     "job-defaults",
+    "executors",
     "call-templates",
     "fragments",
     "static-if",
+    "for-each",
     "retry",
+    "share",
+    "soft-fail",
     "dynamic-matrix",
     "expand-matrix",
     "fallback",
+    "lifecycle",
     "if-changed",
+    "artifacts",
     "injection-hoist"
   ]
 }

@@ -1,0 +1,106 @@
+---
+title: soft_fail
+description: Tolerate failure on a single step without failing the job — for any exit code, or only the ones you name.
+---
+
+Sometimes a step is allowed to fail. GitHub's built-in answer is
+`continue-on-error: true`, which tolerates **any** non-zero exit. But often you only
+want to forgive _specific_ exit codes (a linter's "issues found" `42`, say) while
+still failing hard on a real crash. `soft_fail` covers both: `true` is the native
+all-or-nothing tolerance, and a list of exit codes is a Buildkite-style selective
+tolerance that nothing in raw Actions YAML can express.
+
+## `true` — tolerate any failure
+
+`soft_fail: true` compiles straight to `continue-on-error: true`. The step still
+shows as failed, but the job continues. Works on `run` and `uses` steps alike.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: CI
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./lint.sh
+        soft_fail: true
+```
+
+```yaml title="generated .yml"
+name: CI
+on:
+  - push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./lint.sh
+        continue-on-error: true
+```
+
+</CodeCompare>
+
+## A list — tolerate only named exit codes
+
+A list of exit codes wraps a `run` step in a build-time shell wrapper that maps only
+the listed codes to success (the step shows green) and re-exits any other code
+unchanged.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: CI
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./flaky-check.sh
+        soft_fail: [0, 42]
+```
+
+```yaml title="generated .yml"
+name: CI
+on:
+  - push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |-
+          __actio_sf_file="$(mktemp)"
+          printf '%s\n' './flaky-check.sh' > "$__actio_sf_file"
+          __actio_sf_code=0
+          bash --noprofile --norc -eo pipefail "$__actio_sf_file" || __actio_sf_code=$?
+          rm -f "$__actio_sf_file"
+          case "$__actio_sf_code" in 0|42) exit 0 ;; *) exit "$__actio_sf_code" ;; esac
+        shell: bash
+```
+
+</CodeCompare>
+
+The wrapper runs your script in a fresh child shell with the same strict flags
+GitHub uses, so multi-line scripts, `set -e` / `pipefail` fail-fast, and explicit
+`exit N` all behave exactly as they would normally — only the final exit code is
+remapped.
+
+## Type
+
+<TypeTable
+  type={{
+    soft_fail: { type: 'boolean | number[]', description: 'true → continue-on-error. A list of exit codes (0-255) → remap only those codes to success.' },
+  }}
+/>
+
+## Gotchas
+
+<Callout type="warn" title="Lists need a POSIX shell on a run step">
+  The list form is supported on `bash`, `sh`, and `pwsh` `run` steps. On any other
+  shell, or on a `uses` step, a list is a **compile error** — use `soft_fail: true`
+  there instead.
+</Callout>
+
+See the [`soft_fail`](/docs/syntax#soft_fail) entry in the syntax reference for the
+exact wrapper semantics.
