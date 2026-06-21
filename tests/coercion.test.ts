@@ -347,4 +347,27 @@ describe("coercion predicate — catalog cross-check", () => {
       expect(coercionTrapCategory(token), `oracle trap not flagged: ${token}`).toBeDefined();
     }
   });
+
+  // Underscore/separator must-pass list pinned per the #146 review. Each case is
+  // self-validating: the predicate must agree with the *live* yaml@2.9 1.1 oracle.
+  // This nails the boundary the review asked about — including that `0o1_0` and the
+  // leading-underscore `_1` are NOT traps (yaml@2.9's 1.1 resolver reads both as
+  // strings: 1.1 octal is leading-zero `0[0-7_]+`, not `0o…`), so flagging them
+  // would be a false positive, not a fix.
+  it("matches the yaml-1.1 oracle on every reviewed underscore/separator case", () => {
+    const mustPass = ["1_000", "10_000", "1_2.3_4", "0x1_00", "0b1_0", "1_", "1__0", "1_0"];
+    const mustSkip = ["0o1_0", "_1"];
+    for (const token of mustPass) {
+      expect(oracleMistypes(token), `expected oracle trap: ${token}`).toBe(true);
+      expect(coercionTrapCategory(token), `expected flagged: ${token}`).toBeDefined();
+      // Requirement #2: fix-mode emit quotes it and it round-trips as the string.
+      const fixed = emitEnv(token, "fix");
+      expect(fixed.yaml, token).toContain(`VAL: '${token}'`);
+      expect(envValue(fixed.yaml, "1.1"), token).toBe(token);
+    }
+    for (const token of mustSkip) {
+      expect(oracleMistypes(token), `expected oracle-safe: ${token}`).toBe(false);
+      expect(coercionTrapCategory(token), `expected not flagged: ${token}`).toBeUndefined();
+    }
+  });
 });
