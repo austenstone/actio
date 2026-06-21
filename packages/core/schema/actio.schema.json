@@ -837,7 +837,7 @@
           "type": "string"
         },
         "needs": {
-          "$ref": "#/definitions/jobNeeds"
+          "$ref": "#/definitions/actioJobNeeds"
         },
         "permissions": {
           "$ref": "#/definitions/permissions"
@@ -940,7 +940,7 @@
           "type": "string"
         },
         "needs": {
-          "$ref": "#/definitions/jobNeeds"
+          "$ref": "#/definitions/actioJobNeeds"
         },
         "snapshot": {
           "$ref": "#/definitions/snapshot"
@@ -1151,6 +1151,9 @@
         },
         "dynamic-matrix": {
           "$ref": "#/definitions/dynamicMatrix"
+        },
+        "expand_matrix": {
+          "$ref": "#/definitions/expandMatrix"
         },
         "for-each": {
           "$ref": "#/definitions/forEach"
@@ -1414,6 +1417,39 @@
           "description": "Matrix fail-fast setting for job-scope loops."
         }
       }
+    },
+    "expandMatrix": {
+      "title": "expand_matrix (Actio macro)",
+      "type": "boolean",
+      "description": "Actio macro. Unroll a compile-time `strategy.matrix` into one discrete named job per leg, so downstream jobs can `needs:` a single leg via the selector syntax `job(axis=value)`. Requires a fully literal matrix (no `${{ }}`); stripped from generated workflow YAML.",
+      "markdownDescription": "**Actio macro**: unroll a compile-time matrix into named jobs.\n\nSet `expand_matrix: true` on a job with a literal `strategy.matrix`. Actio emits one job per leg with a deterministic slug (`build-linux-x64`), rewrites every `${{ matrix.* }}` reference to the concrete leg value, and lets other jobs target a leg with the `needs:` selector `job(axis=value)`.\n\n```yaml\njobs:\n  build:\n    expand_matrix: true\n    strategy:\n      matrix:\n        os: [linux, windows]\n        arch: [x64, arm64]\n    runs-on: ${{ matrix.os }}\n    steps:\n      - run: ./build --arch ${{ matrix.arch }}\n  deploy:\n    needs: build(os=linux, arch=x64)\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./deploy.sh\n```\n\nThe matrix must be compile-time known; runtime matrices (`${{ fromJSON(...) }}`) stay native. GitHub caps a matrix at 256 jobs, so >256 legs is a build error."
+    },
+    "actioNeedsItem": {
+      "type": "string",
+      "anyOf": [
+        {
+          "pattern": "^[_a-zA-Z][a-zA-Z0-9_-]*$"
+        },
+        {
+          "pattern": "^[_a-zA-Z][a-zA-Z0-9_-]*\\s*\\(.*\\)$",
+          "description": "Actio macro. An expand_matrix leg selector `job(axis=value, ...)`. A partial selector (subset of axes) targets every matching leg. Rewritten to concrete job slug(s) at compile time."
+        }
+      ]
+    },
+    "actioJobNeeds": {
+      "description": "Identifies jobs that must complete before this job runs. A string or array of strings. Actio additionally accepts an expand_matrix leg selector `job(axis=value)` that is rewritten to concrete job slug(s) at compile time.",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/actioNeedsItem"
+          },
+          "minItems": 1
+        },
+        {
+          "$ref": "#/definitions/actioNeedsItem"
+        }
+      ]
     },
     "callTemplateDefinition": {
       "type": "object",
