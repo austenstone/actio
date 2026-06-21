@@ -37,6 +37,7 @@ export interface Step {
   inject?: string;
   retry?: unknown;
   fallback?: unknown;
+  soft_fail?: unknown;
   [key: string]: unknown;
 }
 

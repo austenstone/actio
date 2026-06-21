@@ -92,6 +92,7 @@
         },
         "retry": { "$ref": "#/definitions/retry" },
         "fallback": { "$ref": "#/definitions/fallback" },
+        "soft_fail": { "$ref": "#/definitions/softFail" },
         "share": { "$ref": "#/definitions/share" },
         "for-each": { "$ref": "#/definitions/forEach" },
         "steps": { "$ref": "#/definitions/normalJob/properties/steps" },
@@ -565,6 +566,24 @@
               ]
             }
           }
+        }
+      ]
+    },
+    "softFail": {
+      "title": "soft_fail (Actio macro)",
+      "description": "Actio macro. Let a step tolerate failure without failing the job. `true` tolerates any non-zero exit (compiles to `continue-on-error: true`). A list of exit codes (Buildkite-style) compiles a `run` step into a build-time shell wrapper that maps only those codes to success and re-exits any other code. Lists apply to `run` steps on bash, sh, or pwsh.",
+      "markdownDescription": "**Actio macro**: tolerate specific failures without failing the job.\n\n- `soft_fail: true` tolerates any non-zero exit. Compiles to `continue-on-error: true`, so the step still shows as failed but the job continues. Works on `run` and `uses` steps.\n- `soft_fail: [0, 42]` tolerates only the listed exit codes. Compiles a `run` step into a build-time wrapper that exits 0 for a listed code (the step shows green) and re-exits the real code otherwise. Supported on bash, sh, and pwsh.\n\n```yaml\nsteps:\n  - run: ./flaky-check.sh\n    soft_fail: [0, 42]\n```",
+      "oneOf": [
+        {
+          "type": "boolean",
+          "description": "`true` tolerates any non-zero exit (continue-on-error)."
+        },
+        {
+          "type": "array",
+          "description": "Exit codes to tolerate. Only these codes map to success.",
+          "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+          "minItems": 1,
+          "uniqueItems": true
         }
       ]
     },

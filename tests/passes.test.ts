@@ -78,6 +78,7 @@ describe("sortPasses", () => {
       byName.get("dynamic-matrix"),
       byName.get("fallback"),
       byName.get("retry"),
+      byName.get("soft-fail"),
       byName.get("when-compile"),
       byName.get("for-each"),
       byName.get("params"),
@@ -93,6 +94,8 @@ describe("sortPasses", () => {
     expect(ordered.indexOf("share")).toBeLessThan(ordered.indexOf("retry"));
     expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("fallback"));
     expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("dynamic-matrix"));
+    expect(ordered.indexOf("retry")).toBeLessThan(ordered.indexOf("soft-fail"));
+    expect(ordered.indexOf("fallback")).toBeLessThan(ordered.indexOf("soft-fail"));
   });
 
   it("ignores forward dependency references to not-yet-registered passes", () => {
@@ -116,6 +119,7 @@ describe("sortPasses", () => {
       "share",
       "retry",
       "fallback",
+      "soft-fail",
       "dynamic-matrix",
       "expand-matrix",
       "lifecycle",
@@ -165,6 +169,7 @@ describe("PassRegistry", () => {
       "share",
       "retry",
       "fallback",
+      "soft-fail",
       "dynamic-matrix",
       "expand-matrix",
       "lifecycle",
@@ -213,6 +218,7 @@ describe("createRegistry", () => {
       "share",
       "retry",
       "fallback",
+      "soft-fail",
       "dynamic-matrix",
       "expand-matrix",
       "lifecycle",
