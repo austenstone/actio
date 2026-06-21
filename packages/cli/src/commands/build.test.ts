@@ -33,6 +33,7 @@ function options(cwd: string, overrides: Partial<BuildOptions> = {}): BuildOptio
     target: "legacy",
     coercion: "fix",
     cwd,
+    lint: "off",
     ...overrides,
   };
 }

@@ -8,6 +8,7 @@ import {
   type Diagnostic,
   formatDiagnostic,
   formatGithubAnnotation,
+  type LintMode,
   type NativeDependencies,
   type Pass,
   type PinPolicy,
@@ -37,6 +38,8 @@ export interface BuildOptions {
   unusedSymbols?: "off" | "warn" | "error";
   /** YAML type-coercion guard mode (`off | warn | fix`). Default `fix`. */
   coercion: CoercionMode;
+  /** actionlint output-lint severity (`off | warn | error`). Default `off`. */
+  lint: LintMode;
   /**
    * Optional override for native dependency resolution (tests inject this to
    * avoid network calls).
@@ -599,6 +602,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     target: opts.target,
     unusedSymbols: opts.unusedSymbols,
     coercion: opts.coercion,
+    lint: opts.lint,
   };
   let result = transpile(source, baseOptions);
 
@@ -610,6 +614,8 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
         ...baseOptions,
         // TODO(native-deps-schema): re-enable validation once upstream schema includes workflow dependencies.
         validate: false,
+        // actionlint doesn't understand the preview `dependencies:` lockfile; skip it here too.
+        lint: "off",
         // TODO(native-deps-schema): update this payload shape once GitHub finalizes preview docs.
         nativeDependencies,
       });

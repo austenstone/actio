@@ -98,6 +98,36 @@ positions and rejects an unquoted trap loudly in strictly-typed positions (e.g.
 > warning and falls back to the inherited mode, so one stray source file never
 > breaks a whole build.
 
+## Output linting (`lint` → actionlint)
+
+`validate` checks the generated workflow against GitHub's JSON Schema (a structural
+gate, on by default). `lint` adds a second, deeper pass: it runs the emitted YAML
+through [actionlint](https://github.com/rhysd/actionlint) and maps every finding
+back to the `.actio.yml` line that produced it, using the same source map that powers
+runtime annotations. This is the "compiler, not text templating" promise. Actio
+validates its own output and blames the source, not the generated file.
+
+```ts title="actio.config.ts"
+export default defineConfig({
+  lint: "error", // off (default) | warn | error
+});
+```
+
+`off` skips the lint entirely, `warn` reports findings as warnings (exit 0), and
+`error` fails the build (pair it with `actio check` in CI). It is independent of the
+schema-gating `validate` boolean, so you can run either, both, or neither.
+
+actionlint is shelled out to from your `PATH`. If the binary isn't installed the
+lint is skipped with a single informational note (never a hard failure), so a missing
+linter can't break a build. Install actionlint to opt every contributor in. The
+findings carry `actionlint-<rule>` codes and the original actionlint message.
+
+> **Scope.** v1 relies on a locally installed `actionlint`. A bundled
+> actionlint-wasm build (for the in-browser playground) is a tracked follow-up, not
+> part of this release. Schema strictness is whatever `@actions/workflow-parser`
+> embeds (GitHub's own schema is deliberately loose), so `lint: error` is the way to
+> catch issues the schema waves through.
+
 ## Pinning (`uses:` → SHA)
 
 `actio build` resolves every mutable `uses:` ref to an immutable commit SHA and

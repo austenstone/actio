@@ -44,6 +44,16 @@ export {
   workflow,
 } from "./ir.js";
 export {
+  type ActionlintFinding,
+  type ActionlintRun,
+  type ActionlintRunner,
+  defaultActionlintRunner,
+  LINT_MODES,
+  type LintMode,
+  lintWorkflowYaml,
+  type SpawnSync,
+} from "./lint.js";
+export {
   type ForEachShareContract,
   type ForEachShareContractEntry,
   type JobDefaultsInternalSnapshot,
