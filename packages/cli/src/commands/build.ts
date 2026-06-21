@@ -28,6 +28,8 @@ export interface BuildOptions {
   passes?: Pass[];
   /** Output target capability profile. */
   target: ActioTarget;
+  /** Severity for dead-code diagnostics on unused params/fragments/executors. Default "warn". */
+  unusedSymbols?: "off" | "warn" | "error";
   /**
    * Optional override for native dependency resolution (tests inject this to
    * avoid network calls).
@@ -379,6 +381,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     sourceMap: opts.sourceMap,
     annotate: opts.annotate,
     target: opts.target,
+    unusedSymbols: opts.unusedSymbols,
   });
 
   if (result.ok && opts.target === "github-actions-native-dependencies-preview") {
@@ -394,6 +397,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
         sourceMap: opts.sourceMap,
         annotate: opts.annotate,
         target: opts.target,
+        unusedSymbols: opts.unusedSymbols,
         // TODO(native-deps-schema): update this payload shape once GitHub finalizes preview docs.
         nativeDependencies,
       });

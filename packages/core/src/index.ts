@@ -98,4 +98,8 @@ export {
   type TranspileResult,
   transpile,
 } from "./transpile.js";
+export {
+  collectUnusedSymbolDiagnostics,
+  type UnusedSymbolsMode,
+} from "./unusedSymbols.js";
 export { validateWorkflowYaml } from "./validate.js";

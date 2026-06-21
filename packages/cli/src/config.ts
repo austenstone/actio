@@ -105,6 +105,7 @@ export function resolveBuildOptions(args: {
       : config.target !== undefined
         ? parseActioTarget(config.target, "Config")
         : DEFAULT_TARGET,
+    unusedSymbols: config.unusedSymbols,
   };
 
   const patterns = files.length > 0 ? files : (config.files ?? config.include ?? []);
