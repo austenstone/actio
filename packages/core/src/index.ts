@@ -61,6 +61,7 @@ export {
   dynamicMatrix,
   EXECUTOR_KEYS,
   type ExecutorKey,
+  expandMatrix,
   fallback,
   forEach,
   fragments,

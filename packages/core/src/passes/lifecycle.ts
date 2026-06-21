@@ -482,6 +482,14 @@ export function lifecyclePass(ctx: ParseContext): void {
 
 export const lifecycle: Pass = {
   name: "lifecycle",
-  runsAfter: ["fragments", "retry", "fallback", "dynamic-matrix", "for-each", "job-defaults"],
+  runsAfter: [
+    "fragments",
+    "retry",
+    "fallback",
+    "dynamic-matrix",
+    "expand-matrix",
+    "for-each",
+    "job-defaults",
+  ],
   apply: lifecyclePass,
 };
