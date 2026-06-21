@@ -98,6 +98,47 @@ positions and rejects an unquoted trap loudly in strictly-typed positions (e.g.
 > warning and falls back to the inherited mode, so one stray source file never
 > breaks a whole build.
 
+## Pinning (`uses:` → SHA)
+
+`actio build` resolves every mutable `uses:` ref to an immutable commit SHA and
+every `docker://image:tag` to a digest, keeping the human-readable tag as a
+trailing comment. The emitted workflow becomes a **lockfile** — the SHA is what
+runs, the comment is what you read, and `actio check` stops the two drifting.
+
+```yaml title="in.actio.yml"
+- uses: pnpm/action-setup@v2
+- uses: docker://alpine:3.18
+```
+
+```yaml title=".github/workflows/out.yml"
+- uses: pnpm/action-setup@d648c2dd069001a242c621c8306af467f150e99d # v2
+- uses: docker://alpine@sha256:51b67269f354137895d43f3b3d810bfacd3945438e94dc5ac55fdac340352f48 # 3.18
+```
+
+Resolved digests are cached in `actio.lock`, so repeat builds are deterministic
+and `--offline` works without touching the network. Re-pinning an already-pinned
+ref is a no-op.
+
+Pinning is **on by default** for third-party actions and `docker://` images;
+first-party `actions/*` and `github/*` refs are left on their tag. Override with
+the `pin` config block or the `--pin`/`--no-pin`/`--pin-github`/`--offline` flags.
+
+```ts title="actio.config.ts"
+export default defineConfig({
+  pin: {
+    enabled: true,      // master switch
+    thirdParty: true,   // pin non-first-party actions
+    github: false,      // also pin actions/* and github/*
+    docker: true,       // pin docker:// images
+    allow: [],          // globs left unpinned, e.g. ["my-org/*"]
+    comment: "tag",     // "tag" | "tag+date" | "none"
+  },
+});
+```
+
+Sugar: `pin: "all"` pins everything (first-party included); `pin: "off"` disables
+pinning entirely.
+
 ## Custom passes
 
 The `passes` field is the headline feature: a pass you supply is **merged** into
