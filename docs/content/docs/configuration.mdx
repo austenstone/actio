@@ -321,6 +321,8 @@ topologically sorting every pass's `runsAfter` — so your pass slots in whereve
 dependencies say it should. A pass is a `{ name, runsAfter?, apply }` descriptor;
 `apply(ctx)` mutates `ctx.data` (the parsed workflow object) in place.
 
+<AutoTypeTable path="../packages/core/src/passes/registry.ts" name="Pass" />
+
 ```ts title="actio.config.ts"
 import { defineConfig, type Pass } from "actio-core";
 
