@@ -22,7 +22,7 @@ export default function HomePage() {
           Try the playground
         </Link>
         <Link
-          href="/docs/macros/fragments"
+          href="/docs/syntax"
           className="rounded-full border px-5 py-2.5 font-medium transition-colors hover:bg-fd-muted"
         >
           Explore macros
