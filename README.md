@@ -1,8 +1,10 @@
 # Actio
 
-A transpiler that compiles a clean `.actio.yml` source into the verbose GitHub Actions YAML you'd otherwise hand-write.
+Write clean GitHub Actions YAML with a handful of compile-time macros. `actio build` expands them into the verbose workflow YAML you'd otherwise hand-write — zero runtime, zero lock-in.
 
-**[documentation →](https://austenstone.github.io/actio)**
+A macro-free `.actio.yml` is already a valid workflow.
+
+**[Documentation →](https://austenstone.github.io/actio)**
 
 ```bash
 npx actio-cli init
