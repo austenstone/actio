@@ -266,7 +266,10 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
     const schema = validateWorkflowYaml(yaml, fileName);
     diagnostics.push(...(map ? schema.map((d) => remapDiagnostic(d, map)) : schema));
   }
-  if ((options.lint ?? "off") !== "off") {
+  // Output linting requires an injected actionlint runner. Keeping the
+  // spawn-based default out of `transpile` lets the browser entry bundle without
+  // `node:child_process`; node callers (CLI) inject `defaultActionlintRunner`.
+  if ((options.lint ?? "off") !== "off" && options.actionlintRunner) {
     const lint = lintWorkflowYaml(
       yaml,
       fileName,
