@@ -73,14 +73,14 @@ export default defineConfig({
 
 `off` disables the check, `warn` reports a warning, and `error` fails the build —
 handy in CI alongside `actio check`. The analysis is deliberately conservative: a
-symbol referenced inside a `static-if` branch, a fragment injected into another
-fragment, or any conditional path counts as used. Keep an intentionally-unused
-symbol by adding a `# actio-keep` comment on its declaration:
+symbol referenced inside a `static-if` branch, injected into another step list, or
+on any conditional path counts as used. Keep an intentionally-unused symbol by adding
+a `# actio-keep` comment on its declaration:
 
 ```yaml title=".actio.yml"
-fragments:
-  scaffold: # actio-keep
-    - uses: actions/checkout@v4
+executors:
+  hardened: # actio-keep
+    runs-on: ubuntu-latest
 ```
 
 ## YAML coercion guard
@@ -131,9 +131,11 @@ export default defineConfig({
 ```
 
 When enabled, every `<<:` merge key in source gets a `yaml-merge-key` warning that
-points at the line and suggests an Actio reuse macro (`fragments` + `inject`,
-`job-defaults`, `executors`, or `extends`) in its place. The `--strict` CLI flag
-turns it on for a single run and overrides the config value.
+points at the line and suggests a native reuse primitive in its place —
+[`_anchors:`](/docs/syntax#_anchors) + `*alias` (plain YAML anchors, valid 1.2.2),
+[`templates:`](/docs/syntax#templates), [`job-defaults`](/docs/macros/job-defaults),
+`executors`, or `extends`. The `--strict` CLI flag turns it on for a single run and
+overrides the config value.
 
 This is a source linter only: it never changes the emitted YAML, and the default
 stays permissive, so `<<:` keeps working unless you opt in. Plain YAML anchors and
@@ -170,44 +172,14 @@ findings carry `actionlint-<rule>` codes and the original actionlint message.
 > embeds (GitHub's own schema is deliberately loose), so `lint: error` is the way to
 > catch issues the schema waves through.
 
-## Pinning (`uses:` → SHA)
+## Pinning (`uses:` → SHA) [#pinning]
 
-`actio build` resolves every mutable `uses:` ref to an immutable commit SHA and
-every `docker://image:tag` to a digest, keeping the human-readable tag as a
-trailing comment. The emitted workflow becomes a **lockfile** — the SHA is what
-runs, the comment is what you read, and `actio check` stops the two drifting.
-
-```yaml title="in.actio.yml"
-- uses: pnpm/action-setup@v2
-- uses: docker://alpine:3.18
-```
-
-```yaml title=".github/workflows/out.yml"
-- uses: pnpm/action-setup@d648c2dd069001a242c621c8306af467f150e99d # v2
-- uses: docker://alpine@sha256:51b67269f354137895d43f3b3d810bfacd3945438e94dc5ac55fdac340352f48 # 3.18
-```
-
-Resolved digests are cached in `actio.lock`, so repeat builds are deterministic
-and `--offline` works without touching the network. Re-pinning an already-pinned
-ref is a no-op.
-
-Only Docker Hub registry images auto-resolve. A `docker://` image on an
-**unsupported registry host** — `ghcr.io`, a private/internal registry, anything
-with a host segment we can't auto-resolve — is **left on its tag** and the build
-continues with a `pin-unresolvable-registry` warning rather than hard-failing, so
-a private registry never becomes an exit-1 cliff while you're still told what
-wasn't locked down.
-
-This skip is narrow on purpose: a failure to resolve an image on a registry we
-*do* support (a Docker Hub auth error, missing tag, rate-limit `429`, or `5xx`)
-is a **real failure and hard-fails** (exit `1`) — it is never silently shipped
-unpinned, which would be a worse outcome than no pin. `--offline` likewise stays
-**fail-closed** (exit `2`) when the lock can't satisfy a ref, because offline
-determinism is the whole point of the flag.
-
-Pinning is **on by default** for third-party actions and `docker://` images;
-first-party `actions/*` and `github/*` refs are left on their tag. Override with
-the `pin` config block or the `--pin`/`--no-pin`/`--pin-github`/`--offline` flags.
+`actio build` automatically freezes mutable `uses:` refs to immutable SHAs and
+`docker://` tags to digests — see [supply-chain pinning](/docs/supply-chain) for how
+resolution, the `actio.lock` lockfile, registries, and `--offline` behave. Configure
+it with the `pin` block (on by default for third-party actions and `docker://`
+images; `actions/*` and `github/*` stay on their tag) or the
+`--pin`/`--no-pin`/`--pin-github`/`--offline` flags:
 
 ```ts title="actio.config.ts"
 export default defineConfig({

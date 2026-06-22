@@ -3,6 +3,22 @@ title: Architecture
 description: The compiler pipeline, the typed IR, provenance, and packages.
 ---
 
+Actio is a **compiler**, not a runtime. You author a `.actio.yml` source — a strict
+[superset](/docs/syntax) of GitHub Actions workflow syntax — and `actio build`
+expands it into the verbose standard workflow YAML you'd otherwise hand-write. Two
+phases, both at **build time**:
+
+1. **Macro expansion** — the keywords Actio adds (the whole
+   [syntax reference](/docs/syntax)) are transformed into plain workflow YAML.
+2. **Compile-time interpolation** — `{{ ... }}` tokens are resolved and baked into
+   the output; `${{ ... }}` is left verbatim for the runner to evaluate. See
+   [interpolation tokens](/docs/syntax#interpolation-tokens).
+
+Nothing Actio adds survives into the generated file: **zero runtime, zero lock-in**.
+A macro-free `.actio.yml` is already a valid workflow, and you can walk away at any
+time by keeping the generated `.yml`. The rest of this page is the pipeline that does
+the compiling.
+
 ## How it works
 
 ```text

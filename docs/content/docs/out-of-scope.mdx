@@ -8,9 +8,9 @@ description: High-demand GitHub Actions asks a compile-time transpiler structura
 Four waves of community research (community discussions, `actions/runner` issues,
 Reddit/SO, competitor authoring, and `github/customer-feedback` enterprise intake)
 surfaced a recurring set of **high-demand GitHub Actions asks that a compile-time
-transpiler structurally cannot solve**. Actio turns clean `.actio.yml` into standard
-workflow YAML *at build time* — it has no runtime, doesn't touch the platform, and
-can't see values that only exist while a run is executing.
+transpiler structurally cannot solve**. Actio is a [build-time compiler with no
+runtime](/docs/architecture): it can't touch the platform or see values that only
+exist while a run is executing.
 
 This page is a reference so we (and contributors) stop re-litigating these, can
 answer "why doesn't Actio just…", and have honest talking points. Each item below is

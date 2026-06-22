@@ -27,7 +27,7 @@ inline comments — the generated YAML stays byte-for-byte unchanged):
 Mappings are **reconstructed at emit time** rather than threaded through the passes:
 the emitted YAML is re-parsed for generated line numbers, and each node is resolved
 back to its source through the typed IR's provenance side-table. `originOf` returns
-a node's **true source range even after a macro moved it** (a fragment-injected
+a node's **true source range even after a macro moved it** (a template-injected
 step, a retry-fanned attempt, the `dynamic-matrix` setup job), because the IR pins
 each origin before mutation and carries it across clones.
 
