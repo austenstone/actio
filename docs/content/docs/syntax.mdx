@@ -951,6 +951,51 @@ jobs:
 
 Full guide: [share](/docs/macros/share).
 
+{/* macro:ref */}
+### `jobs.<job_id>.steps[*].ref` [#ref]
+
+Expose a step's outputs by a rename-safe logical handle. Reference anywhere with
+`${{ ref.<handle>.<output> }}`; Actio assigns the step id, synthesizes
+`jobs.<id>.outputs`, adds `needs` edges, and strips the `ref` key. Where `share`
+wires compiler-minted outputs, `ref` generalizes the same engine to outputs the
+compiler did not mint: action `uses:` outputs, hand-written `$GITHUB_OUTPUT` writes,
+and reusable call-job outputs.
+
+- **Valid in:** `jobs.<job_id>.steps[*]`
+- **Type:** map with optional `handle` and a required `outputs` list
+- **Compiles to:** `steps.<id>.outputs.<name>` (same job) or `needs.<job>.outputs.<name>` (cross job), plus synthesized `job.outputs` and `needs`
+
+Non-minted producers must declare their `outputs:` (auto-sniffing of
+`$GITHUB_OUTPUT` is deferred). Cross-job references resolve to `needs.<job>.outputs.<name>`;
+same-job references stay local as `steps.<id>.outputs.<name>` with no `needs` added. A
+dotted `${{ ref.<handle>.<output>.<field> }}` lowers to `fromJSON(...)`. Reusable
+call-jobs are referenced as `${{ ref.job.<call_id>.<output> }}` and add only a `needs`
+edge.
+
+<TypeTable
+  type={{
+    handle: { type: 'string', description: 'Explicit handle. Defaults to a slug of the step name, then the step id. A same-job collision is a compile error.' },
+    outputs: { type: 'string[]', description: 'Output names this step publishes. Required for non-minted producers (action, hand-written run).', required: true },
+  }}
+/>
+
+```yaml title=".actio.yml"
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        ref:
+          handle: node
+          outputs: [node-version]
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "on ${{ ref.node.node-version }}"
+```
+
+Full guide: [ref](/docs/macros/ref).
+
 {/* macro:fallback */}
 ### `jobs.<job_id>.steps[*].fallback` [#fallback]
 

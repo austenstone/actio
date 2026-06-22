@@ -40,6 +40,21 @@ export interface ShareMatrixClobberCheck {
   path: Path;
 }
 
+/** A cross-job step producer that `reference-wire` must synthesize `job.outputs` for (#160). */
+export interface ReferenceSynth {
+  jobId: string;
+  job: Record<string, unknown>;
+  stepId: string;
+  name: string;
+  path: Path;
+}
+
+/** Lower -> wire handoff for the `${{ ref.* }}` reference-graph passes (#160). */
+export interface ReferenceGraphInternal {
+  synth: ReferenceSynth[];
+  edges: [string, string][];
+}
+
 export interface ParseContextInternal {
   /** Preserved macro templates stripped from `ctx.data` after the job-defaults pass. */
   jobDefaults?: JobDefaultsInternalSnapshot;
@@ -51,6 +66,8 @@ export interface ParseContextInternal {
   artifacts?: { uploader?: string };
   /** Deferred matrix-output clobber checks re-run after late matrix passes (#158). */
   share?: { matrixClobberChecks: ShareMatrixClobberCheck[] };
+  /** Lower -> wire handoff for the `${{ ref.* }}` reference-graph passes (#160). */
+  referenceGraph?: ReferenceGraphInternal;
 }
 
 /**

@@ -12,6 +12,8 @@ const fixtureDirsByPassName: Record<string, string[]> = {
   "injection-hoist": ["injection-hoist"],
   fallback: ["fallback-job", "fallback-notify", "fallback-recover"],
   fragments: ["fragments"],
+  "reference-lower": ["ref-same-job", "ref-cross-job", "ref-action-producer", "ref-call-job"],
+  "reference-wire": ["ref-cross-job", "ref-action-producer", "ref-call-job"],
   "call-templates": [
     "call-templates-extends",
     "call-templates-compose",

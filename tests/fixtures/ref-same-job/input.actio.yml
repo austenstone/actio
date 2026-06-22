@@ -1,0 +1,12 @@
+name: Ref Same Job
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tag
+        run: echo "tag=$(date +%s)" >> "$GITHUB_OUTPUT"
+        ref:
+          handle: tag
+          outputs: [tag]
+      - run: echo "building ${{ ref.tag.tag }}"

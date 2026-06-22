@@ -1,0 +1,16 @@
+name: Ref Cross Job
+on: [push]
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute
+        run: echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+        ref:
+          handle: meta
+          outputs: [sha]
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "first ${{ ref.meta.sha }}"
+      - run: echo "second ${{ ref.meta.sha }}"

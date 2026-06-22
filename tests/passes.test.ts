@@ -119,6 +119,7 @@ describe("sortPasses", () => {
       "fragments",
       "artifacts",
       "share",
+      "reference-lower",
       "retry",
       "fallback",
       "soft-fail",
@@ -128,6 +129,7 @@ describe("sortPasses", () => {
       "if-changed",
       "injection-hoist",
       "share-matrix-check",
+      "reference-wire",
     ]);
   });
 });
@@ -172,6 +174,7 @@ describe("PassRegistry", () => {
       "fragments",
       "artifacts",
       "share",
+      "reference-lower",
       "retry",
       "fallback",
       "soft-fail",
@@ -181,6 +184,7 @@ describe("PassRegistry", () => {
       "if-changed",
       "injection-hoist",
       "share-matrix-check",
+      "reference-wire",
       "post",
     ]);
   });
@@ -224,6 +228,7 @@ describe("createRegistry", () => {
       "fragments",
       "artifacts",
       "share",
+      "reference-lower",
       "retry",
       "fallback",
       "soft-fail",
@@ -233,6 +238,7 @@ describe("createRegistry", () => {
       "if-changed",
       "injection-hoist",
       "share-matrix-check",
+      "reference-wire",
     ]);
   });
 

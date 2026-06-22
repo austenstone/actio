@@ -1,0 +1,9 @@
+name: Ref Call Job
+on: [push]
+jobs:
+  lib:
+    uses: ./.github/workflows/lib.yml
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "using ${{ ref.job.lib.version }}"

@@ -1,0 +1,138 @@
+---
+title: ref
+description: Reference any producer's output by a rename-safe handle and let Actio wire needs and outputs.
+---
+
+Threading a value between jobs in raw YAML is the most error-prone hand-work in a
+workflow: give the producing step an `id`, declare `jobs.<id>.outputs`, add the
+consumer to `needs`, then read it back through `${{ needs.<job>.outputs.<name> }}`.
+Every piece is stringly-typed and silently breaks on a rename. `ref` collapses all of
+it. Tag the producing step with a logical `handle`, reference its outputs anywhere as
+`${{ ref.<handle>.<output> }}`, and Actio assigns the id, synthesizes `job.outputs`,
+and adds the `needs` edges for you.
+
+Where [`share`](/docs/macros/share) wires outputs the compiler mints itself, `ref`
+generalizes that same engine to outputs the compiler did not mint: action `uses:`
+outputs, hand-written `$GITHUB_OUTPUT` writes, and reusable call-job outputs. `share`
+and `ref` are two front-ends over one reference graph.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: Build
+on: [push]
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        ref:
+          handle: node
+          outputs: [node-version]
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "building on ${{ ref.node.node-version }}"
+```
+
+```yaml title="generated .yml"
+name: Build
+on:
+  - push
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        id: step_node
+    outputs:
+      node-version: ${{ steps.step_node.outputs.node-version }}
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "building on ${{ needs.setup.outputs.node-version }}"
+    needs:
+      - setup
+```
+
+</CodeCompare>
+
+The `${{ ref.node.node-version }}` reference in `build` resolves to
+`${{ needs.setup.outputs.node-version }}`, the `setup` step gains an `id`, its
+`node-version` output is published once on `jobs.setup.outputs`, and `needs: [setup]`
+is added. Rename the handle and every reference moves with it; there is no string to
+keep in sync.
+
+## Handles
+
+A producer's handle is how consumers address it. It is resolved explicit-first:
+
+1. An explicit `handle:` on the `ref` block.
+2. A slug of the step `name`, when no handle is given.
+3. The synthesized step `id`, as a last resort.
+
+Two producers that resolve to the same handle in the same job is a `ref-ambiguous`
+compile error, never a silent pick. When a handle is reused across different jobs,
+qualify the reference with the job id: `${{ ref.<job>.<handle>.<output> }}`.
+
+## Same job vs cross job
+
+The wiring follows the reference site:
+
+- **Same job** resolves to `${{ steps.<id>.outputs.<name> }}`. No `needs` and no
+  `job.outputs` are added.
+- **Cross job** resolves to `${{ needs.<job>.outputs.<name> }}`, synthesizes the
+  producer's `job.outputs` once (deduped across however many consumers read it), and
+  merges a `needs` edge onto every consuming job.
+
+## Producer kinds
+
+<TypeTable
+  type={{
+    handle: { type: 'string', description: 'Explicit handle. Defaults to a slug of the step name, then the step id.' },
+    outputs: { type: 'string[]', description: 'Output names this step publishes. Required for non-minted producers.', required: true },
+  }}
+/>
+
+- **Action `uses:`** outputs: declare them in `outputs:`; reference an undeclared one
+  and Actio warns (`ref-output-unknown-on-action`) but still wires it.
+- **Hand-written `run:`** writes to `$GITHUB_OUTPUT`: declare every name in `outputs:`.
+  Referencing an undeclared name is a hard `ref-unknown-output` error.
+- **Reusable call-jobs**: reference outputs as `${{ ref.job.<call_id>.<output> }}`. The
+  call-job already declares its own outputs, so Actio adds only the `needs` edge.
+
+Non-minted producers must list their `outputs:` explicitly. Sniffing
+`$GITHUB_OUTPUT` writes to infer outputs is deferred.
+
+## Diagnostics
+
+`ref` fails the build with a precise diagnostic instead of emitting broken YAML:
+
+- `ref-unknown-step` — the handle matches no producer.
+- `ref-unknown-output` — a `run` producer is missing the referenced output.
+- `ref-ambiguous` — a handle collides, on declaration or at a bare reference.
+- `ref-cycle` — the added `needs` edges would form a cycle.
+- `ref-self` — a step references its own handle.
+- `ref-output-undeclared` — a `ref` producer declares no `outputs:`.
+- `ref-matrix-clobber` — a cross-job reference targets a matrix-fanned producer, whose
+  per-leg outputs would clobber each other.
+- `ref-output-unknown-on-action` (warning) — an action producer is referenced for an
+  output it did not declare.
+
+## Gotchas
+
+<Callout title="needs is merged, not replaced">
+  Every job that reads a cross-job `${{ ref.<handle>.<output> }}` gains a `needs:` edge
+  on the producing job, merged with any `needs:` you already declared. A reference
+  therefore also defines ordering: a consumer always runs after its producer.
+</Callout>
+
+<Callout title="Matrix producers cannot be referenced cross-job">
+  A matrix expands one job into many legs that all write the same output name. A
+  cross-job reference cannot pick a leg, so it is a `ref-matrix-clobber` compile error.
+  Reference such outputs within the same job, where each leg keeps its own
+  `steps.<id>.outputs.<name>`.
+</Callout>
+
+See the [`ref`](/docs/syntax#ref) entry in the syntax reference for the full option
+list.
