@@ -1,6 +1,6 @@
 ---
 title: Glossary
-description: Definitions of the core Actio terms — transpile, macro, fragment, hoist, executor, source map, drift check, and more.
+description: Definitions of the core Actio terms — transpile, macro, pass, drift check, source map, hoist, executor, superset, and more.
 ---
 
 A quick reference for the terms used throughout these docs. Most map directly to a
@@ -20,9 +20,9 @@ expanded; none survive into the output.
 standard key, event, and value works exactly as it does in a normal workflow, so a
 macro-free `.actio.yml` file *is* a normal workflow.
 
-**Macro** — A keyword Actio adds (`params`, `fragments`, `job-defaults`,
-`executors`, `dynamic-matrix`, `static-if`, `inject`, `retry`, `fallback`) that
-expands into the boilerplate GitHub requires.
+**Macro** — A keyword Actio adds on top of normal workflow syntax that expands into
+the boilerplate GitHub requires. See the [syntax reference](/docs/syntax) for the
+full list.
 
 **Pass** — A single transform step in the compiler pipeline. Built-in passes
 implement the macros; you can register [custom passes](/docs/configuration#custom-passes)
@@ -30,6 +30,15 @@ that are merged into the pipeline and ordered by their `runsAfter` dependencies.
 
 **Drift check** — `actio check` (alias for `build --check`): verifies the committed
 workflows match what the sources would generate, failing CI if they're stale.
+
+**Executor** — A named runner/container/service preset declared under `executors`. A
+job selects one (or an ordered list) via `executor`, and Actio merges its
+`runs-on`/`container`/`services` in at compile time.
+
+**Hoist** — Moving an untrusted `${{ }}` context value out of a `run:` body into
+`env:` and referencing it by variable, so it can't be executed as part of the shell
+command. This is the script-injection mitigation that [`injection-hoist`](/docs/macros/injection-hoist)
+performs.
 
 ## Interpolation
 
@@ -41,34 +50,9 @@ runner to evaluate at run time.
 
 ## Macro keywords
 
-**params** — Typed compile-time parameters, referenced with `{{ params.<name> }}`
-and stripped from the emitted YAML. See [params](/docs/macros/params).
-
-**fragments / inject** — A `fragment` is a reusable, named list of steps; `inject`
-splices it into a job at a call site. See [fragments](/docs/macros/fragments).
-
-**job-defaults** — Default job-level settings merged into every job at compile time.
-See [job-defaults](/docs/macros/job-defaults).
-
-**executors / executor** — `executors` defines named runner/container/service
-presets; a job references one (or an ordered list) via `executor`.
-
-**dynamic-matrix** — Generates a job's `strategy.matrix` at runtime from a script,
-splitting into a setup job that prints JSON to `$GITHUB_OUTPUT` and a matrix job
-wired with `needs` + `fromJSON()`. See [dynamic-matrix](/docs/macros/dynamic-matrix).
-
-**static-if** — A compile-time structural condition. If the expression is false, the
-whole job, step, or keyed object is omitted from the output. See [static-if](/docs/macros/static-if).
-
-**retry** — Expands a flaky step into a chain of conditional attempts with optional
-backoff `delay`. See [retry](/docs/macros/retry).
-
-**fallback** — A native try/catch for steps and jobs: *notify* on failure by
-default, or set `recover: true` to let the job pass. See [fallback](/docs/macros/fallback).
-
-**injection-hoist** — A security transform that defuses script injection by hoisting
-untrusted `${{ }}` interpolation out of `run:` bodies into `env:`. See
-[injection-hoist](/docs/macros/injection-hoist).
+Actio adds roughly nineteen macro keywords. Rather than re-list them here, see the
+[syntax reference](/docs/syntax) for the complete keyword dictionary and the
+[macro guides](/docs/macros) for tutorial-style walkthroughs of each one.
 
 ## Output
 

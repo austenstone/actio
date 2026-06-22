@@ -82,19 +82,34 @@ Prefer the typed-IR visitor helpers (`workflow`, `visitJobs`, `visitSteps`,
 Interpolation: `{{ ... }}` is **compile-time** (resolved by `actio build`);
 `${{ ... }}` is **runtime passthrough** (emitted verbatim for the runner).
 
-| Keyword | Scope | What it does |
+| Group | Keyword(s) | What it does |
 | --- | --- | --- |
-| `params` | workflow | Typed compile-time inputs; reference with `{{ params.* }}` |
-| `_anchors` + `*alias` | workflow / step | Native YAML anchor library; a `- *alias` step list is flattened in place. Preferred for same-file, no-param reuse |
-| `templates` + `inject...with` | workflow / step | Parameterized named step lists; also resolves cross-file `inject: ./lib#name` |
-| `fragments` + `inject` | workflow / step | Deprecated (warning only): reusable named step lists, spliced in with `- inject: <name>`. Prefer `_anchors:`/`templates:` |
-| `job-defaults` | workflow | Job-level defaults merged into every job |
-| `executors` + `executor` | workflow / job | Named runner/container/service presets |
-| `call-templates` + `extends` | workflow / job | Named reusable-workflow call presets (`uses`/`with`/`needs`/`secrets`/`if`); jobs `extends:` and override deltas |
-| `dynamic-matrix` | job | Generate `strategy.matrix` at runtime from a script |
-| `static-if` | job, step | Compile-time conditional; drops the node when false |
-| `retry` | step | Retry a flaky step with optional backoff |
-| `fallback` | job, step | Native try/catch (notify, or `recover: true`) |
+| **Reuse** | `_anchors` + `- *alias` | Native YAML anchor library; the aliased step list is flattened in place. Preferred for same-file, no-param reuse |
+| | `templates` + `inject … with` | Named parameterized step lists; typed compile-time args |
+| | `inject: ./lib#name` | Cross-file step/job reuse from imported templates/modules |
+| | `fragments` + `inject` | **Deprecated** (lint `fragment-deprecated`): same-file step lists. Prefer `_anchors`/`templates` |
+| | `reusable` | Author one workflow that's both `workflow_call` + `workflow_dispatch`; inputs derived once |
+| | `call-templates` + `extends` | Named reusable-workflow call presets (`uses`/`with`/`needs`/`secrets`/`if`); jobs `extends:` and override deltas |
+| **Config presets** | `params` | Typed compile-time inputs; reference with `{{ params.* }}` |
+| | `job-defaults` | Job-level defaults merged into every job |
+| | `executors` + `executor` | Named runner/container/service presets |
+| **Matrix** | `dynamic-matrix` | Generate `strategy.matrix` at runtime from a script |
+| | `expand-matrix` | Unroll a literal matrix into named static jobs at compile time |
+| | `for-each` | Repeat a step (or job) over a list |
+| **Reliability** | `retry` | Retry a flaky step with optional backoff |
+| | `fallback` | Native try/catch (notify, or `recover: true`) |
+| | `soft-fail` | `continue-on-error`, or a build-time exit-code allow-list |
+| | `lifecycle` (`ensure`/`on-success`/`on-failure`/`on-abort`) | Guarded teardown/outcome hooks (`always()`/`success()`/`failure()`/`cancelled()`) |
+| **Wiring** | `share` | Promote step outputs to `job.outputs` + auto-wire `needs` |
+| | `ref` | Infer the producer job; wire `job.outputs` + `needs` |
+| **Conditionals** | `static-if` | Compile-time conditional; drops the node when false |
+| | `if-changed` | Gate a step/job on changed paths (synthesizes a `paths-filter` job) |
+| **Security** | `injection-hoist` | Defuse script injection: hoist untrusted `${{ }}` out of `run:` into `env:` |
+| **Artifacts** | `artifacts` | Append an `actions/upload-artifact` step |
+
+Full keyword dictionary (incl. `let`, `coercion`, `finally`, and the per-step hoist
+overrides `unsafe`/`trust`/`force`): see the
+[syntax reference](https://austenstone.github.io/actio/docs/syntax).
 
 ```yaml title=".actio.yml"
 params:
