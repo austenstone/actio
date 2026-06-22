@@ -673,3 +673,274 @@ jobs:
     expect(jobsOf(doc).build.needs).toEqual(["lint", "setup"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Inference: ref: is optional. A step becomes a producer the moment a consumer
+// references ref.<handle>.<output> and the handle matches its id or name.
+// Omitting ref: must emit byte-identical YAML to the explicit ref: form.
+// ---------------------------------------------------------------------------
+
+describe("ref: inferred producers (no ref:)", () => {
+  it("action producer: omitting ref: is byte-identical to ref: [outputs]", () => {
+    const inferred = `
+name: P
+on: [push]
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        name: node
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.node.node-version }}"
+`;
+    const explicit = inferred.replace(
+      "name: node\n",
+      "name: node\n        ref: [node-version]\n",
+    );
+    const a = transpile(inferred, { fileName: "t.actio.yml" });
+    const b = transpile(explicit, { fileName: "t.actio.yml" });
+    expect(a.ok).toBe(true);
+    expect(b.ok).toBe(true);
+    expect(a.yaml).toBe(b.yaml);
+  });
+
+  it("run producer: omitting ref: with an echo $GITHUB_OUTPUT write is byte-identical", () => {
+    const inferred = `
+name: P
+on: [push]
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: tag
+        run: echo "version=1" >> "$GITHUB_OUTPUT"
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.tag.version }}"
+`;
+    const explicit = inferred.replace(
+      '>> "$GITHUB_OUTPUT"\n',
+      '>> "$GITHUB_OUTPUT"\n        ref: [version]\n',
+    );
+    const a = transpile(inferred, { fileName: "t.actio.yml" });
+    const b = transpile(explicit, { fileName: "t.actio.yml" });
+    expect(a.ok).toBe(true);
+    expect(b.ok).toBe(true);
+    expect(a.yaml).toBe(b.yaml);
+    expect(a.diagnostics).toEqual([]);
+  });
+
+  it("same-job inference resolves to steps.<id>.outputs.<name> with no needs", () => {
+    const { errors, doc } = build(`
+name: SameJobInfer
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: tag
+        run: echo "version=1" >> "$GITHUB_OUTPUT"
+      - run: echo "\${{ ref.tag.version }}"
+`);
+    expect(errors).toEqual([]);
+    const job = jobsOf(doc).build;
+    expect(job.needs).toBeUndefined();
+    expect(job.outputs).toBeUndefined();
+    const producer = steps(job)[0];
+    expect(steps(job)[1].run).toBe(`echo "\${{ steps.${producer.id}.outputs.version }}"`);
+  });
+
+  it("infers a producer from a step id when there is no name", () => {
+    const { errors, doc } = build(`
+name: InferById
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - id: tagger
+        run: echo "v=1" >> "$GITHUB_OUTPUT"
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.tagger.v }}"
+`);
+    expect(errors).toEqual([]);
+    expect(jobsOf(doc).b.needs).toEqual(["a"]);
+    expect(jobsOf(doc).a.outputs).toEqual({
+      v: "${{ steps.tagger.outputs.v }}",
+    });
+  });
+
+  it("hard errors when an inferred run producer never writes the referenced output", () => {
+    const { result, errors } = build(`
+name: Unwritten
+on: [push]
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: tag
+        run: echo "version=1" >> "$GITHUB_OUTPUT"
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.tag.missing }}"
+`);
+    expect(hasCode(result, "ref-output-unwritten")).toBe(true);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(result.ok).toBe(false);
+  });
+
+  it("degrades to a warning and wires anyway when a run write is dynamic", () => {
+    const { result, errors, doc } = build(`
+name: Dynamic
+on: [push]
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: tag
+        run: echo "$DYNAMIC" >> "$GITHUB_OUTPUT"
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.tag.version }}"
+`);
+    expect(errors).toEqual([]);
+    expect(hasCode(result, "ref-output-unscannable")).toBe(true);
+    expect(jobsOf(doc).build.needs).toEqual(["setup"]);
+    expect(jobsOf(doc).setup.outputs).toEqual({
+      version: "${{ steps.step_tag.outputs.version }}",
+    });
+  });
+
+  it("warns at most once per dynamic producer across many references", () => {
+    const { result } = build(`
+name: DynamicOnce
+on: [push]
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: tag
+        run: echo "$DYNAMIC" >> "$GITHUB_OUTPUT"
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.tag.a }} \${{ ref.tag.b }} \${{ ref.tag.c }}"
+`);
+    const count = result.diagnostics.filter((d) => d.code === "ref-output-unscannable").length;
+    expect(count).toBe(1);
+  });
+
+  it("an ambiguous inferred handle errors; the qualified form resolves it", () => {
+    const ambiguous = `
+name: Ambiguous
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        name: node
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        name: node
+  c:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.node.node-version }}"
+`;
+    const r1 = build(ambiguous);
+    expect(hasCode(r1.result, "ref-ambiguous")).toBe(true);
+
+    const qualified = ambiguous.replace("ref.node.node-version", "ref.a.node.node-version");
+    const r2 = build(qualified);
+    expect(r2.errors).toEqual([]);
+    expect(jobsOf(r2.doc).c.needs).toEqual(["a"]);
+  });
+
+  it("flags a self-reference even when the producer is inferred by name", () => {
+    const { result } = build(`
+name: SelfInfer
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - name: tag
+        run: echo "version=\${{ ref.tag.version }}" >> "$GITHUB_OUTPUT"
+`);
+    expect(hasCode(result, "ref-self")).toBe(true);
+  });
+
+  it("scans heredoc and printf $GITHUB_OUTPUT writes as static", () => {
+    const heredoc = build(`
+name: Heredoc
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - name: tag
+        run: |
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "line one" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.tag.notes }}"
+`);
+    expect(heredoc.errors).toEqual([]);
+    expect(hasCode(heredoc.result, "ref-output-unscannable")).toBe(false);
+    expect(jobsOf(heredoc.doc).b.needs).toEqual(["a"]);
+
+    const printf = build(`
+name: Printf
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - name: tag
+        run: printf "version=1\\n" >> "$GITHUB_OUTPUT"
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.tag.version }}"
+`);
+    expect(printf.errors).toEqual([]);
+    expect(hasCode(printf.result, "ref-output-unscannable")).toBe(false);
+    expect(jobsOf(printf.doc).b.needs).toEqual(["a"]);
+  });
+
+  it("does not synthesize producers for unreferenced named steps", () => {
+    const { errors, doc } = build(`
+name: NoBulk
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - name: tag
+        run: echo "version=1" >> "$GITHUB_OUTPUT"
+      - name: other
+        run: echo hi
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.tag.version }}"
+`);
+    expect(errors).toEqual([]);
+    expect(jobsOf(doc).b.needs).toEqual(["a"]);
+    expect(steps(jobsOf(doc).a)[1].id).toBeUndefined();
+  });
+});
