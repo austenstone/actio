@@ -3,10 +3,47 @@ title: Supply-chain pinning
 description: Freeze mutable action refs to immutable digests with the pins surface.
 ---
 
-Actio ships a dedicated pin-management surface for freezing mutable refs to
-immutable digests without introducing a foreign runtime. For action dependencies,
-this now serves as a **legacy bridge** while GitHub's native workflow
-`dependencies:` lock model rolls out.
+Actio freezes mutable action and image refs to immutable digests at build time, and
+ships a `pins` management surface for auditing and updating those locks — all without
+introducing a foreign runtime. For action dependencies, the `pins` surface now serves
+as a **legacy bridge** while GitHub's native workflow `dependencies:` lock model rolls
+out.
+
+## Automatic pinning at build time
+
+`actio build` resolves every mutable `uses:` ref to an immutable commit SHA and every
+`docker://image:tag` to a digest, keeping the human-readable tag as a trailing
+comment. The emitted workflow becomes a **lockfile** — the SHA is what runs, the
+comment is what you read, and [`actio check`](/docs/cli) stops the two drifting.
+
+```yaml title="in.actio.yml"
+- uses: pnpm/action-setup@v2
+- uses: docker://alpine:3.18
+```
+
+```yaml title=".github/workflows/out.yml"
+- uses: pnpm/action-setup@d648c2dd069001a242c621c8306af467f150e99d # v2
+- uses: docker://alpine@sha256:51b67269f354137895d43f3b3d810bfacd3945438e94dc5ac55fdac340352f48 # 3.18
+```
+
+Resolved digests are cached in `actio.lock`, so repeat builds are deterministic and
+`--offline` works without touching the network; re-pinning an already-pinned ref is a
+no-op. Pinning is **on by default** for third-party actions and `docker://` images;
+first-party `actions/*` and `github/*` refs are left on their tag. Tune it with the
+[`pin` config block](/docs/configuration#pinning) or the
+`--pin`/`--no-pin`/`--pin-github`/`--offline` flags.
+
+Only Docker Hub registry images auto-resolve. A `docker://` image on an **unsupported
+registry host** — `ghcr.io`, a private/internal registry, anything with a host
+segment we can't auto-resolve — is **left on its tag** with a
+`pin-unresolvable-registry` warning rather than hard-failing, so a private registry
+never becomes an exit-`1` cliff while you're still told what wasn't locked. That skip
+is narrow: a failure to resolve on a registry we *do* support (a Docker Hub auth
+error, missing tag, rate-limit `429`, or `5xx`) is a **real failure and hard-fails**
+(exit `1`), never silently shipped unpinned. `--offline` likewise stays
+**fail-closed** (exit `2`) when the lock can't satisfy a ref.
+
+## The `pins` command
 
 ```bash
 # verify pin state
