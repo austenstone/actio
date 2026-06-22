@@ -11,6 +11,10 @@ discovery won't reach, like alongside your sources). Supported formats:
 `actio.config.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs`, `.json` (TS/ESM are
 loaded at runtime via [jiti](https://github.com/unjs/jiti) — no build step).
 
+<Tabs items={['ts', 'js', 'json']}>
+
+<Tab value="ts">
+
 ```ts twoslash title="actio.config.ts"
 import { defineConfig } from "actio-core"; // also re-exported from "actio-cli/config"
 
@@ -23,6 +27,44 @@ export default defineConfig({
   passes: [],                // custom transform passes (see below)
 });
 ```
+
+</Tab>
+
+<Tab value="js">
+
+```js title="actio.config.js"
+import { defineConfig } from "actio-core";
+
+export default defineConfig({
+  outDir: ".github/workflows",
+  validate: true,
+  header: true,
+  target: "legacy",
+  files: ["**/*.actio.yml"],
+  passes: [],
+});
+```
+
+</Tab>
+
+<Tab value="json">
+
+```json title="actio.config.json"
+{
+  "outDir": ".github/workflows",
+  "validate": true,
+  "header": true,
+  "target": "legacy",
+  "files": ["**/*.actio.yml"]
+}
+```
+
+JSON can't express `passes` (transform functions) — reach for `.ts`/`.js` when you
+need custom passes.
+
+</Tab>
+
+</Tabs>
 
 `defineConfig()` is an identity helper — it exists purely for type-safe authoring
 and autocompletion.

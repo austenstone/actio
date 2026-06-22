@@ -51,14 +51,14 @@ jobs:
             cat VERSION
             echo "${__ACTIO_EOF}"
           } >> "$GITHUB_OUTPUT"
-        id: step_version
-    outputs:
+        id: step_version # [!code highlight]
+    outputs: # [!code highlight:2]
       version: ${{ steps.step_version.outputs.version }}
   deploy:
     runs-on: ubuntu-latest
     steps:
       - run: ./deploy.sh ${{ needs.build.outputs.version }}
-    needs:
+    needs: # [!code highlight:2]
       - build
 ```
 

@@ -28,9 +28,15 @@ ergonomics over a **compile-time-known** value, it's in scope.
 The job graph is fixed when the workflow is parsed. You can't add/remove/reorder jobs
 or edges based on values computed during the run.
 
+<Accordions type="single">
+<Accordion title="High-demand asks (3)">
+
 - [github/customer-feedback#8205](https://github.com/github/customer-feedback/issues/8205) — dynamic `needs:` values
 - [github/customer-feedback#3758](https://github.com/github/customer-feedback/issues/3758) — fully dynamic workflows/jobs (runtime subset)
 - [community #73156](https://github.com/orgs/community/discussions/73156) — restart an individual failed job *while the workflow is still running*
+
+</Accordion>
+</Accordions>
 
 **Why not:** these mutate the DAG from runtime state. Actio only knows the DAG at
 compile time. *(Compile-time-known fan-out IS in scope — see edge cases.)*
@@ -40,9 +46,15 @@ compile time. *(Compile-time-known fan-out IS in scope — see edge cases.)*
 Secret storage, scoping, environments, branch protection, and marketplace trust live
 in the GitHub platform, not in YAML.
 
+<Accordions type="single">
+<Accordion title="High-demand asks (3)">
+
 - [community #15379](https://github.com/orgs/community/discussions/15379) — org-wide environments & environment secrets
 - [community #13836](https://github.com/orgs/community/discussions/13836) — bypass/relax branch protection from a workflow
 - Marketplace-trust half of the pin ask (the *authoring* half ships separately, see [#96](https://github.com/austenstone/actio/issues/96))
+
+</Accordion>
+</Accordions>
 
 **Why not:** no amount of generated YAML changes where GitHub keeps secrets or
 enforces protection.
@@ -51,10 +63,16 @@ enforces protection.
 
 How runs, jobs, and the Actions tab render is platform UI. YAML can't restyle it.
 
+<Accordions type="single">
+<Accordion title="High-demand asks (4)">
+
 - [github/customer-feedback#5584](https://github.com/github/customer-feedback/issues/5584) — hide non-running (skipped) jobs from the run graph
 - [community #18001](https://github.com/orgs/community/discussions/18001) — hide jobs in the UI when their `if:` is false
 - [community #26256](https://github.com/orgs/community/discussions/26256) — delete/hide old or renamed workflows
 - [community #12025](https://github.com/orgs/community/discussions/12025) — mark reusable workflows as templates / hide from the Actions tab
+
+</Accordion>
+</Accordions>
 
 **Why not:** runtime-`if` skipping and tab rendering are UI behaviors.
 *(Compile-time-known skips ARE in scope via [`static-if`](/docs/macros/static-if) —
@@ -64,9 +82,15 @@ see edge cases.)*
 
 Some contexts and fields just aren't populated where users want them, at runtime.
 
+<Accordions type="single">
+<Accordion title="High-demand asks (3)">
+
 - [actions/runner#480](https://github.com/actions/runner/issues/480) + [#2372](https://github.com/actions/runner/issues/2372) — workflow-level `env` not usable in all fields
 - [community #8945](https://github.com/orgs/community/discussions/8945) — expose `job_id` in the `github` context
 - [actions/runner#1483](https://github.com/actions/runner/issues/1483) — boolean inputs aren't actually booleans at runtime
+
+</Accordion>
+</Accordions>
 
 **Why not:** when the value is runtime-input-driven, Actio can't inline it. *(When the
 value is compile-time-known, [`{{ params }}`](/docs/macros/params) already inlines it
@@ -76,9 +100,15 @@ into `runs-on:`/`with:`/`if:` where `${{ env }}` is rejected — see edge cases.
 
 The scheduler decides queueing, cancellation, and conclusions at runtime.
 
+<Accordions type="single">
+<Accordion title="High-demand asks (3)">
+
 - [community #12835](https://github.com/orgs/community/discussions/12835) — concurrency: queue *all* jobs in a group (don't cancel)
 - [actions/runner#662](https://github.com/actions/runner/issues/662) — command to early-exit a job and set its conclusion
 - [actions/runner#2347](https://github.com/actions/runner/issues/2347) — `allow-failure` for a given job
+
+</Accordion>
+</Accordions>
 
 **Why not:** these are runtime scheduler behaviors. Generated YAML can't change how
 the queue/conclusion engine works.

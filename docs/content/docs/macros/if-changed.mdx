@@ -30,7 +30,7 @@ jobs:
 
 ```yaml title="generated .yml"
 jobs:
-  actio_changes:
+  actio_changes: # [!code highlight:13]
     runs-on: ubuntu-latest
     outputs:
       filter_1: ${{ steps.actio_filter.outputs.filter_1 }}
@@ -49,10 +49,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build docs
         run: ./build-docs.sh
-        if: needs.actio_changes.outputs.filter_1 == 'true'
+        if: needs.actio_changes.outputs.filter_1 == 'true' # [!code highlight]
       - name: Always run
         run: ./test.sh
-    needs:
+    needs: # [!code highlight:2]
       - actio_changes
 ```
 
@@ -129,7 +129,7 @@ jobs:
 ```yaml title="generated .yml"
   smoke:
     runs-on: ubuntu-latest
-    if: needs.actio_changes.outputs.filter_1 == 'true' && github.ref == 'refs/heads/main'
+    if: needs.actio_changes.outputs.filter_1 == 'true' && github.ref == 'refs/heads/main' # [!code highlight]
 ```
 
 </CodeCompare>

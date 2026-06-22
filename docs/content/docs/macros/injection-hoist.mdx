@@ -23,7 +23,7 @@ steps:
 ```yaml title="generated .yml"
 steps:
   - name: Greet PR author
-    env:
+    env: # [!code highlight:2]
       PR_TITLE: ${{ github.event.pull_request.title }}
     run: echo Hello "$PR_TITLE"
 ```

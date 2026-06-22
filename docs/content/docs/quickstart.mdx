@@ -3,16 +3,43 @@ title: Quickstart
 description: Scaffold, compile, and drift-check your first .actio.yml source.
 ---
 
+<Steps>
+
+<Step>
+
+### Scaffold a starter source file
+
 ```bash
-# scaffold a starter source file
 npx actio-cli init ci.actio.yml
+```
 
-# compile *.actio.yml → .github/workflows/*.yml
+</Step>
+
+<Step>
+
+### Compile to workflows
+
+Turns `*.actio.yml` into `.github/workflows/*.yml`.
+
+```bash
 npx actio-cli build
+```
 
-# CI drift check (fails if generated output is stale)
+</Step>
+
+<Step>
+
+### Drift-check in CI
+
+Fails if the generated output is stale.
+
+```bash
 npx actio-cli check
 ```
+
+</Step>
+
+</Steps>
 
 ## Recommended layout
 
