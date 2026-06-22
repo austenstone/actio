@@ -1,0 +1,15 @@
+name: Matrix Comprehension
+on: [push]
+params:
+  versions:
+    type: object
+    default: [18, 20, 22]
+let:
+  runner: ubuntu-latest
+jobs:
+  test:
+    runs-on: "{{ let.runner }}"
+    strategy:
+      matrix: "{{ [ { node: v, label: format('node-{0}', v) } for v in params.versions ] }}"
+    steps:
+      - run: echo "building ${{ matrix.node }} (${{ matrix.label }})"

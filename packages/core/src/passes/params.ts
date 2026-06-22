@@ -353,6 +353,13 @@ export interface ResolveTextOptions {
   validateRuntimeExpressions?: boolean;
   enforceNoResidualTokens?: boolean;
   reportInterpolationErrors?: boolean;
+  /**
+   * Marks the final pipeline boundary walk: expand matrix comprehensions to a
+   * native `strategy.matrix.include` and lint for stray compile tokens. Set only
+   * by `runCompletePassPipeline` so intermediate passes (fragments/forEach) never
+   * trip the guardrail before symbols are fully bound.
+   */
+  guardrail?: boolean;
 }
 
 const mapInterpolationError = (
@@ -496,13 +503,78 @@ export const resolveCompileTimeText = (
 };
 
 /** Resolve compile-time text interpolation recursively in a value tree. */
+/** True when `path` ends at a job's `strategy.matrix` definition. */
+const isMatrixDefPosition = (path: Path): boolean =>
+  path.length >= 2 && path[path.length - 1] === "matrix" && path[path.length - 2] === "strategy";
+
+/**
+ * A whole-value matrix comprehension `{{ [expr for x in list] }}` evaluates at
+ * build time to a native `strategy.matrix.include` array. Returns the rewritten
+ * matrix object, or undefined when `value` is not a comprehension (fall through
+ * to normal text resolution, preserving the bare-ref `interp-non-scalar` path).
+ */
+const expandMatrixComprehension = (
+  ctx: ParseContext,
+  value: string,
+  path: Path,
+): { include: unknown[] } | undefined => {
+  const inner = wholeValueToken(value);
+  if (inner === undefined) return undefined;
+  const node = parseExpression(inner);
+  if (node?.kind !== "comprehension") return undefined;
+  try {
+    const result = evalExpr(node, compileEvalEnv(ctx));
+    if (!Array.isArray(result)) {
+      pushDiagnostic(
+        ctx,
+        "error",
+        `Matrix comprehension "${inner}" must evaluate to a list`,
+        path,
+        {
+          code: "expr-type-error",
+        },
+      );
+      return { include: [] };
+    }
+    return { include: result };
+  } catch (error) {
+    const mapped = mapInterpolationError(error, inner);
+    pushDiagnostic(ctx, "error", mapped.message, path, { code: mapped.code });
+    return { include: [] };
+  }
+};
+
+/** Report a compile-time `{{ }}` token that survived into an emitted position. */
+const reportStrayCompileToken = (ctx: ParseContext, value: string, path: Path): void => {
+  const usesPosition = path.length > 0 && path[path.length - 1] === "uses";
+  pushDiagnostic(
+    ctx,
+    "error",
+    usesPosition
+      ? `Unresolved compile-time token survived into a uses: position: "${value}"`
+      : `Stray compile-time token in a non-evaluated position: "${value}"`,
+    path,
+    { code: usesPosition ? "uses-unresolved" : "expr-stray" },
+  );
+};
+
 export const resolveCompileTimeTextBoundaries = (
   ctx: ParseContext,
   value: unknown,
   path: Path,
   options: ResolveTextOptions = {},
 ): unknown => {
-  if (typeof value === "string") return resolveCompileTimeText(ctx, value, path, options);
+  if (typeof value === "string") {
+    if (options.guardrail && isMatrixDefPosition(path)) {
+      const matrix = expandMatrixComprehension(ctx, value, path);
+      if (matrix !== undefined) return matrix;
+    }
+    const resolved = resolveCompileTimeText(ctx, value, path, options);
+    if (options.guardrail && typeof resolved === "string" && hasCompileToken(resolved)) {
+      reportStrayCompileToken(ctx, resolved, path);
+    }
+    return resolved;
+  }
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index++) {
       value[index] = resolveCompileTimeTextBoundaries(ctx, value[index], [...path, index], options);
