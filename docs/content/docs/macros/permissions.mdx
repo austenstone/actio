@@ -51,6 +51,13 @@ It runs **late**, after every step-producing macro (fragments, matrix, lifecycle
 artifacts, ...) has expanded, so it sees the final step list. The pass is a pure IR
 transform with no Node built-ins, so it composes into the browser bundle.
 
+## Config
+
+`permissions` takes a string mode for the common case, or a `PermissionsConfig`
+object for granular control. Each field is detailed in the sections below.
+
+<AutoTypeTable path="../packages/core/src/config.ts" name="PermissionsConfig" />
+
 ## Modes
 
 | Mode     | Behavior                                                                              |
