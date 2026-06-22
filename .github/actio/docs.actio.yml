@@ -14,8 +14,8 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
-fragments:
-  setup:
+_anchors:
+  setup: &setup
     - uses: actions/checkout@v4
       with:
         persist-credentials: false
@@ -32,7 +32,7 @@ jobs:
       run:
         working-directory: docs
     steps:
-      - inject: setup
+      - *setup
       - name: Install root deps for TypeDoc type resolution
         working-directory: .
         run: npm ci

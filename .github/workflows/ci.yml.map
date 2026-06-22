@@ -166,21 +166,10 @@
       },
       "source": 0,
       "original": {
-        "line": 18,
-        "col": 13
+        "line": 35,
+        "col": 9
       },
-      "path": "jobs.build.steps.0.uses"
-    },
-    {
-      "generated": {
-        "line": 28
-      },
-      "source": 0,
-      "original": {
-        "line": 20,
-        "col": 30
-      },
-      "path": "jobs.build.steps.0.with.persist-credentials"
+      "path": "jobs.build.steps.0"
     },
     {
       "generated": {
@@ -188,32 +177,10 @@
       },
       "source": 0,
       "original": {
-        "line": 21,
-        "col": 13
+        "line": 36,
+        "col": 9
       },
-      "path": "jobs.build.steps.1.uses"
-    },
-    {
-      "generated": {
-        "line": 31
-      },
-      "source": 0,
-      "original": {
-        "line": 23,
-        "col": 23
-      },
-      "path": "jobs.build.steps.1.with.node-version"
-    },
-    {
-      "generated": {
-        "line": 32
-      },
-      "source": 0,
-      "original": {
-        "line": 24,
-        "col": 16
-      },
-      "path": "jobs.build.steps.1.with.cache"
+      "path": "jobs.build.steps.1"
     },
     {
       "generated": {
@@ -221,8 +188,8 @@
       },
       "source": 0,
       "original": {
-        "line": 25,
-        "col": 12
+        "line": 37,
+        "col": 14
       },
       "path": "jobs.build.steps.2.run"
     },
