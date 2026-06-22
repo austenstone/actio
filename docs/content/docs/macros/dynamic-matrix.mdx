@@ -3,10 +3,17 @@ title: dynamic-matrix
 description: The headline feature — generate a matrix at runtime from a script.
 ---
 
-The headline feature. A job-level block whose `script` prints a JSON array (or
-`{include:[...]}`); Actio generates the setup job + wiring.
+When the matrix list isn't known until the run — open PRs, changed packages, a
+fan-out computed from an API — a static `strategy.matrix` can't express it. A
+job-level `dynamic-matrix` block runs a `script` that prints a JSON array (or
+`{include:[...]}`), and Actio generates the setup job plus all the wiring.
 
-Splits into a setup job (compact JSON via heredoc) and the matrix job (`needs` +
+If the list **is** known at build time you don't need this: loop it inline with
+[`for-each`](/docs/macros/for-each), or unroll it into individually addressable
+named jobs with [`expand-matrix`](/docs/macros/expand-matrix). `dynamic-matrix` is
+specifically for lists computed at runtime.
+
+It splits into a setup job (compact JSON via heredoc) and the matrix job (`needs` +
 `fromJSON` + `fail-fast: false` + empty-matrix guard):
 
 <CodeCompare>

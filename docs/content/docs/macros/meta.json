@@ -6,6 +6,8 @@
     "job-defaults",
     "executors",
     "call-templates",
+    "anchors",
+    "templates",
     "fragments",
     "static-if",
     "for-each",
