@@ -1566,29 +1566,44 @@
     },
     "refProducer": {
       "title": "ref (Actio macro)",
-      "type": "object",
-      "required": [
-        "outputs"
-      ],
-      "additionalProperties": false,
-      "description": "Actio macro. Mark this step as a named reference producer so other steps and jobs can read its outputs by a rename-safe handle with `${{ ref.<handle>.<output> }}`. Actio assigns the step id, synthesizes `job.outputs`, and wires `needs` automatically, then strips the `ref` key from the generated workflow. Non-minted producers (an action `uses:` or a hand-written `$GITHUB_OUTPUT` `run:`) must declare their `outputs:` explicitly.",
-      "markdownDescription": "**Actio macro**: expose this step's outputs by a logical handle.\n\nReference the outputs anywhere with `${{ ref.<handle>.<output> }}` (qualify cross-job collisions as `${{ ref.<job>.<handle>.<output> }}`). Actio assigns the step id, synthesizes `jobs.<id>.outputs`, and adds `needs` edges, all rename-safe. A dotted `${{ ref.<handle>.<output>.<field> }}` lowers to `fromJSON(...)`.\n\n```yaml\nsteps:\n  - uses: actions/setup-node@v4\n    ref:\n      handle: node\n      outputs: [node-version]\n```",
-      "properties": {
-        "handle": {
-          "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$",
-          "description": "Explicit logical handle for this producer. Defaults to a slug of the step `name`, then the step id. A handle that collides with another producer in the same job is a `ref-ambiguous` compile error."
-        },
-        "outputs": {
+      "description": "Actio macro. Mark this step as a named reference producer so other steps and jobs can read its outputs by a rename-safe handle with `${{ ref.<handle>.<output> }}`. Actio assigns the step id, synthesizes `job.outputs`, and wires `needs` automatically, then strips the `ref` key from the generated workflow. Non-minted producers (an action `uses:` or a hand-written `$GITHUB_OUTPUT` `run:`) must declare their `outputs:` explicitly. Use the positional shorthand `ref: [output, ..]` (the handle derives from the step name then id), or the explicit `ref: { handle?, outputs }` map to rename the handle.",
+      "markdownDescription": "**Actio macro**: expose this step's outputs by a logical handle.\n\nReference the outputs anywhere with `${{ ref.<handle>.<output> }}` (qualify cross-job collisions as `${{ ref.<job>.<handle>.<output> }}`). Actio assigns the step id, synthesizes `jobs.<id>.outputs`, and adds `needs` edges, all rename-safe. A dotted `${{ ref.<handle>.<output>.<field> }}` lowers to `fromJSON(...)`.\n\nPrimary positional shorthand (handle derives from the step name then id):\n\n```yaml\nsteps:\n  - uses: actions/setup-node@v4\n    name: node\n    ref: [node-version]\n```\n\nExplicit-handle form, to rename the handle off the step name/id:\n\n```yaml\nsteps:\n  - uses: actions/setup-node@v4\n    ref: { handle: node, outputs: [node-version] }\n```",
+      "oneOf": [
+        {
+          "title": "ref shorthand (outputs)",
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "string",
             "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
           },
-          "description": "The output names this step publishes. Required for non-minted producers (G3): action `uses:` outputs and hand-written `$GITHUB_OUTPUT` writes are not sniffed."
+          "description": "Positional shorthand: the output names this step publishes. Equivalent to `{ outputs: [..] }`; the handle derives from the step `name` (slugified), then the step id."
+        },
+        {
+          "type": "object",
+          "required": [
+            "outputs"
+          ],
+          "additionalProperties": false,
+          "description": "Explicit-handle form: rename the producer handle off the step `name`/id.",
+          "properties": {
+            "handle": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$",
+              "description": "Explicit logical handle for this producer. Defaults to a slug of the step `name`, then the step id. A handle that collides with another producer in the same job is a `ref-ambiguous` compile error."
+            },
+            "outputs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+              },
+              "description": "The output names this step publishes. Required for non-minted producers (G3): action `uses:` outputs and hand-written `$GITHUB_OUTPUT` writes are not sniffed."
+            }
+          }
         }
-      }
+      ]
     },
     "sharedOutput": {
       "title": "share.<name> (Actio macro)",
