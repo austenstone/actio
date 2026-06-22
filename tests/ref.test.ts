@@ -535,3 +535,141 @@ describe("graph primitives", () => {
     expect(topoOrder(adj)).toEqual(["c"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Positional shorthand: ref: [outputs] is the primary producer form and is a
+// pure alias for ref: { outputs: [..] }. The handle still derives from the
+// step name then id, and explicit handle: (map form) still wins.
+// ---------------------------------------------------------------------------
+
+describe("ref: positional array shorthand", () => {
+  it("emits byte-identical YAML to the equivalent { outputs } map form", () => {
+    const arr = `
+name: Shorthand
+on: [push]
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        name: node
+        ref: [node-version, dist-tag]
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.node.node-version }} \${{ ref.node.dist-tag }}"
+`;
+    const map = arr.replace(
+      "ref: [node-version, dist-tag]",
+      "ref: { outputs: [node-version, dist-tag] }",
+    );
+    const a = transpile(arr, { fileName: "t.actio.yml" });
+    const m = transpile(map, { fileName: "t.actio.yml" });
+    expect(a.ok).toBe(true);
+    expect(m.ok).toBe(true);
+    expect(a.yaml).toBe(m.yaml);
+  });
+
+  it("derives the handle from the step name for the array form", () => {
+    const { errors, doc } = build(`
+name: DeriveArr
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Tag
+        run: echo "v=1" >> "$GITHUB_OUTPUT"
+        ref: [v]
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.build_tag.v }}"
+`);
+    expect(errors).toEqual([]);
+    expect(jobsOf(doc).b.needs).toEqual(["a"]);
+  });
+
+  it("falls back to the step id when the array form has no name or handle", () => {
+    const { errors, doc } = build(`
+name: DeriveArrId
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - id: tagger
+        run: echo "v=1" >> "$GITHUB_OUTPUT"
+        ref: [v]
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.tagger.v }}"
+`);
+    expect(errors).toEqual([]);
+    expect(jobsOf(doc).b.needs).toEqual(["a"]);
+  });
+
+  it("ref-output-undeclared: an empty array still errors", () => {
+    const { result } = build(`
+name: EmptyArr
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+        ref: []
+`);
+    expect(hasCode(result, "ref-output-undeclared")).toBe(true);
+  });
+
+  it("explicit handle: in the map form still works and still wins over the name", () => {
+    const { errors, doc } = build(`
+name: HandleWins
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        ref: { handle: node, outputs: [node-version] }
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.node.node-version }}"
+`);
+    expect(errors).toEqual([]);
+    expect(jobsOf(doc).b.needs).toEqual(["a"]);
+  });
+
+  it("a cross-job array-form ref synthesizes job.outputs and merged needs", () => {
+    const { errors, doc } = build(`
+name: CrossArr
+on: [push]
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        name: node
+        ref: [node-version]
+  build:
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "\${{ ref.node.node-version }}"
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo lint
+`);
+    expect(errors).toEqual([]);
+    const setup = jobsOf(doc).setup;
+    expect(setup.outputs).toEqual({
+      "node-version": "${{ steps.step_node.outputs.node-version }}",
+    });
+    expect(jobsOf(doc).build.needs).toEqual(["lint", "setup"]);
+  });
+});

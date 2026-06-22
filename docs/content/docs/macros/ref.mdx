@@ -7,9 +7,10 @@ Threading a value between jobs in raw YAML is the most error-prone hand-work in 
 workflow: give the producing step an `id`, declare `jobs.<id>.outputs`, add the
 consumer to `needs`, then read it back through `${{ needs.<job>.outputs.<name> }}`.
 Every piece is stringly-typed and silently breaks on a rename. `ref` collapses all of
-it. Tag the producing step with a logical `handle`, reference its outputs anywhere as
+it. List the producing step's outputs with `ref: [..]`, reference them anywhere as
 `${{ ref.<handle>.<output> }}`, and Actio assigns the id, synthesizes `job.outputs`,
-and adds the `needs` edges for you.
+and adds the `needs` edges for you. The handle derives from the step `name` (then its
+id); rename it explicitly with the `{ handle, outputs }` map form when you need to.
 
 Where [`share`](/docs/macros/share) wires outputs the compiler mints itself, `ref`
 generalizes that same engine to outputs the compiler did not mint: action `uses:`
@@ -26,9 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4
-        ref:
-          handle: node
-          outputs: [node-version]
+        name: node
+        ref: [node-version]
   build:
     runs-on: ubuntu-latest
     steps:
@@ -44,6 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4
+        name: node
         id: step_node
     outputs:
       node-version: ${{ steps.step_node.outputs.node-version }}
@@ -57,23 +58,35 @@ jobs:
 
 </CodeCompare>
 
-The `${{ ref.node.node-version }}` reference in `build` resolves to
+The positional `ref: [node-version]` is the primary producer form: it declares the
+output and lets the handle derive from the step `name` (`node`), so the
+`${{ ref.node.node-version }}` reference in `build` resolves to
 `${{ needs.setup.outputs.node-version }}`, the `setup` step gains an `id`, its
 `node-version` output is published once on `jobs.setup.outputs`, and `needs: [setup]`
-is added. Rename the handle and every reference moves with it; there is no string to
+is added. Rename the step and every reference moves with it; there is no string to
 keep in sync.
 
 ## Handles
 
 A producer's handle is how consumers address it. It is resolved explicit-first:
 
-1. An explicit `handle:` on the `ref` block.
+1. An explicit `handle:` on the `ref` map form.
 2. A slug of the step `name`, when no handle is given.
 3. The synthesized step `id`, as a last resort.
 
-Two producers that resolve to the same handle in the same job is a `ref-ambiguous`
-compile error, never a silent pick. When a handle is reused across different jobs,
-qualify the reference with the job id: `${{ ref.<job>.<handle>.<output> }}`.
+Reach for the `{ handle, outputs }` map form when you need to pin a handle that does
+not track the step `name`/id:
+
+```yaml title=".actio.yml"
+- uses: actions/setup-node@v4
+  ref: { handle: node, outputs: [node-version] }
+```
+
+This is byte-identical to `ref: [node-version]` on a step named `node`; the explicit
+`handle:` simply wins over the derived one. Two producers that resolve to the same
+handle in the same job is a `ref-ambiguous` compile error, never a silent pick. When a
+handle is reused across different jobs, qualify the reference with the job id:
+`${{ ref.<job>.<handle>.<output> }}`.
 
 ## Same job vs cross job
 
@@ -87,10 +100,16 @@ The wiring follows the reference site:
 
 ## Producer kinds
 
+A `ref` producer takes one of two equivalent forms. The positional shorthand
+`ref: [a, b]` is the primary form: it lists the output names and derives the handle
+from the step `name`, then its id. The `{ handle?, outputs }` map form is the
+escape hatch, used only when you need an explicit `handle:` that does not track the
+step `name`/id. Both feed the same reference graph; the map keys are:
+
 <TypeTable
   type={{
-    handle: { type: 'string', description: 'Explicit handle. Defaults to a slug of the step name, then the step id.' },
-    outputs: { type: 'string[]', description: 'Output names this step publishes. Required for non-minted producers.', required: true },
+    handle: { type: 'string', description: 'Explicit handle (map form only). Defaults to a slug of the step name, then the step id.' },
+    outputs: { type: 'string[]', description: 'Output names this step publishes. Required for non-minted producers. This is the value of the positional shorthand ref: [..].', required: true },
   }}
 />
 

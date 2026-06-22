@@ -1,0 +1,13 @@
+name: Ref Shorthand
+on: [push]
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        name: node
+        ref: [node-version]
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "building on ${{ ref.node.node-version }}"

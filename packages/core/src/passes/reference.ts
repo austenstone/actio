@@ -86,16 +86,32 @@ function collectJob(
   job.steps.forEach((step, idx) => {
     if (!isObject(step) || step.ref == null) return;
     const refPath: Path = ["jobs", jobId, "steps", idx, "ref"];
-    const block = step.ref;
-    if (!isObject(block)) {
-      pushDiagnostic(ctx, "error", "ref must be a mapping of { handle?, outputs }", refPath, {
-        code: "ref-output-undeclared",
-      });
+    const raw = step.ref;
+
+    // Two equivalent producer forms converge on a single `{ handle?, outputs }`
+    // shape: the positional shorthand `ref: [a, b]` (primary, no explicit handle)
+    // and the explicit map `ref: { handle?, outputs }` (escape hatch to rename
+    // the handle off name/id). A non-array, non-mapping value is neither.
+    let handleRaw: unknown;
+    let outputs: string[];
+    if (Array.isArray(raw)) {
+      handleRaw = undefined;
+      outputs = readOutputs(ctx, raw, [...refPath]) ?? [];
+    } else if (isObject(raw)) {
+      handleRaw = raw.handle;
+      outputs = readOutputs(ctx, raw.outputs, [...refPath, "outputs"]) ?? [];
+    } else {
+      pushDiagnostic(
+        ctx,
+        "error",
+        "ref must be a list of outputs or a mapping of { handle?, outputs }",
+        refPath,
+        { code: "ref-output-undeclared" },
+      );
       delete step.ref;
       return;
     }
 
-    const outputs = readOutputs(ctx, block.outputs, [...refPath, "outputs"]) ?? [];
     if (outputs.length === 0) {
       pushDiagnostic(
         ctx,
@@ -110,7 +126,7 @@ function collectJob(
 
     const kind: "action" | "run" = typeof step.uses === "string" ? "action" : "run";
     const stepId = ensureStepId(step, used, `ref_${jobId}_step_${idx + 1}`);
-    const explicit = typeof block.handle === "string" ? block.handle : undefined;
+    const explicit = typeof handleRaw === "string" ? handleRaw : undefined;
     const derived = typeof step.name === "string" && step.name ? slugify(step.name) : stepId;
     const handle = explicit && explicit.length > 0 ? explicit : derived;
 
