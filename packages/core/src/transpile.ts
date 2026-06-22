@@ -8,6 +8,7 @@ import type { ActioTarget } from "./config.js";
 import type { Diagnostic } from "./diagnostics.js";
 import { emitYaml, generatedHeader } from "./emit.js";
 import { type ActionlintRunner, type LintMode, lintWorkflowYaml } from "./lint.js";
+import type { ModuleResolver } from "./modules.js";
 import { type ParseContext, type Path, parseActio } from "./parser.js";
 import { annotate } from "./passes/annotate.js";
 import { isObject, pushDiagnostic } from "./passes/helpers.js";
@@ -100,6 +101,13 @@ export interface TranspileOptions {
    * Default "actions/upload-artifact@v4".
    */
   artifacts?: { uploader?: string };
+  /**
+   * Cross-file import seam (#161). Resolves `inject: ./lib#name` selectors to
+   * module sources. Keeps `transpile()` pure string->string: when omitted, local
+   * cross-file injects error with `import-module-not-found`. The CLI/build layer
+   * supplies a filesystem resolver; tests inject an in-memory one.
+   */
+  modules?: ModuleResolver;
 }
 
 export interface TranspileResult {
@@ -213,6 +221,13 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
   }
   if (options.artifacts !== undefined) {
     ctx.internal.artifacts = options.artifacts;
+  }
+  if (options.modules !== undefined) {
+    ctx.internal.modules = {
+      resolver: options.modules,
+      stack: [fileName],
+      compile: (modCtx) => runPasses(modCtx, passes),
+    };
   }
 
   // Collect dead-code diagnostics before passes prune the declaration blocks

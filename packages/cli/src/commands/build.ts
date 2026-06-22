@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -9,6 +9,7 @@ import {
   formatDiagnostic,
   formatGithubAnnotation,
   type LintMode,
+  type ModuleResolver,
   type NativeDependencies,
   type Pass,
   type PinPolicy,
@@ -65,6 +66,30 @@ export interface BuildOptions {
   pinResolver?: PinRefResolver;
   /** Lockfile path for the pin cache (defaults to `actio.lock`). */
   lockPath?: string;
+  /** Override the cross-file import resolver (tests inject an in-memory one). */
+  moduleResolver?: ModuleResolver;
+}
+
+/**
+ * Filesystem seam for cross-file `inject: ./lib#name`. The import pass vets the
+ * selector (relative + `.actio.yml`/`.yaml` + `#name`, no `@ref`) before calling
+ * `resolve`, so this only maps an already-checked path to its source. `id` is the
+ * cwd-relative path: a stable, human-readable key for cycle detection and the
+ * `fromFile` of nested injects. `resolve` must be sync because `transpile` is.
+ */
+function createFilesystemModuleResolver(cwd: string): ModuleResolver {
+  return {
+    resolve(spec, fromFile) {
+      const target = path.resolve(path.dirname(path.resolve(cwd, fromFile)), spec);
+      try {
+        if (!statSync(target).isFile()) return undefined;
+      } catch {
+        return undefined;
+      }
+      const id = path.relative(cwd, target) || path.basename(target);
+      return { id, source: readFileSync(target, "utf8") };
+    },
+  };
 }
 
 const DEFAULT_GLOBS = ["**/*.actio.yml"];
@@ -609,6 +634,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     artifacts: opts.artifacts,
     coercion: opts.coercion,
     lint: opts.lint,
+    modules: opts.moduleResolver ?? createFilesystemModuleResolver(cwd),
   };
   let result = transpile(source, baseOptions);
 

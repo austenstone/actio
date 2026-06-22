@@ -467,7 +467,7 @@ jobs:
     expect(errors.some((d) => /template-cycle/.test(d.message))).toBe(true);
   });
 
-  it("reserves cross-file inject with inject-cross-file-unsupported", () => {
+  it("errors on cross-file inject when no module resolver is provided", () => {
     const { result, errors } = diag(`name: x
 on: [push]
 jobs:
@@ -477,7 +477,7 @@ jobs:
       - inject: ./lib.actio.yml#setup
 `);
     expect(result.ok).toBe(false);
-    ranged(errors, /inject-cross-file-unsupported/);
+    ranged(errors, /import-module-not-found/);
   });
 
   it("errors on an invalid template param type", () => {

@@ -1,5 +1,7 @@
 import { type Document, LineCounter, parseDocument } from "yaml";
 import type { Diagnostic, Range } from "./diagnostics.js";
+import type { Step } from "./ir.js";
+import type { ModuleResolver } from "./modules.js";
 import type { SymbolTable } from "./symbols.js";
 
 /** Plain-JS workflow model. Intentionally loose — we only type macro-relevant bits at use sites. */
@@ -55,6 +57,30 @@ export interface ReferenceGraphInternal {
   edges: [string, string][];
 }
 
+/**
+ * Runtime state for the cross-file import pass (#161), installed on the importer
+ * context. `stack` is the chain of module ids currently being materialized (seeded
+ * with the importer file) for self-contained cycle detection; `materializeStep` is
+ * the hook the fragments pass calls to splice a STEP-level `inject: ./lib#name`.
+ */
+export interface ModuleRuntime {
+  resolver: ModuleResolver;
+  stack: string[];
+  materializeStep?: (
+    ctx: ParseContext,
+    selector: string,
+    step: Step,
+    stepPath: Path | undefined,
+  ) => Step[] | undefined;
+  /**
+   * Run the complete pass pipeline over a parsed module context. Injected by
+   * `transpile()` so `import.ts` can recursively compile modules in their own
+   * lexical scope without statically importing the pass barrel (which would
+   * close an `index -> import -> index` cycle).
+   */
+  compile?: (ctx: ParseContext) => void;
+}
+
 export interface ParseContextInternal {
   /** Preserved macro templates stripped from `ctx.data` after the job-defaults pass. */
   jobDefaults?: JobDefaultsInternalSnapshot;
@@ -68,6 +94,8 @@ export interface ParseContextInternal {
   share?: { matrixClobberChecks: ShareMatrixClobberCheck[] };
   /** Lower -> wire handoff for the `${{ ref.* }}` reference-graph passes (#160). */
   referenceGraph?: ReferenceGraphInternal;
+  /** Cross-file import seam + cycle stack, wired from `TranspileOptions.modules` (#161). */
+  modules?: ModuleRuntime;
 }
 
 /**

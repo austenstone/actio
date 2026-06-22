@@ -338,15 +338,23 @@ function expandList(
     if (isInject(step)) {
       const name = step.inject;
       if (isCrossFileInject(name)) {
-        pushDiagnostic(
-          ctx,
-          "error",
-          diagnosticMessage(
-            "inject-cross-file-unsupported",
-            `cross-file inject "${name}" is not supported yet; the \`./lib#name\` selector lands with cross-file import support`,
-          ),
-          sourcePathFor(ctx, step, stepPath, ["inject"]),
-        );
+        const materialize = ctx.internal.modules?.materializeStep;
+        if (!materialize) {
+          pushDiagnostic(
+            ctx,
+            "error",
+            diagnosticMessage(
+              "import-module-not-found",
+              `cross-file inject "${name}" needs a module resolver; none was provided`,
+            ),
+            sourcePathFor(ctx, step, stepPath, ["inject"]),
+            { code: "import-module-not-found" },
+          );
+          continue;
+        }
+        const spliced = materialize(ctx, name, step, stepPath);
+        if (spliced === undefined) continue;
+        out.push(...spliced);
         continue;
       }
       const template = templates[name];

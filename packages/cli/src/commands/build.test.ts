@@ -249,3 +249,60 @@ describe("ciAnnotationsEnabled", () => {
     expect(ciAnnotationsEnabled({ GITHUB_ACTIONS: "true", VITEST: "true" })).toBe(false);
   });
 });
+
+describe("cross-file import (filesystem resolver)", () => {
+  const LIB = [
+    "fragments:",
+    "  setupNode:",
+    "    - uses: actions/checkout@v4",
+    "    - uses: actions/setup-node@v4",
+    "jobs:",
+    "  deployJob:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    "      - run: echo deploy",
+    "",
+  ].join("\n");
+
+  const MAIN = [
+    "name: CI",
+    "on: [push]",
+    "jobs:",
+    "  build:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    "      - inject: ./lib.actio.yml#setupNode",
+    "      - run: npm test",
+    "  deploy:",
+    "    inject: ./lib.actio.yml#deployJob",
+    "    runs-on: ubuntu-24.04",
+    "",
+  ].join("\n");
+
+  it("splices an imported fragment and job from a sibling file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "actio-cli-import-"));
+    await writeFile(join(dir, "lib.actio.yml"), LIB, "utf8");
+    await writeFile(join(dir, "main.actio.yml"), MAIN, "utf8");
+
+    const code = await runBuild(["main.actio.yml"], options(dir, { validate: false }));
+    expect(code).toBe(0);
+
+    const out = parse(await readFile(join(dir, "out", "main.yml"), "utf8"));
+    const buildSteps = out.jobs.build.steps.map(
+      (s: { uses?: string; run?: string }) => s.uses ?? s.run,
+    );
+    expect(buildSteps).toEqual(["actions/checkout@v4", "actions/setup-node@v4", "npm test"]);
+    expect(out.jobs.deploy["runs-on"]).toBe("ubuntu-24.04");
+    expect(out.jobs.deploy.steps[0].run).toBe("echo deploy");
+    expect(out.jobs.deployJob).toBeUndefined();
+  });
+
+  it("errors when the imported module file is missing", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "actio-cli-import-"));
+    await writeFile(join(dir, "main.actio.yml"), MAIN, "utf8");
+
+    const code = await runBuild(["main.actio.yml"], options(dir, { validate: false }));
+    expect(code).not.toBe(0);
+    expect(existsSync(join(dir, "out", "main.yml"))).toBe(false);
+  });
+});
