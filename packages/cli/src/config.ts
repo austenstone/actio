@@ -1,6 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { ActioConfig, ActioTarget, CoercionMode, LintMode, PinPolicy } from "actio-core";
+import type {
+  ActioConfig,
+  ActioTarget,
+  CoercionMode,
+  LintMode,
+  PermissionsConfig,
+  PermissionsMode,
+  PinPolicy,
+} from "actio-core";
 import { createJiti } from "jiti";
 import type { BuildOptions } from "./commands/build.js";
 
@@ -13,6 +21,7 @@ const DEFAULT_COERCION: CoercionMode = "fix";
 const COERCION_MODES = ["off", "warn", "fix"] as const;
 const DEFAULT_LINT: LintMode = "off";
 const LINT_MODES = ["off", "warn", "error"] as const;
+const PERMISSIONS_MODES = ["off", "infer", "check"] as const;
 
 function parseActioTarget(raw: unknown, source: string): ActioTarget {
   if (typeof raw !== "string") {
@@ -45,6 +54,27 @@ function parseLintMode(raw: unknown, source: string): LintMode {
     );
   }
   return parsed;
+}
+
+function parsePermissionsMode(raw: unknown, source: string): PermissionsMode {
+  const parsed = PERMISSIONS_MODES.find((mode) => mode === raw);
+  if (parsed === undefined) {
+    throw new Error(
+      `${source} permissions must be one of: ${PERMISSIONS_MODES.join(", ")} (received "${String(raw)}")`,
+    );
+  }
+  return parsed;
+}
+
+/** CLI `--permissions <mode>` overrides the config mode while keeping any config override table. */
+function resolvePermissions(
+  config: PermissionsMode | PermissionsConfig | undefined,
+  flag: string | undefined,
+  passed: (name: string) => boolean,
+): PermissionsMode | PermissionsConfig | undefined {
+  if (!passed("--permissions")) return config;
+  const mode = parsePermissionsMode(flag, "CLI");
+  return config && typeof config === "object" ? { ...config, mode } : mode;
 }
 
 export interface LoadedConfig {
@@ -140,7 +170,7 @@ function resolvePinPolicy(raw: ActioConfig["pin"], passed: (name: string) => boo
  */
 export function resolveBuildOptions(args: {
   files: string[];
-  flags: { outDir?: string; target?: string; coercion?: string; lint?: string };
+  flags: { outDir?: string; target?: string; coercion?: string; lint?: string; permissions?: string };
   forceCheck: boolean;
   argv: string[];
   config: ActioConfig;
@@ -168,6 +198,7 @@ export function resolveBuildOptions(args: {
     unusedSymbols: config.unusedSymbols,
     strict: passed("--strict") ? true : (config.strict ?? false),
     artifacts: config.artifacts,
+    permissions: resolvePermissions(config.permissions, flags.permissions, passed),
     coercion: passed("--coercion")
       ? parseCoercionMode(flags.coercion, "CLI")
       : config.coercion !== undefined

@@ -5,6 +5,37 @@ import type { PinCommentStyle } from "./passes/pin.js";
 export type ActioTarget = "legacy" | "github-actions-native-dependencies-preview";
 
 /**
+ * Least-privilege permissions policy.
+ * - `off`: no-op (default). The pass never rewrites or audits output.
+ * - `infer`: emit each job's computed minimal `permissions:` union and a
+ *   top-level `permissions: {}` deny-all baseline when the root declares none.
+ * - `check`: audit each job's declared block against the computed minimum and
+ *   warn on over-grant (escalated to a build error under `actio check`).
+ */
+export type PermissionsMode = "off" | "infer" | "check";
+
+/**
+ * Granular permissions config. The string sugar (`"off" | "infer" | "check"`)
+ * is equivalent to `{ mode }`.
+ */
+export interface PermissionsConfig {
+  /** Policy mode. Default "off" (string form passes the mode directly). */
+  mode?: PermissionsMode;
+  /**
+   * Extend or override the bundled action -> required-scopes table. Keyed by
+   * `owner/repo[/path]` (no `@ref`); the value is a scope -> `read`|`write` map.
+   * A user entry always wins over the bundled default for that action.
+   */
+  actions?: Record<string, Record<string, "read" | "write">>;
+  /**
+   * Opt-in heuristic that maps `gh`/`GITHUB_TOKEN` usage inside a `run:` body to
+   * scopes (e.g. `gh pr` -> `pull-requests: write`). Default false: a token-using
+   * `run:` step instead marks the job unknown so it is never silently under-granted.
+   */
+  inferRunScopes?: boolean;
+}
+
+/**
  * Pin-on-compile policy. At `actio build`, pinnable `uses:` refs are rewritten to
  * an immutable SHA / digest with the original tag kept as a trailing comment.
  */
@@ -106,6 +137,14 @@ export interface ActioConfig {
    * pin policy). Default "actions/upload-artifact@v4".
    */
   artifacts?: { uploader?: string };
+  /**
+   * Least-privilege `permissions:` policy. `off` (default) is a no-op; `infer`
+   * emits each job's computed minimal block (plus a top-level deny-all baseline);
+   * `check` audits declared blocks and warns on over-grant (errors under
+   * `actio check`). The object form adds an action -> scopes override table and
+   * an opt-in `inferRunScopes` heuristic for `run:` steps.
+   */
+  permissions?: PermissionsMode | PermissionsConfig;
 }
 
 /** Identity helper that gives `actio.config.ts` authors full type-checking and inference. */

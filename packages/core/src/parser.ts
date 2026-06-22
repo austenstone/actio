@@ -90,6 +90,13 @@ export interface ParseContextInternal {
   injectionHoist?: "fix" | "warn" | "error" | "off";
   /** Inline `artifacts:` macro config; `uploader` is the upload action ref to emit. */
   artifacts?: { uploader?: string };
+  /** Normalized least-privilege permissions policy (resolved from config sugar). */
+  permissions?: {
+    mode: "off" | "infer" | "check";
+    actions?: Record<string, Record<string, "read" | "write">>;
+    inferRunScopes?: boolean;
+    strict?: boolean;
+  };
   /** Deferred matrix-output clobber checks re-run after late matrix passes (#158). */
   share?: { matrixClobberChecks: ShareMatrixClobberCheck[] };
   /** Lower -> wire handoff for the `${{ ref.* }}` reference-graph passes (#160). */

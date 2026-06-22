@@ -14,6 +14,8 @@ import {
   type ModuleResolver,
   type NativeDependencies,
   type Pass,
+  type PermissionsConfig,
+  type PermissionsMode,
   type PinPolicy,
   type PinResolution,
   type PinTarget,
@@ -43,6 +45,8 @@ export interface BuildOptions {
   strict?: boolean;
   /** Inline `artifacts:` macro config; `uploader` is the upload action ref to emit. */
   artifacts?: { uploader?: string };
+  /** Least-privilege permissions policy (`off | infer | check`, or granular config). Default `off`. */
+  permissions?: PermissionsMode | PermissionsConfig;
   /** YAML type-coercion guard mode (`off | warn | fix`). Default `fix`. */
   coercion: CoercionMode;
   /** actionlint output-lint severity (`off | warn | error`). Default `off`. */
@@ -640,6 +644,8 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     unusedSymbols: opts.unusedSymbols,
     strict: opts.strict,
     artifacts: opts.artifacts,
+    permissions: opts.permissions,
+    permissionsStrict: opts.check,
     coercion: opts.coercion,
     lint: opts.lint,
     actionlintRunner: opts.actionlintRunner ?? defaultActionlintRunner,
