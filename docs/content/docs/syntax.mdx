@@ -31,7 +31,7 @@ build` leaves behind.
 | [`expand_matrix`](#expand-matrix) | job | boolean | literal matrix unrolled into named jobs |
 | [`static-if`](#static-if) | job, step | string (bare expr) | node kept or omitted at compile time |
 | [`static-if(<expr>)`](#static-if-merge) | job, step | keyed map | merged into parent when true |
-| [`inject`](#inject) | step | string | replaced by the fragment's steps |
+| [`inject`](#inject) | step, job | string | replaced by the fragment's steps, or an imported step/job |
 | [`for-each`](#for-each) | step | map | expanded into repeated steps (or a matrix) |
 | [`retry`](#retry) | step | integer or map | chain of conditional attempts |
 | [`share`](#share) | step | map of outputs | `job.outputs` + `needs` wiring |
@@ -847,6 +847,52 @@ steps:
 ```
 
 See [`fragments`](#fragments) and [`templates`](#templates). Full guide: [fragments + inject](/docs/macros/fragments).
+
+#### Cross-file import: `inject: ./lib.actio.yml#name` [#inject-cross-file]
+
+`inject` also imports a step or job from another `.actio.yml` file by giving it a
+path selector: a relative path, then `#`, then the name of a `fragments:`,
+`templates:`, or job entry in that file. The imported node is partial-compiled in
+its own file's scope and spliced inline, so the generated workflow stays
+self-contained with no remaining reference to the source file.
+
+**Step form** — splice an imported step or step-list at this position. Pass typed
+arguments with `with:` exactly as you would for a local template:
+
+```yaml title=".actio.yml"
+steps:
+  - inject: ./lib.actio.yml#setupNode
+    with: { node: 20 }
+  - run: npm test
+```
+
+**Job form** — set `inject` as a job body to import a whole job. The local job key
+becomes the emitted job id, and any sibling keys deep-merge over the imported job:
+
+```yaml title=".actio.yml"
+jobs:
+  deploy:
+    inject: ./lib.actio.yml#deployJob
+    with: { env: prod }
+    runs-on: ubuntu-24.04   # overrides the imported runner
+```
+
+- **Deep-merge (GitLab `include` semantics):** maps merge recursively, scalars and
+  **arrays replace** (last-wins). Local keys override imported ones.
+- **Lexical scope:** `with:` is the only channel from the importer into the define.
+  Every other `{{ }}` in the imported body (e.g. `{{ let.* }}`) resolves in the
+  **source file's** scope, never the importer's.
+- **`uses:` is never inspected:** imported `uses:` stays native and is SHA-pinned by
+  the terminal pin pass alongside the rest of the assembled workflow.
+- **v1 limits:** local relative paths only (must start `./` or `../` and end
+  `.actio.yml` or `.yaml`, case-insensitive); `#name` is required; no `@ref`. Remote
+  `owner/repo@ref` imports are out of scope.
+
+Errors point at the offending selector: `import-module-not-found` (file missing),
+`import-define-not-found` (no such name), `import-cycle` (A imports B imports A, with
+the full chain), `import-local-ref-version` (selector carries an `@ref`),
+`import-unknown-param` (a `with:` key the define does not declare), and
+`import-malformed-module` (bad selector, extension, or unparseable source).
 
 {/* macro:for-each */}
 ### `jobs.<job_id>.for-each` / `jobs.<job_id>.steps[*].for-each` [#for-each]

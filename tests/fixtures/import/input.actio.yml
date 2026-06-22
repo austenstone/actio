@@ -1,0 +1,14 @@
+name: Import
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: ./lib.actio.yml#setupNode
+        with:
+          node: "22"
+      - run: npm test
+  release:
+    inject: ./lib.actio.yml#deploy
+    permissions:
+      contents: write

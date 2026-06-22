@@ -1,0 +1,17 @@
+templates:
+  setupNode:
+    params:
+      node: { type: string, default: "20" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "{{ args.node }}"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: echo deploy
+      - uses: actions/upload-artifact@v4

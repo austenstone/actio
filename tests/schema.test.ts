@@ -488,6 +488,29 @@ jobs:
     expect(validate(doc)).toBe(false);
   });
 
+  it("accepts a step cross-file inject with with:", () => {
+    const doc = load(`on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: ./lib.actio.yml#setupNode
+        with:
+          node: 20`);
+    expect(validate(doc)).toBe(true);
+  });
+
+  it("accepts a job-body cross-file inject with sibling overrides", () => {
+    const doc = load(`on: [push]
+jobs:
+  deploy:
+    inject: ./lib.actio.yml#deployJob
+    with:
+      env: prod
+    runs-on: ubuntu-24.04`);
+    expect(validate(doc)).toBe(true);
+  });
+
   it("rejects job-only keys in executor definitions", () => {
     for (const key of ["strategy", "if", "continue-on-error", "environment"]) {
       const doc = load(`on: [push]

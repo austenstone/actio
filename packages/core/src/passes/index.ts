@@ -7,6 +7,7 @@ import { fallback } from "./fallback.js";
 import { forEach } from "./forEach.js";
 import { fragments } from "./fragments.js";
 import { ifChanged } from "./ifChanged.js";
+import { deepMerge, importPass } from "./import.js";
 import { injectionHoist } from "./injectionHoist.js";
 import {
   applyDefaults,
@@ -31,7 +32,11 @@ import { whenCompile } from "./whenCompile.js";
 /**
  * The transforms Actio ships with. Order is derived from each pass's `runsAfter`
  * (see registry.ts), not this array, so the effective pipeline is:
- *   params → call-templates → job-defaults → for-each → when-compile → fragments → artifacts → share → reference-lower → retry → fallback → soft-fail → dynamic-matrix → expand-matrix → lifecycle → if-changed → injection-hoist → share-matrix-check → reference-wire
+ *   import → params → call-templates → job-defaults → for-each → when-compile → fragments → artifacts → share → reference-lower → retry → fallback → soft-fail → dynamic-matrix → expand-matrix → lifecycle → if-changed → injection-hoist → share-matrix-check → reference-wire
+ *
+ * `import` runs FIRST (no `runsAfter`, first in this array) so cross-file
+ * `inject: ./lib#name` steps/jobs are spliced into the tree before every other
+ * macro expands and before the terminal pin walks the assembled output (#161).
  *
  * `reusable` runs right after `params` so its input-reference normalization sees
  * fully resolved compile-time text before the call/normal job partition.
@@ -53,6 +58,7 @@ import { whenCompile } from "./whenCompile.js";
  * synthesis and matrix-clobber guard see the settled matrix shape (#160).
  */
 export const builtinPasses: Pass[] = [
+  importPass,
   params,
   reusable,
   callTemplates,
@@ -112,6 +118,7 @@ export {
   CALL_TEMPLATE_KEYS,
   type CallTemplateKey,
   callTemplates,
+  deepMerge,
   dynamicMatrix,
   EXECUTOR_KEYS,
   type ExecutorKey,
@@ -120,6 +127,7 @@ export {
   forEach,
   fragments,
   ifChanged,
+  importPass,
   injectionHoist,
   JOB_DEFAULT_KEYS,
   JOB_DEFAULTS_SAFE_SUBSET,

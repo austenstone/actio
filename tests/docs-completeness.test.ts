@@ -26,8 +26,14 @@ const passPageSlug: Record<string, string> = {
 // Adding a pass here is an explicit, reviewed decision to leave it undocumented.
 // Keep it tiny and justified. `share-matrix-check` is not a keyword: it is the
 // deferred half of the `share` macro's clobber guard, re-run after the matrix
-// passes settle (#158), and is documented on the share page.
-const internalPassAllowlist: ReadonlySet<string> = new Set<string>(["share-matrix-check"]);
+// passes settle (#158), and is documented on the share page. `import` is not a
+// keyword either: it powers the cross-file form of the existing `inject` verb
+// (`inject: ./lib#name`), documented on the inject macro page and in syntax.mdx
+// (#161), so it has no page of its own.
+const internalPassAllowlist: ReadonlySet<string> = new Set<string>([
+  "share-matrix-check",
+  "import",
+]);
 
 const macroPagePath = (passName: string): string =>
   join(macrosDir, `${passPageSlug[passName] ?? passName}.mdx`);

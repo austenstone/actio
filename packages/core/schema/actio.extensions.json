@@ -95,7 +95,7 @@
       }
     }
   ],
-  "jobOneOf": [{ "$ref": "#/definitions/extendsCallJob" }],
+  "jobOneOf": [{ "$ref": "#/definitions/extendsCallJob" }, { "$ref": "#/definitions/importJob" }],
   "patchDefinitions": {
     "reusableWorkflowCallJob": {
       "properties": {
@@ -108,8 +108,8 @@
         "inject": {
           "type": "string",
           "title": "inject (Actio macro)",
-          "description": "Actio macro. Splice in the steps of the named fragment (defined under top-level `fragments:`) at this position. Replaced inline by `actio build`.",
-          "markdownDescription": "**Actio macro**: splice a fragment here.\n\nReplaced inline by `actio build` with the steps of the named fragment from top-level `fragments:`.\n\n```yaml\nsteps:\n  - inject: setup\n  - run: npm test\n```"
+          "description": "Actio macro. Splice steps here. Local form `inject: name` splices a top-level `fragments:` entry; cross-file form `inject: ./lib.actio.yml#name` imports a step/fragment/template from another file (pair with `with:` to bind its params). Replaced inline by `actio build`.",
+          "markdownDescription": "**Actio macro**: splice steps here.\n\n- **Local**: `inject: setup` splices the named entry from top-level `fragments:`.\n- **Cross-file**: `inject: ./lib.actio.yml#name` imports a step, fragment, or template define from another file (relative path, `.actio.yml`/`.yaml`, `#name` required, no `@ref`). Add `with:` to bind the define's `params`.\n\nReplaced inline by `actio build`; nothing survives into the generated workflow.\n\n```yaml\nsteps:\n  - inject: setup\n  - inject: ./lib.actio.yml#setupNode\n    with: { node: 20 }\n  - run: npm test\n```"
         },
         "static-if": {
           "type": ["string", "boolean"],
@@ -350,6 +350,24 @@
         "strategy": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/strategy" },
         "concurrency": { "$ref": "#/definitions/reusableWorkflowCallJob/properties/concurrency" },
         "extends": { "$ref": "#/definitions/extendsRef" }
+      }
+    },
+    "importJob": {
+      "type": "object",
+      "title": "inject (Actio cross-file import)",
+      "description": "Actio macro. Import a job define from another `.actio.yml` file. `inject` is a `./path.actio.yml#name` selector; `with` binds the define's `params`; any sibling keys deep-merge over the imported job (maps merge recursively, arrays replace). The local job key becomes the emitted job id. Resolved and inlined by `actio build`; nothing survives into the generated workflow.",
+      "markdownDescription": "**Actio macro**: import a job from another `.actio.yml` file.\n\n`inject` is a `./lib.actio.yml#name` selector (relative path, `.actio.yml`/`.yaml`, `#name` required, no `@ref`). `with` binds the imported define's `params`; sibling keys deep-merge over the imported job (maps merge, arrays replace). The **local job key** becomes the emitted job id.\n\n```yaml\njobs:\n  deploy:\n    inject: ./lib.actio.yml#deployJob\n    with: { env: prod }\n    runs-on: ubuntu-24.04\n```",
+      "required": ["inject"],
+      "properties": {
+        "inject": {
+          "type": "string",
+          "title": "inject (Actio cross-file import)",
+          "description": "Cross-file selector `./lib.actio.yml#jobName`: relative path (`./` or `../`), `.actio.yml`/`.yaml` extension, `#name` required, no `@ref`."
+        },
+        "with": {
+          "type": "object",
+          "description": "Actio macro. Compile-time argument map binding the imported define's `params`. The only importer-to-define channel; all other `{{ }}` in the define resolve in its own source file's scope."
+        }
       }
     },
     "share": {

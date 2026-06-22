@@ -53,6 +53,7 @@ export {
   lintWorkflowYaml,
   type SpawnSync,
 } from "./lint.js";
+export type { ModuleResolver, ResolvedModule } from "./modules.js";
 export {
   type ForEachShareContract,
   type ForEachShareContractEntry,
@@ -76,6 +77,7 @@ export {
   type CallTemplateKey,
   callTemplates,
   createRegistry,
+  deepMerge,
   dynamicMatrix,
   EXECUTOR_KEYS,
   type ExecutorKey,
@@ -83,6 +85,7 @@ export {
   fallback,
   forEach,
   fragments,
+  importPass,
   JOB_DEFAULT_KEYS,
   JOB_DEFAULTS_SAFE_SUBSET,
   type JobDefaultKey,
