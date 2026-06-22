@@ -365,9 +365,7 @@ function ensureSynthesized(handle: string, state: ScanState): void {
     const stepId = ensureStepId(step, used, `ref_${jobId}_step_${idx + 1}`);
     const kind: "action" | "run" = typeof step.uses === "string" ? "action" : "run";
     const scan =
-      kind === "run" && typeof step.run === "string"
-        ? scanGithubOutputWrites(step.run)
-        : undefined;
+      kind === "run" && typeof step.run === "string" ? scanGithubOutputWrites(step.run) : undefined;
 
     const producer: RefProducer = {
       jobId,
@@ -625,9 +623,7 @@ function rewriteJob(jobId: string, job: Job, state: ScanState): void {
     const stepId = typeof step.id === "string" ? step.id : undefined;
     const path: Path = ["jobs", jobId, "steps", idx];
     const rewrite = (s: string) =>
-      scanRuntimeExprs(s, (inner) =>
-        rewriteExprBody(inner, jobId, stepId, idx, path, state),
-      );
+      scanRuntimeExprs(s, (inner) => rewriteExprBody(inner, jobId, stepId, idx, path, state));
     walkStrings(step, rewrite);
   });
 }

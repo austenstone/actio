@@ -696,10 +696,7 @@ jobs:
     steps:
       - run: echo "\${{ ref.node.node-version }}"
 `;
-    const explicit = inferred.replace(
-      "name: node\n",
-      "name: node\n        ref: [node-version]\n",
-    );
+    const explicit = inferred.replace("name: node\n", "name: node\n        ref: [node-version]\n");
     const a = transpile(inferred, { fileName: "t.actio.yml" });
     const b = transpile(explicit, { fileName: "t.actio.yml" });
     expect(a.ok).toBe(true);
