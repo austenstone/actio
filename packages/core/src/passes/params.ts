@@ -9,7 +9,7 @@ interface ParsedExpr {
   asJson: boolean;
 }
 
-const PARAM_TYPES: ReadonlySet<ParamType> = new Set([
+export const PARAM_TYPES: ReadonlySet<ParamType> = new Set([
   "string",
   "number",
   "boolean",
@@ -44,7 +44,11 @@ const typeAcceptsDefault = (type: ParamType, value: unknown): boolean => {
   return isStepList(value);
 };
 
-const validateEnumValues = (raw: unknown): string[] | undefined => {
+/** A provided (non-undefined) value satisfies a declared param type. */
+export const valueMatchesParamType = (type: ParamType, value: unknown): boolean =>
+  value !== undefined && typeAcceptsDefault(type, value);
+
+export const validateEnumValues = (raw: unknown): string[] | undefined => {
   if (!Array.isArray(raw) || raw.length === 0) return undefined;
   if (!raw.every((value) => typeof value === "string")) return undefined;
   return [...raw];
@@ -513,6 +517,59 @@ export const resolveCompileTimeTextBoundaries = (
     }
   }
   return value;
+};
+
+/** A call-site template argument: its declared type plus the bound value. */
+export interface TemplateArg {
+  type: ParamType;
+  value: unknown;
+}
+
+const makeArgSymbol = (name: string, type: ParamType, value: unknown): SymbolDef => ({
+  name,
+  kind: symbolKindForType(type),
+  type,
+  compileTimeKnown: true,
+  hasDefault: true,
+  valueKnown: true,
+  required: false,
+  taint: conservativeTaint(),
+  value,
+});
+
+/**
+ * Resolve `{{ args.* }}` inside a cloned template body by binding the call-site
+ * args as temporary `args.<name>` symbols on the SAME shared symbol table the
+ * params text path already reads, then running the one compile-time resolver.
+ * Routing args through this seam (rather than a bespoke substituter) is what
+ * keeps a single evaluator: PR3 upgrades the engine behind it and this callsite
+ * never changes. Bindings are restored afterward so sibling and nested injects
+ * never observe another inject's args.
+ */
+export const resolveArgsInBody = (
+  ctx: ParseContext,
+  body: unknown,
+  args: Record<string, TemplateArg>,
+  path: Path,
+): unknown => {
+  const saved = new Map<string, SymbolDef | undefined>();
+  for (const [name, arg] of Object.entries(args)) {
+    const key = `args.${name}`;
+    saved.set(key, ctx.symbols.get(key));
+    ctx.symbols.set(key, makeArgSymbol(key, arg.type, arg.value));
+  }
+  try {
+    return resolveCompileTimeTextBoundaries(ctx, body, path, {
+      validateRuntimeExpressions: false,
+      enforceNoResidualTokens: false,
+      reportInterpolationErrors: false,
+    });
+  } finally {
+    for (const [key, prev] of saved) {
+      if (prev === undefined) ctx.symbols.delete(key);
+      else ctx.symbols.set(key, prev);
+    }
+  }
 };
 
 const isStepListPosition = (path: Path): boolean => path[path.length - 1] === "steps";

@@ -244,6 +244,38 @@ jobs:
       - run: npm ci
 ```
 
+{/* macro:templates */}
+### `templates` [#templates]
+
+Parameterized, named lists of steps. Like [`fragments`](#fragments), but with typed
+`params:`. Splice a template into a job with `- inject: <name>` and pass a `with:`
+mapping; `{{ args.<name> }}` references in the body are resolved at compile time and
+erased. The `templates` key is stripped from the generated workflow.
+
+- **Valid in:** top level
+- **Type:** map of name → `{ params?, steps }`
+- **Compiles to:** nothing; each `inject` is replaced in place with the template's
+  steps, with `{{ args.* }}` substituted from `with:`
+
+```yaml title=".actio.yml"
+templates:
+  greet:
+    params:
+      who: { type: string }
+      times: { type: number, default: 1 }
+    steps:
+      - run: echo "hello {{ args.who }} x{{ args.times }}"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: greet
+        with: { who: world }
+```
+
+Param types reuse the [`params`](#params) type system. See [`inject`](#inject) for the
+call site. Full guide: [fragments + inject](/docs/macros/fragments).
+
 {/* macro:job-defaults */}
 ### `job-defaults` [#job-defaults]
 
@@ -735,19 +767,23 @@ Full guide: [static-if](/docs/macros/static-if).
 ### `jobs.<job_id>.steps[*].inject` [#inject]
 
 Splice in the steps of the named fragment (defined under top-level `fragments:`) at this
-position. Replaced inline by `actio build`.
+position. Replaced inline by `actio build`. To pass typed arguments, name a
+[`templates`](#templates) entry instead and add a `with:` mapping; `{{ args.<name> }}`
+references in the template body are resolved at compile time.
 
 - **Valid in:** `jobs.<job_id>.steps[*]`
-- **Type:** string (a fragment name)
-- **Compiles to:** the fragment's steps, in place
+- **Type:** string (a fragment or template name)
+- **Compiles to:** the fragment's or template's steps, in place
 
 ```yaml title=".actio.yml"
 steps:
   - inject: setup
+  - inject: greet
+    with: { who: world }
   - run: npm test
 ```
 
-See [`fragments`](#fragments). Full guide: [fragments + inject](/docs/macros/fragments).
+See [`fragments`](#fragments) and [`templates`](#templates). Full guide: [fragments + inject](/docs/macros/fragments).
 
 {/* macro:for-each */}
 ### `jobs.<job_id>.for-each` / `jobs.<job_id>.steps[*].for-each` [#for-each]

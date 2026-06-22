@@ -29,6 +29,13 @@
       "markdownDescription": "**Actio macro**: a parking spot for YAML anchors.\n\nNative YAML anchors (`&`/`*`/`<<:`) already own no-arg reuse; `_anchors:` just gives anchor libraries a reserved home so they do not pollute real workflow keys. A `- *alias` whose anchor is a step list is flattened into the surrounding steps. The `_anchors` key is stripped from the generated workflow.\n\n```yaml\n_anchors:\n  setup: &setup\n    - uses: actions/checkout@v4\n    - uses: actions/setup-node@v4\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - *setup\n      - run: npm ci\n```",
       "additionalProperties": true
     },
+    "templates": {
+      "type": "object",
+      "title": "templates (Actio macro)",
+      "description": "Actio macro. Parameterized, named step lists. Splice a template into a job with `- inject: <name>` and pass typed `with:` args resolved at compile time via `{{ args.<name> }}`. The `templates` key is stripped from the generated workflow.",
+      "markdownDescription": "**Actio macro**: parameterized step lists.\n\nLike `fragments:`, but with typed `params:`. Inject with `- inject: <name>` and a `with:` mapping; `{{ args.<name> }}` references in the body are resolved and erased at compile time. The `templates` key is stripped from the generated workflow.\n\n```yaml\ntemplates:\n  greet:\n    params:\n      who: { type: string }\n    steps:\n      - run: echo \"hello {{ args.who }}\"\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - inject: greet\n        with: { who: world }\n```",
+      "additionalProperties": { "$ref": "#/definitions/actioTemplate" }
+    },
     "job-defaults": {
       "$ref": "#/definitions/jobDefaults",
       "description": "Actio macro. Default job-level settings merged into jobs at compile time. Stripped from generated workflow YAML."
@@ -398,6 +405,25 @@
     "sharedOutputType": {
       "description": "Compile-time type assertion for the shared output. Boolean is a type assertion only — Actio does NOT coerce the runtime value.",
       "enum": ["string", "number", "boolean", "enum", "object"]
+    },
+    "actioTemplate": {
+      "title": "templates.<name> (Actio macro)",
+      "description": "A parameterized, named step list. `params:` declares typed compile-time inputs; `steps:` is the body spliced at the inject site.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["steps"],
+      "properties": {
+        "params": {
+          "type": "object",
+          "description": "Typed compile-time parameters, referenced in the body with `{{ args.<name> }}`.",
+          "additionalProperties": { "$ref": "#/definitions/actioParam" }
+        },
+        "steps": {
+          "type": "array",
+          "description": "The ordered list of steps to inject wherever this template is referenced.",
+          "items": { "$ref": "#/definitions/step" }
+        }
+      }
     },
     "actioParam": {
       "title": "params.<name> (Actio macro)",
