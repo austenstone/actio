@@ -1,6 +1,7 @@
 import { defineConfig, defineDocs } from 'fumadocs-mdx/config';
 import { metaSchema, pageSchema } from 'fumadocs-core/source/schema';
 import { rehypeCodeDefaultOptions } from 'fumadocs-core/mdx-plugins';
+import { transformerTwoslash } from 'fumadocs-twoslash';
 import { transformerActioKeywords } from './lib/shiki-actio';
 
 // You can customize Zod schemas for frontmatter and `meta.json` here
@@ -25,6 +26,7 @@ export default defineConfig({
       transformers: [
         ...(rehypeCodeDefaultOptions.transformers ?? []),
         transformerActioKeywords(),
+        transformerTwoslash(),
       ],
     },
   },
