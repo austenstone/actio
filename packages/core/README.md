@@ -30,7 +30,7 @@ workflow YAML. If you already have a parsed context, `runPasses()` and
 `applyPasses()` is intentionally lower level: it runs only pass transforms and may
 leave compile-time `{{ ... }}` text interpolation unresolved.
 
-See the [full documentation and API reference](https://github.com/austenstone/actio#readme).
+See the [full documentation and API reference](https://austenstone.github.io/actio).
 
 ## License
 

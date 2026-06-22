@@ -1,64 +1,88 @@
 ---
 title: Introduction
-description: A transpiler that compiles a clean .actio.yml source into the verbose GitHub Actions YAML you'd otherwise hand-write.
+description: Write clean GitHub Actions YAML with a handful of compile-time macros; actio build expands them into the verbose workflow YAML you'd otherwise hand-write — zero runtime, zero lock-in.
 ---
 
-Actio adds a handful of macro keywords on top of standard workflow YAML. They expand
-at **build time** — nothing survives into the generated output, so there's no runtime
-and no lock-in. Everything that isn't a macro is passthrough: a macro-free
-`.actio.yml` is already a valid workflow.
+Actio is a strict superset of GitHub Actions YAML. Write ordinary workflow files and
+reach for a macro only where raw YAML turns into boilerplate; [`actio build`](/docs/quickstart)
+expands every macro at **build time** into the verbose YAML you'd otherwise hand-write.
+Nothing survives into the output — no runtime, no lock-in — and a macro-free `.actio.yml`
+is already a valid workflow.
 
-Here's the smallest useful example. [`fragments`](/docs/macros/fragments) defines
-reusable steps, `inject` splices them in, and ordinary steps pass straight through:
+The flagship is [`dynamic-matrix`](/docs/macros/dynamic-matrix). Print a JSON array from a
+script and Actio generates the setup job, the `needs` + `fromJSON` wiring, `fail-fast: false`,
+and the empty-matrix guard — the plumbing you'd otherwise hand-write and get subtly wrong:
 
 <CodeCompare>
 
 ```yaml title=".actio.yml"
-fragments:
-  setup:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
 jobs:
   test:
     runs-on: ubuntu-latest
+    dynamic-matrix:
+      script: echo '["1", "2", "3"]'
+      alias: shard
     steps:
-      - inject: setup
-      - run: npm test
+      - run: ./run-shard.sh ${{ matrix.shard }}
 ```
 
 ```yaml title="generated .yml"
 jobs:
+  actio_setup_test:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.actio_eval.outputs.matrix }}
+    steps:
+      - name: Evaluate dynamic matrix
+        id: actio_eval
+        run: |-
+          {
+            echo 'matrix<<ACTIO_EOF'
+            echo '["1", "2", "3"]' | jq -c .
+            echo ACTIO_EOF
+          } >> "$GITHUB_OUTPUT"
   test:
     runs-on: ubuntu-latest
+    needs: [actio_setup_test]
+    strategy:
+      matrix:
+        shard: ${{ fromJSON(needs.actio_setup_test.outputs.matrix) }}
+      fail-fast: false
+    if: needs.actio_setup_test.outputs.matrix != '[]' && needs.actio_setup_test.outputs.matrix != ''
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-      - run: npm test
+      - run: ./run-shard.sh ${{ matrix.shard }}
 ```
 
 </CodeCompare>
 
+`{{ ... }}` resolves at build time; `${{ ... }}` passes through to the runner untouched
+([token rules](/docs/syntax#interpolation-tokens)).
+
 ## Why
+
+Every row is a real pain in hand-written workflow YAML, and the macro that erases it:
 
 | Pain in raw YAML | Macro |
 | --- | --- |
-| Dynamic matrix needs a hand-built setup job that prints JSON to `$GITHUB_OUTPUT`, consumed downstream via `fromJSON()`, with escaping and empty-guard gotchas | [`dynamic-matrix`](/docs/macros/dynamic-matrix) |
-| A native matrix fans out anonymous jobs, so nothing downstream can `needs:` one specific leg | [`expand_matrix`](/docs/macros/expand-matrix) |
-| Reusing steps forces a separate [composite action](https://docs.github.com/en/actions/sharing-automations/creating-actions/creating-a-composite-action) or [reusable workflow](https://docs.github.com/en/actions/sharing-automations/reusing-workflows) file | [`fragments`](/docs/macros/fragments) |
-| Retrying flaky steps requires bash loops or third-party actions | [`retry`](/docs/macros/retry) |
-| try/catch means smearing `if: failure()` / `continue-on-error` across steps | [`fallback`](/docs/macros/fallback) |
-| Compile-time constants and structured defaults are hard to keep typed in plain YAML | [`params`](/docs/macros/params) |
+| A runtime matrix needs a hand-built setup job that prints JSON to `$GITHUB_OUTPUT`, consumed downstream via `fromJSON()`, with escaping and empty-guard gotchas | [`dynamic-matrix`](/docs/macros/dynamic-matrix) |
+| Reusing a block of steps forces a separate [composite action](https://docs.github.com/en/actions/sharing-automations/creating-actions/creating-a-composite-action) or [reusable workflow](https://docs.github.com/en/actions/sharing-automations/reusing-workflows) file | [`_anchors` / `templates`](/docs/macros/anchors) |
+| Retrying a flaky step means hand-rolled bash loops or a third-party action | [`retry`](/docs/macros/retry) |
+| try/catch means smearing `if: failure()` and `continue-on-error` across steps | [`fallback`](/docs/macros/fallback) |
+| Keeping typed compile-time constants and defaults consistent across a workflow | [`params`](/docs/macros/params) |
 
 Prior art ([`github-actions-workflow-ts`](https://github.com/emmanuelnk/github-actions-workflow-ts),
 [`github-actions-wac`](https://github.com/webiny/github-actions-wac),
-[`projen`](https://github.com/projen/projen)) does typed object → YAML 1:1
-serialization. Actio's differentiator is the **macro/transform compiler**.
+[`projen`](https://github.com/projen/projen)) serializes a typed object graph 1:1 into
+YAML. Actio is a **macro/transform compiler**: the source stays YAML and macros rewrite
+it at build time, so you keep plain workflow files and just stop hand-writing the
+boilerplate. See the [syntax reference](/docs/syntax) for every keyword and
+[architecture](/docs/architecture) for the two-phase compile model.
 
 ## Next steps
 
 <Cards>
   <Card title="Installation" href="/docs/installation" description="Install the CLI and check requirements." />
   <Card title="Quickstart" href="/docs/quickstart" description="init, build, and check in under a minute." />
-  <Card title="Macros" href="/docs/macros/params" description="The five keywords that do the work." />
-  <Card title="Architecture" href="/docs/architecture" description="How the compiler pipeline works." />
+  <Card title="Macros" href="/docs/syntax" description="Every keyword, in one reference." />
+  <Card title="Architecture" href="/docs/architecture" description="How the two-phase compiler works." />
 </Cards>

@@ -1,7 +1,7 @@
 # actio-cli
 
-> The `actio` command — compile clean `.actio.yml` sources into the verbose
-> GitHub Actions workflow YAML you'd otherwise hand-write.
+> Compile clean GitHub Actions YAML — a handful of compile-time macros — into the
+> verbose workflow YAML you'd otherwise hand-write. Zero runtime, zero lock-in.
 
 Part of [Actio](https://github.com/austenstone/actio).
 
@@ -28,8 +28,8 @@ npx actio-cli build
 npx actio-cli check
 ```
 
-See the [full documentation](https://github.com/austenstone/actio#readme) for
-macros (`fragments`, `retry`, `dynamic-matrix`, `fallback`), config, and the
+See the [full documentation](https://austenstone.github.io/actio) for
+macros (`dynamic-matrix`, `retry`, `fallback`, `params`), config, and the
 custom-pass API.
 
 ## License
