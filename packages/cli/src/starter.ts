@@ -4,8 +4,8 @@ export const STARTER_ACTIO = `${SCHEMA_MODELINE}
 name: CI
 on: [push]
 
-fragments:
-  setup_node:
+_anchors:
+  setup_node: &setup_node
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
       with:
@@ -15,7 +15,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - inject: setup_node
+      - *setup_node
       - name: Test
         run: npm ci && npm test
 `;
