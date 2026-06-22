@@ -72,6 +72,110 @@ jobs:
   });
 });
 
+describe("flatten rule (anchors)", () => {
+  it("splices a `- *alias` sequence into job steps and strips `_anchors`", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+_anchors:
+  setup: &setup
+    - uses: actions/checkout@v4
+    - run: echo hi
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - *setup
+      - run: npm ci
+`);
+    expect(errors).toEqual([]);
+    expect(doc._anchors).toBeUndefined();
+    expect(doc.jobs.a.steps).toEqual([
+      { uses: "actions/checkout@v4" },
+      { run: "echo hi" },
+      { run: "npm ci" },
+    ]);
+  });
+
+  it("flattens nested aliases recursively", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+_anchors:
+  inner: &inner
+    - run: inner
+  outer: &outer
+    - run: before
+    - *inner
+    - run: after
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - *outer
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.a.steps).toEqual([{ run: "before" }, { run: "inner" }, { run: "after" }]);
+  });
+
+  it("flattens a `- *alias` inside a step-level fallback list", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+_anchors:
+  recover: &recover
+    - run: cleanup
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: flaky
+        fallback:
+          - *recover
+          - run: notify
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.a.steps.map((s: { run?: string }) => s.run)).toEqual([
+      "flaky",
+      "cleanup",
+      "notify",
+    ]);
+  });
+
+  it("flattens a `- *alias` inside a fallback.steps block", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+_anchors:
+  recover: &recover
+    - run: cleanup
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: flaky
+        fallback:
+          recover: true
+          steps:
+            - *recover
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.a.steps.map((s: { run?: string }) => s.run)).toEqual(["flaky", "cleanup"]);
+  });
+
+  it("leaves a whole-value `steps: *alias` untouched", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+_anchors:
+  all: &all
+    - uses: actions/checkout@v4
+    - run: echo hi
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps: *all
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.a.steps).toEqual([{ uses: "actions/checkout@v4" }, { run: "echo hi" }]);
+  });
+});
+
 describe("dynamic-matrix", () => {
   const src = `name: x
 on: [push]

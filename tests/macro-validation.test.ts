@@ -332,3 +332,39 @@ jobs:
     ranged(errors, /dynamic-matrix requires a "script" string/);
   });
 });
+
+describe("flatten rule validation", () => {
+  it("errors when a `- *alias` sequence lands at a non-step position", () => {
+    const { result, errors } = diag(`name: x
+on: [push]
+_anchors:
+  seq: &seq
+    - run: a
+    - run: b
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    env:
+      FOO:
+        - *seq
+    steps:
+      - run: echo hi
+`);
+    expect(result.ok).toBe(false);
+    ranged(errors, /template-flatten-nonstep/);
+  });
+
+  it("errors when spliced step nesting exceeds the depth cap", () => {
+    const deep = `${"- ".repeat(70)}run: echo deep`;
+    const { result, errors } = diag(`name: x
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      ${deep}
+`);
+    expect(result.ok).toBe(false);
+    ranged(errors, /template-depth-exceeded/);
+  });
+});

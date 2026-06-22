@@ -6,7 +6,17 @@ import type { Pass } from "./registry.js";
 
 type FragmentMap = Record<string, Step[]>;
 const FORM_B_KEY_RE = /^static-if\([\s\S]*\)$/;
+// A `- *alias` whose anchor is a sequence parses to a nested array at a step
+// position; flatten splices it in place. The cap is a defensive guard against
+// pathologically deep nesting (YAML aliases cannot form cycles).
+const FLATTEN_DEPTH_CAP = 64;
 const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
+
+// Coerce a fallback step list while preserving spliced `*alias` sequences
+// (nested arrays). Plain asStepArray drops arrays via filter(isObject), which
+// would silently delete a `- *alias` before the flatten branch can splice it.
+const asFlattenableSteps = (value: unknown): Step[] =>
+  (Array.isArray(value) ? value : []).filter((s) => isObject(s) || Array.isArray(s)) as Step[];
 
 function getFragments(ctx: ParseContext): FragmentMap {
   const frags = ctx.data.fragments;
@@ -57,10 +67,27 @@ function expandList(
   fragments: FragmentMap,
   stack: string[],
   listPath?: Path,
+  depth = 0,
 ): Step[] {
+  if (depth > FLATTEN_DEPTH_CAP) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      diagnosticMessage(
+        "template-depth-exceeded",
+        `spliced step nesting exceeded the depth cap of ${FLATTEN_DEPTH_CAP}`,
+      ),
+      listPath ? sourcePathFor(ctx, list, listPath) : undefined,
+    );
+    return [];
+  }
   const out: Step[] = [];
   for (const [index, step] of list.entries()) {
     const stepPath = listPath ? [...listPath, index] : undefined;
+    if (Array.isArray(step)) {
+      out.push(...expandList(step as Step[], ctx, fragments, stack, stepPath, depth + 1));
+      continue;
+    }
     if (hasBadInject(step)) {
       pushDiagnostic(
         ctx,
@@ -105,7 +132,7 @@ function expandList(
         continue;
       }
       const copies = (fragments[name] ?? []).map((s) => cloneNode(ctx, s));
-      out.push(...expandList(copies, ctx, fragments, [...stack, name]));
+      out.push(...expandList(copies, ctx, fragments, [...stack, name], undefined, depth));
     } else {
       if (isObject(step) && step.fallback != null) {
         expandFallbackInPlace(step, ctx, fragments, stack, sourcePathFor(ctx, step, stepPath));
@@ -127,7 +154,7 @@ function expandFallbackInPlace(
   const fb = container.fallback;
   if (Array.isArray(fb)) {
     container.fallback = expandList(
-      asStepArray(fb),
+      asFlattenableSteps(fb),
       ctx,
       fragments,
       stack,
@@ -135,7 +162,7 @@ function expandFallbackInPlace(
     );
   } else if (isObject(fb) && Array.isArray(fb.steps)) {
     fb.steps = expandList(
-      asStepArray(fb.steps),
+      asFlattenableSteps(fb.steps),
       ctx,
       fragments,
       stack,
@@ -147,6 +174,25 @@ function expandFallbackInPlace(
 function stripResidualWhenCompile(ctx: ParseContext, value: unknown, path: Path): void {
   if (Array.isArray(value)) {
     value.forEach((item, index) => {
+      if (Array.isArray(item)) {
+        // A spliced `- *alias` step-sequence materializes as a nested array of
+        // step mappings. Literal nested arrays (e.g. a matrix axis `[[1,2]]`)
+        // hold scalars, so only an all-object inner array is a flatten misuse.
+        if (item.length > 0 && item.every(isObject)) {
+          pushDiagnostic(
+            ctx,
+            "error",
+            diagnosticMessage(
+              "template-flatten-nonstep",
+              "a `- *alias` sequence can only flatten inside a steps list (job steps, fallback, or fallback.steps); remove it or move it to a steps position",
+            ),
+            sourcePathFor(ctx, item, [...path, index]),
+          );
+          return;
+        }
+        stripResidualWhenCompile(ctx, item, [...path, index]);
+        return;
+      }
       stripResidualWhenCompile(ctx, item, [...path, index]);
     });
     return;
@@ -178,9 +224,10 @@ function stripResidualWhenCompile(ctx: ParseContext, value: unknown, path: Path)
 
 /**
  * fragments pass: collect top-level `fragments:`, expand all `- inject: <name>`
- * entries (in job steps, job fallback, and step fallback), then strip the
- * `fragments:` key. Runs after static-if and strips any residual static-if
- * directives that reach this stage.
+ * entries (in job steps, job fallback, and step fallback), flatten any spliced
+ * `- *alias` sequences in those step lists, then strip the `fragments:` and
+ * reserved `_anchors:` keys. Runs after static-if and strips any residual
+ * static-if directives that reach this stage.
  */
 export function fragmentsPass(ctx: ParseContext): void {
   const fragments = getFragments(ctx);
@@ -199,6 +246,7 @@ export function fragmentsPass(ctx: ParseContext): void {
     stripResidualWhenCompile(ctx, job, ["jobs", id]);
   });
   delete ctx.data.fragments;
+  delete ctx.data._anchors;
   stripResidualWhenCompile(ctx, ctx.data, []);
 }
 

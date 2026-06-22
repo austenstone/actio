@@ -3516,6 +3516,13 @@
         "$ref": "#/definitions/actioParam"
       }
     },
+    "_anchors": {
+      "type": "object",
+      "title": "_anchors (Actio macro)",
+      "description": "Actio macro. Reserved top-level home for YAML anchor definitions (`&name`) referenced elsewhere with `*name`. A `- *alias` of a sequence is flattened into the surrounding steps list at compile time. The `_anchors` key is stripped from the generated workflow.",
+      "markdownDescription": "**Actio macro**: a parking spot for YAML anchors.\n\nNative YAML anchors (`&`/`*`/`<<:`) already own no-arg reuse; `_anchors:` just gives anchor libraries a reserved home so they do not pollute real workflow keys. A `- *alias` whose anchor is a step list is flattened into the surrounding steps. The `_anchors` key is stripped from the generated workflow.\n\n```yaml\n_anchors:\n  setup: &setup\n    - uses: actions/checkout@v4\n    - uses: actions/setup-node@v4\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - *setup\n      - run: npm ci\n```",
+      "additionalProperties": true
+    },
     "job-defaults": {
       "$ref": "#/definitions/jobDefaults",
       "description": "Actio macro. Default job-level settings merged into jobs at compile time. Stripped from generated workflow YAML."
