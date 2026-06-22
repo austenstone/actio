@@ -1295,3 +1295,172 @@ jobs:
     expect(errors.some((d) => d.message.includes("extends must be a string or list"))).toBe(true);
   });
 });
+
+describe("templates (parameterized inject)", () => {
+  it("injects a template and substitutes {{ args.* }} from with:", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+templates:
+  greet:
+    params:
+      who: { type: string }
+    steps:
+      - run: echo "hello {{ args.who }}"
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: greet
+        with: { who: world }
+      - run: done
+`);
+    expect(errors).toEqual([]);
+    expect(doc.templates).toBeUndefined();
+    expect(doc.jobs.a.steps).toEqual([{ run: 'echo "hello world"' }, { run: "done" }]);
+  });
+
+  it("expands the same template twice with different args", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+templates:
+  greet:
+    params:
+      who: { type: string }
+    steps:
+      - run: hi {{ args.who }}
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: greet
+        with: { who: ada }
+      - inject: greet
+        with: { who: linus }
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.a.steps).toEqual([{ run: "hi ada" }, { run: "hi linus" }]);
+  });
+
+  it("applies a param default when the arg is omitted", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+templates:
+  greet:
+    params:
+      who: { type: string, default: world }
+    steps:
+      - run: hi {{ args.who }}
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: greet
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.a.steps).toEqual([{ run: "hi world" }]);
+  });
+
+  it("substitutes into a multi-step body and accepts number/enum params", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+templates:
+  build:
+    params:
+      node: { type: number }
+      mode: { type: enum, values: [dev, prod] }
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "{{ args.node }}"
+      - run: build --mode {{ args.mode }}
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: build
+        with: { node: 20, mode: prod }
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.a.steps).toEqual([
+      { uses: "actions/setup-node@v4", with: { "node-version": "20" } },
+      { run: "build --mode prod" },
+    ]);
+  });
+
+  it("nests a fragment inside a template and a template inside a fragment", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+fragments:
+  setup:
+    - uses: actions/checkout@v4
+  outer:
+    - inject: greet
+      with: { who: world }
+    - run: tail
+templates:
+  greet:
+    params:
+      who: { type: string }
+    steps:
+      - inject: setup
+      - run: hi {{ args.who }}
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: outer
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.a.steps).toEqual([
+      { uses: "actions/checkout@v4" },
+      { run: "hi world" },
+      { run: "tail" },
+    ]);
+  });
+
+  it("never inspects a real uses: step (uses + with, no inject, left verbatim)", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+templates:
+  greet:
+    params:
+      who: { type: string }
+    steps:
+      - run: hi {{ args.who }}
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - inject: greet
+        with: { who: world }
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.a.steps).toEqual([
+      { uses: "actions/setup-node@v4", with: { "node-version": "20" } },
+      { run: "hi world" },
+    ]);
+  });
+
+  it("preserves ${{ }} runtime expressions verbatim while erasing {{ args.* }}", () => {
+    const { doc, errors } = build(`name: x
+on: [push]
+templates:
+  greet:
+    params:
+      who: { type: string }
+    steps:
+      - run: echo "{{ args.who }} \${{ github.sha }}"
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: greet
+        with: { who: world }
+`);
+    expect(errors).toEqual([]);
+    expect(doc.jobs.a.steps).toEqual([{ run: 'echo "world ${{ github.sha }}"' }]);
+  });
+});

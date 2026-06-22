@@ -368,3 +368,153 @@ jobs:
     ranged(errors, /template-depth-exceeded/);
   });
 });
+
+describe("templates / inject validation", () => {
+  it("errors on inject of an unknown template with with:", () => {
+    const { result, errors } = diag(`name: x
+on: [push]
+templates:
+  known:
+    steps:
+      - run: ok
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: missing
+        with: { x: 1 }
+`);
+    expect(result.ok).toBe(false);
+    ranged(errors, /template-unknown/);
+  });
+
+  it("errors when a required arg is missing", () => {
+    const { result, errors } = diag(`name: x
+on: [push]
+templates:
+  greet:
+    params:
+      who: { type: string }
+    steps:
+      - run: hi {{ args.who }}
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: greet
+        with: {}
+`);
+    expect(result.ok).toBe(false);
+    ranged(errors, /template-arg-missing/);
+  });
+
+  it("errors when an arg has the wrong type", () => {
+    const { result, errors } = diag(`name: x
+on: [push]
+templates:
+  greet:
+    params:
+      n: { type: number }
+    steps:
+      - run: hi {{ args.n }}
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: greet
+        with: { n: "not-a-number" }
+`);
+    expect(result.ok).toBe(false);
+    ranged(errors, /template-arg-type/);
+  });
+
+  it("errors when an unknown arg is passed", () => {
+    const { result, errors } = diag(`name: x
+on: [push]
+templates:
+  greet:
+    params:
+      who: { type: string }
+    steps:
+      - run: hi {{ args.who }}
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: greet
+        with: { who: world, extra: nope }
+`);
+    expect(result.ok).toBe(false);
+    ranged(errors, /template-arg-unknown/);
+  });
+
+  it("detects a template cycle", () => {
+    const { result, errors } = diag(`name: x
+on: [push]
+templates:
+  loop:
+    steps:
+      - inject: loop
+        with: {}
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: loop
+        with: {}
+`);
+    expect(result.ok).toBe(false);
+    expect(errors.some((d) => /template-cycle/.test(d.message))).toBe(true);
+  });
+
+  it("reserves cross-file inject with inject-cross-file-unsupported", () => {
+    const { result, errors } = diag(`name: x
+on: [push]
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: ./lib.actio.yml#setup
+`);
+    expect(result.ok).toBe(false);
+    ranged(errors, /inject-cross-file-unsupported/);
+  });
+
+  it("errors on an invalid template param type", () => {
+    const { result, errors } = diag(`name: x
+on: [push]
+templates:
+  greet:
+    params:
+      who: { type: bogus }
+    steps:
+      - run: hi
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: greet
+`);
+    expect(result.ok).toBe(false);
+    ranged(errors, /template-param-type/);
+  });
+
+  it("errors when a template param definition is not an object", () => {
+    const { result, errors } = diag(`name: x
+on: [push]
+templates:
+  greet:
+    params:
+      who: "string"
+    steps:
+      - run: hi
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: greet
+`);
+    expect(result.ok).toBe(false);
+    ranged(errors, /template-param-invalid/);
+  });
+});
