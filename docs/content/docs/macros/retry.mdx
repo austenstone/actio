@@ -3,7 +3,13 @@ title: retry
 description: Retry flaky steps with automatic backoff.
 ---
 
-Retry flaky steps with automatic backoff. Works with both `run:` and `uses:` steps.
+A publish, deploy, or upload step that leans on an external service fails
+intermittently — a transient 502, a rate limit, a flaky registry — and one blip
+shouldn't redden the whole run. `retry` re-runs the **same step on the same runner**
+up to N times with optional backoff; the first success clears it. Works with both
+`run:` and `uses:` steps. When the failure is the **runner itself** (OOM, too few
+cores), reach for [`fallback.retry`](/docs/macros/fallback#retry-different-runner)
+instead — it re-runs the step once in a fresh job on a different `runs-on`.
 
 Fans out into conditional attempts, each gated on prior failure:
 

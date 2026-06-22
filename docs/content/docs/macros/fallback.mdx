@@ -3,7 +3,10 @@ title: fallback
 description: A native try/catch for steps and jobs.
 ---
 
-A native try/catch. Attach `fallback:` to a step (or a job).
+A native try/catch. Attach `fallback:` to a step (or a job) to **recover or notify**
+when it fails. To simply *tolerate* a failure and continue, see
+[`soft_fail`](/docs/macros/soft-fail); for teardown that runs regardless of outcome,
+see [`lifecycle`](/docs/macros/lifecycle).
 
 ## Default = notify
 
@@ -52,6 +55,13 @@ and the fallback uses `steps.<id>.outcome == 'failure'`, so the job can continue
 Some failures aren't your code — they're the runner (OOM kills, flaky hosted
 infra, a job that needs more cores). `retry:` re-runs the *same step* in a brand
 new job on a different `runs-on`, gated on the original job failing.
+
+<Callout title="fallback.retry vs the retry macro">
+  Don't confuse this with the standalone [`retry`](/docs/macros/retry) macro, which
+  re-runs the **same step on the same runner** N times for transient flakiness.
+  `fallback.retry` runs the step **once on a different runner**, for infra-level
+  failures.
+</Callout>
 
 The guarded step is lifted into a sibling `<job>_retry` job with
 `needs: [<job>]` and `if: failure()`, running on the fallback runner:

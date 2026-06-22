@@ -3,10 +3,11 @@ title: params
 description: Typed compile-time inputs interpolated with double-brace tokens.
 ---
 
-Define compile-time parameters once, then interpolate them with `{{ params.x }}`
-for scalars or `{{ toJSON(params.x) }}` for objects/lists.
-
-`params` is stripped and literals are fully resolved:
+A workflow that hardcodes the same env name, image tag, or retry count across
+several jobs and steps drifts the moment one copy changes. `params` declares those
+values once as typed, validated compile-time inputs; reference scalars with
+`{{ params.x }}` and objects/lists with `{{ toJSON(params.x) }}`. The values are
+resolved by `actio build` and baked into the generated YAML:
 
 <CodeCompare>
 
@@ -38,8 +39,14 @@ jobs:
 
 </CodeCompare>
 
-## Token rules
+## params vs `reusable.inputs`
 
-- `{{ ... }}` is compile-time interpolation.
-- `${{ ... }}` is GitHub runtime passthrough (except reserved roots handled by other macros).
-- `${{ params.* }}` is invalid — `params` are compile-time-only.
+Both feed values into a workflow, at different times. `params` are **compile-time**:
+`actio build` resolves them and bakes the result into the output, so there is no
+runtime `params` (and `${{ params.* }}` is invalid). [`reusable.inputs`](/docs/macros/reusable)
+are **runtime** inputs a caller or dispatcher sets per run. Use `params` to
+deduplicate build-time constants; use `reusable.inputs` when the value must vary per
+invocation.
+
+See [interpolation tokens](/docs/syntax#interpolation-tokens) for the full `{{ }}`
+vs `${{ }}` rules.

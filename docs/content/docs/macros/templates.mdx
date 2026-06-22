@@ -1,0 +1,84 @@
+---
+title: templates
+description: Parameterized, named step lists spliced into jobs with inject … with.
+---
+
+[`_anchors`](/docs/macros/anchors) reuses a step list verbatim — but the moment the
+sequence differs by a value (a Node version, a deploy target, an environment name)
+anchors can't help: YAML anchors take no arguments. `templates:` defines a named,
+**typed** step list and splices it into a job with `- inject: <name>` plus a `with:`
+mapping. `{{ args.<name> }}` references in the body resolve at compile time; both the
+`templates` key and the `inject` call are erased from the output.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: Deploy
+on: [push]
+templates:
+  deploy:
+    params:
+      env: { type: string }
+      url: { type: string }
+    steps:
+      - run: ./deploy.sh --env {{ args.env }}
+      - run: curl -sf {{ args.url }}/health
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: deploy
+        with: { env: staging, url: https://staging.example.com }
+  prod:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: deploy
+        with: { env: prod, url: https://example.com }
+```
+
+```yaml title="generated .yml"
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh --env staging
+      - run: curl -sf https://staging.example.com/health
+  prod:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh --env prod
+      - run: curl -sf https://example.com/health
+```
+
+</CodeCompare>
+
+Param types reuse the [`params`](/docs/macros/params) type system (`string`, `number`,
+`boolean`, `enum`, defaults, required).
+
+## Cross-file templates
+
+`inject` also pulls a template from another file with `inject: ./path#name`, so a team
+can keep a shared library of step sequences in one place:
+
+```yaml title=".actio.yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: ./.github/actio/lib.actio.yml#setup
+      - run: npm test
+```
+
+## When to use templates vs _anchors vs call-templates
+
+| You need | Use |
+|---|---|
+| Same step list, **no parameters**, same file | [`_anchors`](/docs/macros/anchors) — native YAML, zero macro surface |
+| A step list that **varies by a value**, or lives in **another file** | **`templates:`** — typed `params:` + `inject … with` |
+| Reuse the **plumbing of a reusable-workflow call job** (`uses`/`with`/`needs`/`secrets`) | [`call-templates`](/docs/macros/call-templates) — job-level `extends:` |
+
+`templates:` splices **steps** into a job; `call-templates` templates an entire
+**call job**. They do not overlap.
+
+See the canonical [`templates` entry](/docs/syntax#templates) for the full keyword
+contract.

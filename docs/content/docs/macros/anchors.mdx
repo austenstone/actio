@@ -1,0 +1,77 @@
+---
+title: _anchors
+description: A native YAML anchor library, flattened into your steps at compile time.
+---
+
+You copy the same `checkout` + `setup-node` (+ cache) preamble into every job. It is
+not parameterized — it is literally the same steps — but Actions YAML gives you no way
+to name a step list and reuse it. `_anchors:` is a reserved top-level home for native
+YAML anchors: define a step list once with `&name`, drop it into any job with
+`- *name`, and Actio **flattens it in place** at compile time. The `_anchors` key is
+stripped from the output, so the generated workflow is byte-for-byte what you would
+have written by hand.
+
+<CodeCompare>
+
+```yaml title=".actio.yml"
+name: CI
+on: [push]
+_anchors:
+  setup: &setup
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - *setup
+      - run: npm test
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - *setup
+      - run: npm run lint
+```
+
+```yaml title="generated .yml"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm test
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run lint
+```
+
+</CodeCompare>
+
+A `- *alias` whose anchor is a step list is spliced into the surrounding steps
+(recursive, with a depth cap); anchors that hold scalars or maps resolve as ordinary
+YAML. Anchors are pure YAML, so they need no Actio-specific syntax.
+
+## When to use _anchors vs templates vs fragments
+
+| You need | Use |
+|---|---|
+| Same step list, **no parameters**, same file | **`_anchors:`** — native, zero new syntax |
+| The list **varies by a value** (version, target, name) | [`templates`](/docs/macros/templates) — typed `params:` + `inject … with` |
+| The list lives in **another file** | [`templates`](/docs/macros/templates) — `inject: ./lib#name` |
+| (legacy) named step blocks via `- inject:` | [`fragments`](/docs/macros/fragments) — **deprecated**, migrate to the above |
+
+Reach for `_anchors:` first: it is the simplest reuse and adds no macro surface. The
+moment you need a parameter or a second file, switch to `templates:`.
+
+See the canonical [`_anchors` entry](/docs/syntax#_anchors) for the full keyword
+contract.

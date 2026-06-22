@@ -10,6 +10,11 @@ job's `outputs:`, add the consuming job to `needs:`, then read it back through
 producing step, reference the value anywhere as `${{ share.<name> }}`, and Actio
 wires `id`, `job.outputs`, `needs`, and the runtime reference for you.
 
+`share` is for outputs **you mint on your own step** — a value you compute or
+capture. To reference an output that **already exists** — an action's `uses:`
+output, a hand-written `$GITHUB_OUTPUT` write, or a reusable call-job output — use
+[`ref`](/docs/macros/ref). They are two front-ends over the same wiring engine.
+
 <CodeCompare>
 
 ```yaml title=".actio.yml"

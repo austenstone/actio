@@ -10,6 +10,10 @@ to give each guarded step an `id`. The lifecycle hooks — `ensure`, `on-success
 Actio stamps in the right condition (and any needed `id`) at compile time. The same
 vocabulary scales up to a workflow-level [`finally:`](#workflow-teardown-finally).
 
+Lifecycle hooks **react** to an outcome (cleanup, log upload, paging). To *recover*
+from a failure — retry on another runner, or a catch step that changes the result —
+see [`fallback`](/docs/macros/fallback).
+
 ## Step and job hooks
 
 | Hook | Step-level guard | Job-level guard | Runs when |

@@ -64,9 +64,11 @@ jobs:
 Use `expand_matrix` when a **later job depends on a specific leg**, not the whole
 fan-out — staged deploys, leg-specific gates, collecting one leg's artifact. If you
 just want N identical runs and a single barrier, a plain native matrix is simpler;
-keep using that. For a matrix whose shape isn't known until the run starts, use
-[`dynamic-matrix`](/docs/macros/dynamic-matrix) — that stays a native runtime matrix
-and is **out of scope** here (see [Limits](#limits)).
+keep using that. To loop a known list into inline steps within a single job (no
+extra jobs), use [`for-each`](/docs/macros/for-each). For a matrix whose shape isn't
+known until the run starts, use [`dynamic-matrix`](/docs/macros/dynamic-matrix) —
+that stays a native runtime matrix and is **out of scope** here (see
+[Limits](#limits)).
 
 ## Slugs
 

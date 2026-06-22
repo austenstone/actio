@@ -10,6 +10,10 @@ while `workflow_call` reads them as `${{ inputs.x }}` — and the dispatch form 
 `null` under a call. `reusable:` declares the inputs once, emits both triggers, and
 rewrites every input reference to the single canonical `${{ inputs.x }}` form.
 
+For values fixed at **build time** rather than supplied per run, reach for
+[`params`](/docs/macros/params) instead — those are compile-time constants, not
+runtime workflow inputs.
+
 <CodeCompare>
 
 ```yaml title=".actio.yml"

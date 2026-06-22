@@ -113,3 +113,18 @@ jobs:
 
 See the [`for-each`](/docs/syntax#for-each) entry in the syntax reference for the
 valid scopes and source forms.
+
+## for-each vs dynamic-matrix vs expand-matrix
+
+All three turn one declaration into many runs; they differ by **when the list is
+known** and **what shape you want**:
+
+- **`for-each`** — the list is known at **build time**. Unrolls to inline serial
+  steps, or with `parallel:` to a native `strategy.matrix`. Reach for it to stamp
+  out repeated steps without a separate job per element.
+- **[`dynamic-matrix`](/docs/macros/dynamic-matrix)** — the list **isn't known until
+  the run** (a script's output: open PRs, changed packages, an API call). Stays a
+  native runtime matrix.
+- **[`expand-matrix`](/docs/macros/expand-matrix)** — a build-time-known matrix you
+  want unrolled into individually **`needs:`-addressable named jobs** (e.g. "deploy
+  only after the `linux/x64` leg").

@@ -9,9 +9,9 @@ description: Reusable step blocks spliced in with inject.
   list is flattened in place at compile time. Compiling a file that uses `fragments:`
   emits a `fragment-deprecated` warning. Migrate:
 
-  - **Same-file, no params:** move the list under [`_anchors:`](/docs/syntax#_anchors)
+  - **Same-file, no params:** move the list under [`_anchors:`](/docs/macros/anchors)
     with a `&name` anchor and call it with `- *name` (see below).
-  - **Params or cross-file:** use [`templates:`](/docs/syntax#templates) +
+  - **Params or cross-file:** use [`templates:`](/docs/macros/templates) +
     `inject ... with`, or cross-file `inject: ./lib#name`.
 </Callout>
 
@@ -50,7 +50,7 @@ jobs:
 </CodeCompare>
 
 Both compile to the identical workflow. If you need typed params or cross-file reuse,
-keep using `templates:` / `inject` instead.
+use [`templates:`](/docs/macros/templates) instead.
 
 ## Reference
 
