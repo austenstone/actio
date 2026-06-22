@@ -3,51 +3,72 @@ title: Syntax reference
 description: Every .actio.yml macro keyword — scope, type, options, and what it compiles to.
 ---
 
-Actio is a strict **superset** of GitHub Actions workflow syntax. Every standard
-key, event, and value works exactly as it does in a normal workflow — see GitHub's
-[workflow syntax reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)
-for those. A macro-free `.actio.yml` file *is* a normal workflow.
+Actio is a strict **superset** of GitHub Actions workflow syntax: every standard
+key, event, and value behaves exactly as it does in a normal workflow (see GitHub's
+[workflow syntax reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)),
+and a macro-free `.actio.yml` file *is* a normal workflow.
 
-This page is the dictionary for the keywords Actio **adds**. Each entry lists where
-the keyword is valid, its type, its options, a minimal example, and what `actio build`
-compiles it into. Every macro is stripped or expanded at compile time — none survive
-in the generated `.yml`.
+On top of that, Actio adds a handful of **compile-time macros**. `actio build` expands
+them into the verbose YAML you'd otherwise hand-write — zero runtime, zero lock-in —
+then strips them, so none survive in the generated `.yml`.
+
+This page is the canonical keyword dictionary: every macro Actio adds, where it's
+valid, its options, a minimal example, and what it compiles to. The per-keyword
+[macro guides](/docs/macros/params) are the tutorial-style deep dives.
 
 ## Quick reference
 
-Jump to any keyword. **Scope** is where it may appear; **Compiles to** is what `actio
+Every keyword Actio adds, grouped by where it lives. **Compiles to** is what `actio
 build` leaves behind.
 
-| Keyword | Scope | Type | Compiles to |
-|---|---|---|---|
-| [`params`](#params) | workflow | map of param defs | stripped; `{{ params.* }}` resolved |
-| [`_anchors`](#_anchors) | workflow | anchor library | stripped; `- *alias` step lists flattened in place |
-| [`templates`](#templates) | workflow | map of param'd step lists | stripped; `inject ... with` expanded in place |
-| [`fragments`](#fragments) | workflow | map of step lists | **deprecated**; prefer `_anchors:`/`templates:`. stripped; `inject` expanded in place |
-| [`job-defaults`](#job-defaults) | workflow | map of job keys | stripped; merged into every job |
-| [`executors`](#executors) | workflow | map of presets | stripped; referenced via `executor` |
-| [`injection-hoist`](#injectionhoist) | workflow, job, step | enum | stripped; controls `${{ }}` hoisting in `run:` |
-| [`finally`](#finally) | workflow | map | stripped; teardown jobs with `needs` + guards |
-| [`executor`](#executor) | job | string or list | stripped; preset merged into the job |
-| [`dynamic-matrix`](#dynamic-matrix) | job | map | setup job + matrix wiring |
-| [`expand_matrix`](#expand-matrix) | job | boolean | literal matrix unrolled into named jobs |
-| [`static-if`](#static-if) | job, step | string (bare expr) | node kept or omitted at compile time |
-| [`static-if(<expr>)`](#static-if-merge) | job, step | keyed map | merged into parent when true |
-| [`inject`](#inject) | step, job | string | replaced by the fragment's steps, or an imported step/job |
-| [`for-each`](#for-each) | step | map | expanded into repeated steps (or a matrix) |
-| [`retry`](#retry) | step | integer or map | chain of conditional attempts |
-| [`share`](#share) | step | map of outputs | `job.outputs` + `needs` wiring |
-| [`ref`](#ref) | step | optional list or map | inferred producer; `job.outputs` + `needs` wiring |
-| [`fallback`](#fallback) | job, step | list or map | try/catch wiring |
-| [`soft_fail`](#soft_fail) | step | boolean or list | `continue-on-error`, or a build-time exit-code wrapper |
-| [`artifacts`](#artifacts) | step | map | trailing `actions/upload-artifact` step |
-| [`unsafe`](#unsafe) | step | boolean | stripped; step left un-hoisted |
-| [`trust`](#trust) | step | list of paths | stripped; listed paths left inline |
-| [`force`](#force) | step | list of paths | stripped; listed paths hoisted to `env` |
-| [`ensure`](#ensure) | job, step | list of steps | guarded steps (`if: always()`) |
-| [`on-success`](#on-success) | job, step | list of steps | guarded steps (`success()`) |
-| [`on-failure`](#on-failure) | job, step | list of steps | guarded steps (`failure()` / outcome) |
-| [`on-abort`](#on-abort) | job, step | list of steps | guarded steps (`cancelled()`) |
+**Workflow keys**
+
+| Keyword | Type | Compiles to |
+|---|---|---|
+| [`params`](#params) | map of param defs | stripped; `{{ params.* }}` resolved |
+| [`let`](#let) | map of compile-time consts | stripped; `{{ let.* }}` resolved |
+| [`reusable`](#reusable) | object | `on.workflow_call` + `workflow_dispatch` |
+| [`_anchors`](#_anchors) | anchor library | stripped; `- *alias` step lists flattened in place |
+| [`templates`](#templates) + [`inject … with`](#inject) | map of param'd step lists | stripped; expanded in place |
+| [`fragments`](#fragments) + `inject` | map of step lists | **deprecated** — prefer `_anchors`/`templates` |
+| [`job-defaults`](#job-defaults) | map of job keys | stripped; merged into every job |
+| [`executors`](#executors) | map of presets | stripped; selected via `executor` |
+| [`call-templates`](#call-templates) | map of call presets | stripped; merged into `extends:` jobs |
+| [`injection-hoist`](#injectionhoist) | enum | stripped; controls `${{ }}` hoisting in `run:` |
+| [`coercion`](#coercion) | enum | stripped; quotes YAML 1.1 coercion traps |
+| [`finally`](#finally) | map | teardown jobs with `needs` + outcome guards |
+
+**Job keys**
+
+| Keyword | Type | Compiles to |
+|---|---|---|
+| [`executor`](#executor) | string or list | preset merged into the job |
+| [`extends`](#extends) | string or list | `call-templates` preset merged into a call job |
+| [`dynamic-matrix`](#dynamic-matrix) | map | setup job + `fromJSON` matrix wiring |
+| [`expand_matrix`](#expand-matrix) | boolean | literal matrix unrolled into named jobs |
+| [`strategy.matrix` comprehension](#matrix-comprehension) | `"{{ [expr for x in list] }}"` | evaluated to a native `matrix.include` |
+| [`static-if`](#static-if) / [`static-if(<expr>)`](#static-if-merge) | bare expr / keyed map | node kept-or-dropped / patch merged when true |
+
+**Step keys** (most are also valid at job scope)
+
+| Keyword | Type | Compiles to |
+|---|---|---|
+| [`inject`](#inject) | string | fragment/template steps, or an imported step/job |
+| [`for-each`](#for-each) | map | repeated steps (or a matrix) |
+| [`retry`](#retry) | integer or map | chain of conditional attempts |
+| [`share`](#share) | map of outputs | `job.outputs` + `needs` wiring |
+| [`ref`](#ref) | optional list or map | inferred producer; `job.outputs` + `needs` wiring |
+| [`fallback`](#fallback) | list or map | try/catch wiring |
+| [`soft_fail`](#soft_fail) | boolean or list | `continue-on-error`, or a build-time exit-code wrapper |
+| [`artifacts`](#artifacts) | map | trailing `actions/upload-artifact` step |
+| [`if-changed`](#if-changed) | glob string(s) | `paths-filter` setup job + folded `if:` guard |
+| hoist overrides: [`unsafe`](#unsafe) · [`trust`](#trust) · [`force`](#force) | boolean / paths / paths | keep inline · keep inline · force into `env` |
+
+**Lifecycle hooks** (job + step)
+
+| Keyword | Type | Compiles to |
+|---|---|---|
+| [`ensure`](#ensure) · [`on-success`](#on-success) · [`on-failure`](#on-failure) · [`on-abort`](#on-abort) | list of steps | guarded steps (`always()` · `success()` · `failure()` · `cancelled()`) |
 
 ## Interpolation tokens
 
@@ -300,6 +321,8 @@ jobs:
       - run: npm ci
 ```
 
+Full guide: [_anchors](/docs/macros/anchors).
+
 {/* macro:templates */}
 ### `templates` [#templates]
 
@@ -330,7 +353,7 @@ jobs:
 ```
 
 Param types reuse the [`params`](#params) type system. See [`inject`](#inject) for the
-call site. Full guide: [fragments + inject](/docs/macros/fragments).
+call site. Full guide: [templates](/docs/macros/templates).
 
 {/* macro:job-defaults */}
 ### `job-defaults` [#job-defaults]
@@ -876,7 +899,7 @@ steps:
   - run: npm test
 ```
 
-See [`fragments`](#fragments) and [`templates`](#templates). Full guide: [fragments + inject](/docs/macros/fragments).
+See [`fragments`](#fragments) and [`templates`](#templates). Full guide: [templates](/docs/macros/templates).
 
 #### Cross-file import: `inject: ./lib.actio.yml#name` [#inject-cross-file]
 
