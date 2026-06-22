@@ -9,58 +9,136 @@ expands every macro at **build time** into the verbose YAML you'd otherwise hand
 Nothing survives into the output — no runtime, no lock-in — and a macro-free `.actio.yml`
 is already a valid workflow.
 
-The flagship is [`dynamic-matrix`](/docs/macros/dynamic-matrix). Print a JSON array from a
-script and Actio generates the setup job, the `needs` + `fromJSON` wiring, `fail-fast: false`,
-and the empty-matrix guard — the plumbing you'd otherwise hand-write and get subtly wrong:
+Here's a real CI→deploy workflow. Three macros — typed [`params`](/docs/macros/params),
+a shared-setup [`_anchors`](/docs/macros/anchors) block reused across both jobs, and a
+[`retry`](/docs/macros/retry) on the flaky deploy — collapse into the plumbing you'd
+otherwise hand-write and keep in sync:
 
 <CodeCompare>
 
 ```yaml title=".actio.yml"
+name: Deploy
+on:
+  push:
+    branches: [main]
+
+params:
+  environment:
+    type: enum
+    values: [staging, production]
+    default: production
+
+_anchors:
+  setup: &setup
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
 jobs:
   test:
     runs-on: ubuntu-latest
-    dynamic-matrix:
-      script: echo '["1", "2", "3"]'
-      alias: shard
     steps:
-      - run: ./run-shard.sh ${{ matrix.shard }}
+      - *setup
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - *setup
+      - name: Publish to {{ params.environment }}
+        uses: cloudflare/wrangler-action@v3
+        retry:
+          attempts: 3
+          delay: 10s
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
 ```
 
 ```yaml title="generated .yml"
+name: Deploy
+on:
+  push:
+    branches:
+      - main
 jobs:
-  actio_setup_test:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.actio_eval.outputs.matrix }}
-    steps:
-      - name: Evaluate dynamic matrix
-        id: actio_eval
-        run: |-
-          {
-            echo 'matrix<<ACTIO_EOF'
-            echo '["1", "2", "3"]' | jq -c .
-            echo ACTIO_EOF
-          } >> "$GITHUB_OUTPUT"
   test:
     runs-on: ubuntu-latest
-    needs: [actio_setup_test]
-    strategy:
-      matrix:
-        shard: ${{ fromJSON(needs.actio_setup_test.outputs.matrix) }}
-      fail-fast: false
-    if: needs.actio_setup_test.outputs.matrix != '[]' && needs.actio_setup_test.outputs.matrix != ''
     steps:
-      - run: ./run-shard.sh ${{ matrix.shard }}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Publish to production (attempt 1/3)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+        id: step_publish_to_production_attempt_1
+        continue-on-error: true
+      - name: Retry backoff (10s) before attempt 2/3
+        run: sleep 10
+        if: steps.step_publish_to_production_attempt_1.outcome == 'failure'
+      - name: Publish to production (attempt 2/3)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+        id: step_publish_to_production_attempt_2
+        if: steps.step_publish_to_production_attempt_1.outcome == 'failure'
+        continue-on-error: true
+      - name: Retry backoff (10s) before attempt 3/3
+        run: sleep 10
+        if: steps.step_publish_to_production_attempt_2.outcome == 'failure'
+      - name: Publish to production (attempt 3/3)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+        id: step_publish_to_production_attempt_3
+        if: steps.step_publish_to_production_attempt_2.outcome == 'failure'
 ```
 
 </CodeCompare>
 
-`{{ ... }}` resolves at build time; `${{ ... }}` passes through to the runner untouched
-([token rules](/docs/syntax#interpolation-tokens)).
+`actio build` baked `{{ params.environment }}` into `production`, flattened the shared
+`setup` into both jobs, and fanned the deploy step out into gated retry attempts with
+backoff. `${{ secrets.CF_API_TOKEN }}` passed straight through — `{{ ... }}` resolves at
+build time, `${{ ... }}` is the runner's ([token rules](/docs/syntax#interpolation-tokens)).
 
-## Why
+<Callout title="Try it before installing anything">
+  Paste this into the [playground](/play) and watch the generated workflow update as you
+  type — right in your browser, no install.
+</Callout>
 
-Every row is a real pain in hand-written workflow YAML, and the macro that erases it:
+## Why Actio
+
+- **Zero lock-in.** The output is ordinary workflow YAML. Delete Actio and everything keeps
+  running — no runtime, no action on the runner, nothing to install.
+- **Adopt it incrementally.** It's a strict superset: rename a `.yml` to `.actio.yml` and it
+  already builds. Reach for a macro only where raw YAML hurts.
+- **Catch mistakes before CI runs.** `actio build` validates against a schema and resolves
+  typed `params` locally, so a typo fails your build instead of burning a red run.
+- **Stop copy-pasting steps.** Reuse a step list with [`_anchors`/`templates`](/docs/macros/anchors) —
+  no separate composite-action or reusable-workflow file to maintain.
+- **No third-party runtime deps.** Retry, try/catch, and dynamic matrices compile to inline
+  Actions YAML — nothing extra to trust at runtime.
+- **One source, many workflows.** Typed `params` and templates keep env names, versions, and
+  defaults consistent across every job and repo.
+- **The output is honest.** Generated YAML is what you'd have written by hand, and
+  [source maps](/docs/source-maps) trace each line back to the macro that produced it.
+
+Each macro erases a specific pain you'd otherwise hand-write — the
+[syntax reference](/docs/syntax) has the full set:
 
 | Pain in raw YAML | Macro |
 | --- | --- |
@@ -81,6 +159,7 @@ boilerplate. See the [syntax reference](/docs/syntax) for every keyword and
 ## Next steps
 
 <Cards>
+  <Card title="Playground" href="/play" description="Compile Actio to workflow YAML live in your browser — no install." />
   <Card title="Installation" href="/docs/installation" description="Install the CLI and check requirements." />
   <Card title="Quickstart" href="/docs/quickstart" description="init, build, and check in under a minute." />
   <Card title="Macros" href="/docs/syntax" description="Every keyword, in one reference." />
