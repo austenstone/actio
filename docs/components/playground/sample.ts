@@ -40,8 +40,8 @@ executors:
         image: redis:7
         ports: ["6379:6379"]
 
-fragments:
-  setup:
+_anchors:
+  setup: &setup
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
       with:
@@ -65,7 +65,7 @@ jobs:
   plan:
     executor: node
     steps:
-      - inject: setup
+      - *setup
       - name: Resolve version
         run: VERSION=$(jq -r .version package.json)
         share:
@@ -85,7 +85,7 @@ jobs:
     needs: plan
     if-changed: [src/**, packages/**, package-lock.json]
     steps:
-      - inject: setup
+      - *setup
       - for-each:
           var: service
           in: params.services
@@ -106,7 +106,7 @@ jobs:
       alias: shard
       script: echo '["unit","integration","e2e"]'
     steps:
-      - inject: setup
+      - *setup
       - run: npm test -- --shard \${{ matrix.shard }}
         fallback:
           recover: true
@@ -118,7 +118,7 @@ jobs:
     static-if: params.preview
     if-changed: [docs/**, README.md]
     steps:
-      - inject: setup
+      - *setup
       - run: npm run docs:build
 
   preview:
@@ -130,7 +130,7 @@ jobs:
       name: preview
       url: https://preview.example.com/\${{ share.version }}
     steps:
-      - inject: setup
+      - *setup
       - run: ./scripts/deploy-preview.sh "\${{ share.deploy.env }}" "\${{ share.deploy.region }}"
 
   reusable-unit:
@@ -154,7 +154,7 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - inject: setup
+      - *setup
       - run: npm publish --tag {{ params.channel }}
         fallback:
           - run: ./scripts/notify-publish-failed.sh

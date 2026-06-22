@@ -21,7 +21,9 @@ build` leaves behind.
 | Keyword | Scope | Type | Compiles to |
 |---|---|---|---|
 | [`params`](#params) | workflow | map of param defs | stripped; `{{ params.* }}` resolved |
-| [`fragments`](#fragments) | workflow | map of step lists | stripped; `inject` expanded in place |
+| [`_anchors`](#_anchors) | workflow | anchor library | stripped; `- *alias` step lists flattened in place |
+| [`templates`](#templates) | workflow | map of param'd step lists | stripped; `inject ... with` expanded in place |
+| [`fragments`](#fragments) | workflow | map of step lists | **deprecated**; prefer `_anchors:`/`templates:`. stripped; `inject` expanded in place |
 | [`job-defaults`](#job-defaults) | workflow | map of job keys | stripped; merged into every job |
 | [`executors`](#executors) | workflow | map of presets | stripped; referenced via `executor` |
 | [`injection-hoist`](#injectionhoist) | workflow, job, step | enum | stripped; controls `${{ }}` hoisting in `run:` |
@@ -220,7 +222,34 @@ jobs:
 Full guide: [reusable](/docs/macros/reusable).
 
 {/* macro:fragments */}
+### Step reuse: pick a primitive [#step-reuse]
+
+Reach for the smallest tool that fits. Native anchors cover the common case; reach
+for `templates:`/`inject` only when you need params or another file.
+
+| Need | Use | Notes |
+|---|---|---|
+| Static, same-file, no params | [`_anchors:`](#_anchors) + `- *alias` | Native YAML; the aliased step list is flattened in place at compile time |
+| Typed params | [`templates:`](#templates) + `inject ... with` | Compile-time args, type-checked |
+| Cross-file reuse | `inject: ./lib#name` | Resolves via imported templates/modules |
+| Compute a value | [`let`](#let) / `{{ ... }}` | Compile-time expressions |
+| Wire job outputs to `needs` | [`ref`](/docs/macros/ref) | Adds `needs:` + output plumbing |
+| (legacy) same-file step list | [`fragments:`](#fragments) + `inject` | **Deprecated**: prefer `_anchors:` |
+
 ### `fragments` [#fragments]
+
+<Callout type="warn" title="Deprecated: prefer _anchors: / templates:">
+  `fragments` still compiles and expands exactly as before, but it is redundant now
+  that a `- *alias` flattens an anchored step list in place. Migrate:
+
+  - **Same-file, no params:** move the list under [`_anchors:`](#_anchors) with a
+    `&name` anchor and call it with `- *name`.
+  - **Params or cross-file:** use [`templates:`](#templates) + `inject ... with`, or
+    cross-file `inject: ./lib#name`.
+
+  Compiling a file that still uses `fragments:` emits a `fragment-deprecated`
+  warning.
+</Callout>
 
 Reusable, named lists of steps. Splice a fragment into a job with `- inject: <name>`.
 The `fragments` key is stripped from the generated workflow.
