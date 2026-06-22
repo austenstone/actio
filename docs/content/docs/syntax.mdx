@@ -218,6 +218,32 @@ jobs:
 
 See [`inject`](#inject) for the call site. Full guide: [fragments + inject](/docs/macros/fragments).
 
+{/* macro:_anchors */}
+### `_anchors` [#_anchors]
+
+A reserved top-level home for native YAML anchor definitions (`&name`) referenced
+elsewhere with `*name`. Anchors already own no-arg in-file reuse; `_anchors:` just
+keeps anchor libraries out of real workflow keys. A `- *alias` whose anchor is a
+step list is flattened into the surrounding steps at compile time (recursive, with
+a depth cap). The `_anchors` key is stripped from the generated workflow.
+
+- **Valid in:** top level
+- **Type:** free-form map (anchor library)
+- **Compiles to:** nothing; anchors resolve at parse, `_anchors` is removed
+
+```yaml title=".actio.yml"
+_anchors:
+  setup: &setup
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - *setup
+      - run: npm ci
+```
+
 {/* macro:job-defaults */}
 ### `job-defaults` [#job-defaults]
 
