@@ -48,6 +48,27 @@ export function buildSchema() {
 
   s.definitions = { ...s.definitions, ...ext.addDefinitions };
 
+  // #165 lets a `- *alias` splice an anchored step sequence into a step list.
+  // A JSON-schema validator resolves the YAML alias to the underlying array
+  // before validation, so each step-list slot may hold either a single step or
+  // a nested array of steps. Upgrade every `items: { $ref: step }` to also
+  // accept `anchoredStepList` so anchor-flattened sources validate. The
+  // compiler still flattens the nesting away in the generated workflow.
+  const stepRef = "#/definitions/step";
+  const anchoredRef = "#/definitions/anchoredStepList";
+  const allowAnchoredSteps = (node) => {
+    if (Array.isArray(node)) {
+      for (const child of node) allowAnchoredSteps(child);
+      return;
+    }
+    if (!node || typeof node !== "object") return;
+    if (node.items && node.items.$ref === stepRef) {
+      node.items = { oneOf: [{ $ref: stepRef }, { $ref: anchoredRef }] };
+    }
+    for (const value of Object.values(node)) allowAnchoredSteps(value);
+  };
+  allowAnchoredSteps(s);
+
   if (ext.jobOneOf) {
     const jobsPattern = s.properties.jobs?.patternProperties;
     if (!jobsPattern) throw new Error("upstream schema is missing jobs.patternProperties");

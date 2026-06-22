@@ -1057,7 +1057,14 @@
           "description": "A job contains a sequence of tasks called steps. Steps can run commands, run setup tasks, or run an action in your repository, a public repository, or an action published in a Docker registry. Not all steps run actions, but all actions run as a step. Each step runs in its own process in the virtual environment and has access to the workspace and filesystem. Because steps run in their own process, changes to environment variables are not preserved between steps. GitHub provides built-in steps to set up and complete a job.\nMust contain either `uses` or `run`\n",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/step"
+            "oneOf": [
+              {
+                "$ref": "#/definitions/step"
+              },
+              {
+                "$ref": "#/definitions/anchoredStepList"
+              }
+            ]
           },
           "minItems": 1
         },
@@ -1360,6 +1367,21 @@
         }
       ],
       "additionalProperties": false
+    },
+    "anchoredStepList": {
+      "title": "anchored step list (Actio macro)",
+      "description": "A `- *alias` whose anchor (`&name`, usually parked under `_anchors:`) is a step sequence. A JSON-schema validator resolves the alias to the underlying array, so a step list may contain a nested array of steps; Actio flattens it into the surrounding list at compile time.",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/definitions/step"
+          },
+          {
+            "$ref": "#/definitions/anchoredStepList"
+          }
+        ]
+      }
     },
     "ifChanged": {
       "title": "if-changed (Actio macro)",
@@ -1701,7 +1723,14 @@
           "type": "array",
           "description": "The ordered list of steps to inject wherever this template is referenced.",
           "items": {
-            "$ref": "#/definitions/step"
+            "oneOf": [
+              {
+                "$ref": "#/definitions/step"
+              },
+              {
+                "$ref": "#/definitions/anchoredStepList"
+              }
+            ]
           }
         }
       }
@@ -1837,7 +1866,14 @@
         "default": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/step"
+            "oneOf": [
+              {
+                "$ref": "#/definitions/step"
+              },
+              {
+                "$ref": "#/definitions/anchoredStepList"
+              }
+            ]
           }
         }
       }
@@ -1855,7 +1891,14 @@
         "default": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/step"
+            "oneOf": [
+              {
+                "$ref": "#/definitions/step"
+              },
+              {
+                "$ref": "#/definitions/anchoredStepList"
+              }
+            ]
           }
         }
       }
@@ -2091,7 +2134,14 @@
           "type": "array",
           "description": "Fallback steps (notify mode). The job still fails.",
           "items": {
-            "$ref": "#/definitions/step"
+            "oneOf": [
+              {
+                "$ref": "#/definitions/step"
+              },
+              {
+                "$ref": "#/definitions/anchoredStepList"
+              }
+            ]
           }
         },
         {
@@ -2105,7 +2155,14 @@
               "type": "array",
               "description": "Steps to run when the guarded step or job fails.",
               "items": {
-                "$ref": "#/definitions/step"
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/step"
+                  },
+                  {
+                    "$ref": "#/definitions/anchoredStepList"
+                  }
+                ]
               }
             },
             "recover": {
@@ -2254,7 +2311,14 @@
       "title": "lifecycle hook (Actio macro)",
       "description": "Actio macro. An ordered list of teardown/outcome steps attached to a step or job. Compiled into guarded steps and stripped from the generated workflow.",
       "items": {
-        "$ref": "#/definitions/step"
+        "oneOf": [
+          {
+            "$ref": "#/definitions/step"
+          },
+          {
+            "$ref": "#/definitions/anchoredStepList"
+          }
+        ]
       }
     },
     "finallyBlock": {
@@ -3590,14 +3654,22 @@
     },
     "fragments": {
       "type": "object",
-      "title": "fragments (Actio macro)",
-      "description": "Actio macro. Reusable, named lists of steps. Splice a fragment into a job with `- inject: <name>`. The `fragments` key is stripped from the generated workflow.",
-      "markdownDescription": "**Actio macro**: reusable, named step lists.\n\nDefine ordered step lists once, then splice them into any job with `- inject: <name>`. The `fragments` key is stripped from the generated workflow.\n\n```yaml\nfragments:\n  setup:\n    - uses: actions/checkout@v4\n    - uses: actions/setup-node@v4\njobs:\n  build:\n    steps:\n      - inject: setup\n      - run: npm ci\n```",
+      "deprecated": true,
+      "title": "fragments (Actio macro, deprecated)",
+      "description": "Actio macro (deprecated). Reusable, named lists of steps spliced with `- inject: <name>`. Still compiles, but prefer `_anchors:` + `- *alias` for same-file reuse, or `templates:` for params / cross-file (`inject: ./lib#name`). The `fragments` key is stripped from the generated workflow.",
+      "markdownDescription": "**Actio macro (deprecated)**: reusable, named step lists.\n\n`fragments:` still compiles and expands as before, but it is dominated by two primitives:\n\n- **Same-file, no params** -> `_anchors:` + `- *alias` (native YAML, flattened at compile time)\n- **Params / cross-file** -> `templates:` + `- inject: <name>` (and `inject: ./lib#name`)\n\nThe `fragments` key is stripped from the generated workflow.\n\n```yaml\n# Prefer anchors for same-file reuse:\n_anchors:\n  setup: &setup\n    - uses: actions/checkout@v4\n    - uses: actions/setup-node@v4\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - *setup\n      - run: npm ci\n```",
       "additionalProperties": {
         "type": "array",
         "description": "An ordered list of steps to inject wherever this fragment is referenced.",
         "items": {
-          "$ref": "#/definitions/step"
+          "oneOf": [
+            {
+              "$ref": "#/definitions/step"
+            },
+            {
+              "$ref": "#/definitions/anchoredStepList"
+            }
+          ]
         }
       }
     },
