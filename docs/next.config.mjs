@@ -16,6 +16,9 @@ const basePath = process.env.PAGES_BASE_PATH ?? '';
 const config = {
   output: 'export',
   reactStrictMode: true,
+  // Twoslash runs the TypeScript compiler at build time; keep these heavy,
+  // Node-only deps out of the bundler (per the Fumadocs Twoslash guide).
+  serverExternalPackages: ['typescript', 'twoslash'],
   // actio-core ships as ESM built for node20; let Next transpile it for the browser.
   transpilePackages: ['actio-core'],
   trailingSlash: true,

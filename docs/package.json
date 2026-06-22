@@ -19,6 +19,7 @@
     "actio-core": "file:../packages/core",
     "fumadocs-core": "16.10.4",
     "fumadocs-mdx": "15.0.12",
+    "fumadocs-twoslash": "^3.2.0",
     "fumadocs-typescript": "^5.2.6",
     "fumadocs-ui": "16.10.4",
     "lucide-react": "^1.20.0",
@@ -28,6 +29,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "tailwind-merge": "^3.6.0",
+    "twoslash": "^0.3.9",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
