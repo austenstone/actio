@@ -1,0 +1,14 @@
+name: Ref Action Producer
+on: [push]
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        ref:
+          handle: node
+          outputs: [node-version]
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "on ${{ ref.node.node-version }}"

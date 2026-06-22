@@ -11,6 +11,7 @@
     "for-each",
     "retry",
     "share",
+    "ref",
     "soft-fail",
     "dynamic-matrix",
     "expand-matrix",

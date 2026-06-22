@@ -18,6 +18,8 @@ const docsDir = join(repoRoot, "docs/content/docs");
 // internal pass name. `when-compile` ships as the `static-if` keyword.
 const passPageSlug: Record<string, string> = {
   "when-compile": "static-if",
+  "reference-lower": "ref",
+  "reference-wire": "ref",
 };
 
 // Internal-only passes that intentionally ship WITHOUT a user-facing macro page.

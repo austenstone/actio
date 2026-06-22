@@ -114,6 +114,7 @@ const OPTION_DEFS: Record<string, string> = {
   retry: "retry",
   fallback: "fallback",
   share: "sharedOutput",
+  ref: "refProducer",
   artifacts: "artifacts",
 };
 

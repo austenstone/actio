@@ -10,6 +10,15 @@ import {
   pushDiagnostic,
   slugify,
 } from "./helpers.js";
+import {
+  detectCycle,
+  isIdentPart,
+  isIdentStart,
+  isSegPart,
+  reportMatrixOutputClobber,
+  scanRuntimeExprs,
+  walkStrings,
+} from "./referenceGraph.js";
 import type { Pass } from "./registry.js";
 
 /**
@@ -102,38 +111,6 @@ function parseSource(source: unknown): ParsedSource | null {
 }
 
 // --- consumer rewriting -----------------------------------------------------
-
-const isIdentStart = (ch: string): boolean => /[A-Za-z_]/.test(ch);
-const isIdentPart = (ch: string): boolean => /[A-Za-z0-9_]/.test(ch);
-const isSegPart = (ch: string): boolean => /[A-Za-z0-9_-]/.test(ch);
-
-/** Find the index of the closing `}}`, respecting GitHub-expression string literals. */
-function findExprClose(s: string, from: number): number {
-  let i = from;
-  let quote = "";
-  while (i < s.length) {
-    const ch = s[i];
-    if (quote) {
-      if (ch === quote) {
-        if (s[i + 1] === quote) {
-          i += 2;
-          continue;
-        }
-        quote = "";
-      }
-      i++;
-      continue;
-    }
-    if (ch === "'" || ch === '"') {
-      quote = ch;
-      i++;
-      continue;
-    }
-    if (ch === "}" && s[i + 1] === "}") return i;
-    i++;
-  }
-  return -1;
-}
 
 interface ScanState {
   ctx: ParseContext;
@@ -284,57 +261,6 @@ function rewriteExprBody(body: string, consumerJobId: string, state: ScanState):
     i++;
   }
   return out;
-}
-
-/** Rewrite all `${{ share.* }}` references in a string, honoring `$${{ ... }}` escapes. */
-function rewriteShareRefs(value: string, consumerJobId: string, state: ScanState): string {
-  if (!value.includes("${{")) return value;
-  let out = "";
-  let cursor = 0;
-  while (cursor <= value.length) {
-    const open = value.indexOf("${{", cursor);
-    if (open < 0) {
-      out += value.slice(cursor);
-      break;
-    }
-    if (open > 0 && value[open - 1] === "$") {
-      out += value.slice(cursor, open - 1);
-      const close = findExprClose(value, open + 3);
-      if (close < 0) {
-        out += value.slice(open);
-        break;
-      }
-      out += value.slice(open, close + 2);
-      cursor = close + 2;
-      continue;
-    }
-    const close = findExprClose(value, open + 3);
-    if (close < 0) {
-      out += value.slice(cursor);
-      break;
-    }
-    out += value.slice(cursor, open);
-    const inner = value.slice(open + 3, close);
-    out += `\${{${rewriteExprBody(inner, consumerJobId, state)}}}`;
-    cursor = close + 2;
-  }
-  return out;
-}
-
-function walkStrings(node: unknown, fn: (s: string) => string): void {
-  if (Array.isArray(node)) {
-    for (let i = 0; i < node.length; i++) {
-      const v = node[i];
-      if (typeof v === "string") node[i] = fn(v);
-      else walkStrings(v, fn);
-    }
-  } else if (isObject(node)) {
-    for (const k of Object.keys(node)) {
-      const v = node[k];
-      if (typeof v === "string") node[k] = fn(v);
-      else walkStrings(v, fn);
-    }
-  }
 }
 
 // --- collection -------------------------------------------------------------
@@ -489,43 +415,28 @@ function hasNeedsCycle(jobs: Record<string, Job>): boolean {
       needs.filter((n): n is string => typeof n === "string"),
     );
   }
-  const color = new Map<string, number>();
-  const dfs = (n: string): boolean => {
-    color.set(n, 1);
-    for (const m of adj.get(n) ?? []) {
-      const c = color.get(m) ?? 0;
-      if (c === 1) return true;
-      if (c === 0 && dfs(m)) return true;
-    }
-    color.set(n, 2);
-    return false;
-  };
-  for (const id of adj.keys()) {
-    if ((color.get(id) ?? 0) === 0 && dfs(id)) return true;
-  }
-  return false;
+  return detectCycle(adj) !== null;
 }
 
 /**
- * Emit the hard error for a share output that escapes a matrix job. GitHub
- * collapses a matrix job's entire `outputs:` map down to whichever leg finishes
- * last, so a cross-job-referenced matrix output silently loses every other leg's
- * value. Shared by the early guard (literal matrices) and the late check (#158,
- * matrices injected by `dynamic-matrix` after the share pass has already run).
+ * Emit the share-flavored matrix-output clobber error. Shared by the early guard
+ * (literal matrices) and the late check (#158, matrices injected by
+ * `dynamic-matrix` after the share pass has already run). The engine owns the
+ * push; share supplies its own code/message so wording stays in lock-step.
  */
-function reportMatrixOutputClobber(
+function reportShareMatrixClobber(
   ctx: ParseContext,
   jobId: string,
   name: string,
   path: Path,
 ): void {
-  pushDiagnostic(
-    ctx,
-    "error",
-    `share output "${name}" escapes matrix job "${jobId}" via job outputs, but GitHub collapses a matrix job's outputs map to a single leg — only the last leg's value survives. Use distinct output names within one serial job, N distinct (non-matrix) jobs for static parallelism, or artifact fan-in for the dynamic case.`,
+  reportMatrixOutputClobber(ctx, {
+    jobId,
+    name,
     path,
-    { code: "share-matrix-output-clobber" },
-  );
+    code: "share-matrix-output-clobber",
+    message: `share output "${name}" escapes matrix job "${jobId}" via job outputs, but GitHub collapses a matrix job's outputs map to a single leg — only the last leg's value survives. Use distinct output names within one serial job, N distinct (non-matrix) jobs for static parallelism, or artifact fan-in for the dynamic case.`,
+  });
 }
 
 /**
@@ -551,7 +462,7 @@ export function sharePass(ctx: ParseContext): void {
   const edges = new Map<string, Set<string>>();
   visitJobs(ctx, ({ id, job }) => {
     const state: ScanState = { ctx, registry, jobIds, edges, path: ["jobs", id] };
-    walkStrings(job, (s) => rewriteShareRefs(s, id, state));
+    walkStrings(job, (s) => scanRuntimeExprs(s, (inner) => rewriteExprBody(inner, id, state)));
   });
 
   // Phase 3 — WIRE job.outputs for cross-job producers and infer needs.
@@ -559,7 +470,7 @@ export function sharePass(ctx: ParseContext): void {
     for (const p of list) {
       if (!p.referencedCrossJob) continue;
       if (p.isMatrix) {
-        reportMatrixOutputClobber(ctx, p.jobId, p.name, p.path);
+        reportShareMatrixClobber(ctx, p.jobId, p.name, p.path);
         continue;
       }
       if (!isObject(p.job.outputs)) p.job.outputs = {};
@@ -614,7 +525,7 @@ export function shareMatrixCheckPass(ctx: ParseContext): void {
   for (const { jobId, job, name, path } of checks) {
     const strategy = job.strategy;
     if (!isObject(strategy) || strategy.matrix === undefined) continue;
-    reportMatrixOutputClobber(ctx, jobId, name, path);
+    reportShareMatrixClobber(ctx, jobId, name, path);
     if (isObject(job.outputs)) delete job.outputs[name];
   }
 }

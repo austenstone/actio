@@ -20,6 +20,7 @@ import {
 } from "./jobDefaults.js";
 import { lifecycle } from "./lifecycle.js";
 import { params } from "./params.js";
+import { referenceLower, referenceWire } from "./reference.js";
 import { type Pass, PassRegistry, runCompletePassPipeline } from "./registry.js";
 import { retry } from "./retry.js";
 import { reusable } from "./reusable.js";
@@ -30,7 +31,7 @@ import { whenCompile } from "./whenCompile.js";
 /**
  * The transforms Actio ships with. Order is derived from each pass's `runsAfter`
  * (see registry.ts), not this array, so the effective pipeline is:
- *   params → call-templates → job-defaults → for-each → when-compile → fragments → artifacts → share → retry → fallback → soft-fail → dynamic-matrix → expand-matrix → lifecycle → if-changed → injection-hoist → share-matrix-check
+ *   params → call-templates → job-defaults → for-each → when-compile → fragments → artifacts → share → reference-lower → retry → fallback → soft-fail → dynamic-matrix → expand-matrix → lifecycle → if-changed → injection-hoist → share-matrix-check → reference-wire
  *
  * `reusable` runs right after `params` so its input-reference normalization sees
  * fully resolved compile-time text before the call/normal job partition.
@@ -45,6 +46,11 @@ import { whenCompile } from "./whenCompile.js";
  * `share-matrix-check` runs after both matrix passes so the matrix-output clobber
  * guard sees the final matrix shape, including matrices injected by `dynamic-matrix`
  * after `share` already wired the outputs (#158).
+ *
+ * `reference-lower` runs after `share` (it reuses share's wire engine and the
+ * `fragments` slot) and rewrites every `${{ ref.* }}` consumer; `reference-wire`
+ * runs last, after every matrix/lifecycle pass, so its cross-job `job.outputs`
+ * synthesis and matrix-clobber guard see the settled matrix shape (#160).
  */
 export const builtinPasses: Pass[] = [
   params,
@@ -56,6 +62,7 @@ export const builtinPasses: Pass[] = [
   fragments,
   artifacts,
   share,
+  referenceLower,
   retry,
   fallback,
   softFail,
@@ -65,6 +72,7 @@ export const builtinPasses: Pass[] = [
   ifChanged,
   injectionHoist,
   shareMatrixCheck,
+  referenceWire,
 ];
 
 /**
@@ -119,6 +127,8 @@ export {
   jobDefaults,
   lifecycle,
   params,
+  referenceLower,
+  referenceWire,
   retry,
   reusable,
   share,
