@@ -5,6 +5,7 @@ import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { TypeTable } from 'fumadocs-ui/components/type-table';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
+import * as Twoslash from 'fumadocs-twoslash/ui';
 import type { MDXComponents } from 'mdx/types';
 import { CodeCompare } from './code-compare';
 
@@ -24,6 +25,7 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     Tab,
     Tabs,
     TypeTable,
+    ...Twoslash,
     ...components,
   };
 }
