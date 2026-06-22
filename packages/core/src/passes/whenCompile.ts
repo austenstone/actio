@@ -1,79 +1,21 @@
 import { deriveNode, originOf, setOrigin, visitJobs } from "../ir.js";
 import { type ParseContext, type Path, rangeOfPath } from "../parser.js";
 import { collectExpressionRoots, RUNTIME_CONTEXT_ROOT_SET } from "../symbols.js";
-import { hasOddBackslashRun } from "../text.js";
+import {
+  collectRefNodes,
+  collectRefUsage,
+  type EvalEnv,
+  evalExpr,
+  type PathSegment,
+  parseExpression,
+  refToString,
+} from "./expr.js";
 import { isObject, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";
-
-type Primitive = string | number | boolean | null;
-type PathSegment = string | number | boolean | null;
-
-interface LiteralNode {
-  kind: "literal";
-  value: Primitive;
-}
-
-interface RefNode {
-  kind: "ref";
-  segments: PathSegment[];
-}
-
-interface CallNode {
-  kind: "call";
-  name: string;
-  args: ExprNode[];
-}
-
-interface UnaryNode {
-  kind: "unary";
-  op: "!";
-  expr: ExprNode;
-}
-
-interface BinaryNode {
-  kind: "binary";
-  op: "||" | "&&" | "==" | "!=" | "<" | "<=" | ">" | ">=";
-  left: ExprNode;
-  right: ExprNode;
-}
-
-type ExprNode = LiteralNode | RefNode | CallNode | UnaryNode | BinaryNode;
-
-interface Token {
-  kind: "identifier" | "number" | "string" | "boolean" | "null" | "operator" | "punct" | "eof";
-  value: string;
-  pos: number;
-}
 
 const FORM_B_KEY_RE = /^static-if\((.*)\)$/;
 
 const diagnosticMessage = (code: string, message: string): string => `[${code}] ${message}`;
-
-const TOKEN_OPERATORS = new Set(["||", "&&", "==", "!=", "<=", ">=", "<", ">", "!"]);
-
-const TOKEN_PUNCT = new Set(["(", ")", "[", "]", ".", ","]);
-
-const isIdentifierStart = (char: string): boolean => /[A-Za-z_]/.test(char);
-
-const isIdentifierPart = (char: string): boolean => /[A-Za-z0-9_]/.test(char);
-
-const isComparable = (value: unknown): value is string | number => {
-  if (typeof value === "string") return true;
-  return typeof value === "number" && Number.isFinite(value);
-};
-
-const refToString = (segments: PathSegment[]): string => {
-  if (segments.length === 0) return "";
-  const [head, ...tail] = segments;
-  const renderedHead =
-    head === undefined ? "" : typeof head === "string" ? head : `[${JSON.stringify(head)}]`;
-  return tail.reduce<string>((acc, segment) => {
-    if (typeof segment === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(segment)) {
-      return `${acc}.${segment}`;
-    }
-    return `${acc}[${JSON.stringify(segment)}]`;
-  }, renderedHead);
-};
 
 const isJobPath = (path: Path): boolean =>
   path.length === 2 && path[0] === "jobs" && typeof path[1] === "string";
@@ -87,323 +29,6 @@ const isStepPath = (path: Path): boolean =>
 
 const hintForRuntimeContext =
   "static-if only supports compile-time values such as params.*, active for-each bindings, or symbols added by custom passes. Use if: for runtime contexts.";
-
-class Tokenizer {
-  readonly source: string;
-  #index = 0;
-
-  constructor(source: string) {
-    this.source = source;
-  }
-
-  next(): Token {
-    this.skipWhitespace();
-    if (this.#index >= this.source.length) return { kind: "eof", value: "", pos: this.#index };
-
-    const start = this.#index;
-    const two = this.source.slice(this.#index, this.#index + 2);
-    if (TOKEN_OPERATORS.has(two)) {
-      this.#index += 2;
-      return { kind: "operator", value: two, pos: start };
-    }
-
-    const char = this.source[this.#index] ?? "";
-    if (TOKEN_OPERATORS.has(char)) {
-      this.#index++;
-      return { kind: "operator", value: char, pos: start };
-    }
-    if (TOKEN_PUNCT.has(char)) {
-      this.#index++;
-      return { kind: "punct", value: char, pos: start };
-    }
-    if (char === "'" || char === '"') return this.readString(char);
-    if (/\d/.test(char)) return this.readNumber();
-    if (isIdentifierStart(char)) return this.readIdentifier();
-
-    throw new Error(`Unexpected token "${char}" at index ${start}`);
-  }
-
-  skipWhitespace(): void {
-    while (this.#index < this.source.length && /\s/.test(this.source[this.#index] ?? "")) {
-      this.#index++;
-    }
-  }
-
-  readIdentifier(): Token {
-    const start = this.#index;
-    this.#index++;
-    while (this.#index < this.source.length && isIdentifierPart(this.source[this.#index] ?? "")) {
-      this.#index++;
-    }
-    const value = this.source.slice(start, this.#index);
-    if (value === "true" || value === "false") return { kind: "boolean", value, pos: start };
-    if (value === "null") return { kind: "null", value, pos: start };
-    return { kind: "identifier", value, pos: start };
-  }
-
-  readNumber(): Token {
-    const start = this.#index;
-    while (this.#index < this.source.length && /\d/.test(this.source[this.#index] ?? "")) {
-      this.#index++;
-    }
-    if ((this.source[this.#index] ?? "") === ".") {
-      this.#index++;
-      while (this.#index < this.source.length && /\d/.test(this.source[this.#index] ?? "")) {
-        this.#index++;
-      }
-    }
-    return { kind: "number", value: this.source.slice(start, this.#index), pos: start };
-  }
-
-  readString(quote: string): Token {
-    const start = this.#index;
-    this.#index++;
-    let value = "";
-    while (this.#index < this.source.length) {
-      const char = this.source[this.#index] ?? "";
-      if (char === quote) {
-        if (quote === "'" && this.source[this.#index + 1] === "'") {
-          value += "'";
-          this.#index += 2;
-          continue;
-        }
-        if (quote === '"' && hasOddBackslashRun(this.source, this.#index)) {
-          value = `${value.slice(0, -1)}${quote}`;
-          this.#index++;
-          continue;
-        }
-        this.#index++;
-        return { kind: "string", value, pos: start };
-      }
-      value += char;
-      this.#index++;
-    }
-    throw new Error(`Unterminated string literal at index ${start}`);
-  }
-}
-
-class ExprParser {
-  readonly #tokenizer: Tokenizer;
-  #lookahead: Token;
-
-  constructor(source: string) {
-    this.#tokenizer = new Tokenizer(source);
-    this.#lookahead = this.#tokenizer.next();
-  }
-
-  parseExpression(): ExprNode {
-    const expr = this.parseOr();
-    if (this.#lookahead.kind !== "eof") {
-      throw new Error(`Unexpected token "${this.#lookahead.value}"`);
-    }
-    return expr;
-  }
-
-  parseOr(): ExprNode {
-    let left = this.parseAnd();
-    while (this.matchOperator("||")) {
-      left = { kind: "binary", op: "||", left, right: this.parseAnd() };
-    }
-    return left;
-  }
-
-  parseAnd(): ExprNode {
-    let left = this.parseCmp();
-    while (this.matchOperator("&&")) {
-      left = { kind: "binary", op: "&&", left, right: this.parseCmp() };
-    }
-    return left;
-  }
-
-  parseCmp(): ExprNode {
-    let left = this.parseUnary();
-    if (
-      this.#lookahead.kind === "operator" &&
-      ["==", "!=", "<", "<=", ">", ">="].includes(this.#lookahead.value)
-    ) {
-      const operator = this.#lookahead.value as BinaryNode["op"];
-      this.consume("operator", operator);
-      left = { kind: "binary", op: operator, left, right: this.parseUnary() };
-    }
-    return left;
-  }
-
-  parseUnary(): ExprNode {
-    if (this.matchOperator("!")) {
-      return { kind: "unary", op: "!", expr: this.parseUnary() };
-    }
-    return this.parsePrimary();
-  }
-
-  parsePrimary(): ExprNode {
-    if (this.matchPunct("(")) {
-      const expr = this.parseOr();
-      this.consume("punct", ")");
-      return expr;
-    }
-    if (this.#lookahead.kind === "string") {
-      const token = this.#lookahead;
-      this.consume("string");
-      return { kind: "literal", value: token.value };
-    }
-    if (this.#lookahead.kind === "number") {
-      const token = this.#lookahead;
-      this.consume("number");
-      return { kind: "literal", value: Number(token.value) };
-    }
-    if (this.#lookahead.kind === "boolean") {
-      const token = this.#lookahead;
-      this.consume("boolean");
-      return { kind: "literal", value: token.value === "true" };
-    }
-    if (this.#lookahead.kind === "null") {
-      this.consume("null");
-      return { kind: "literal", value: null };
-    }
-    if (this.#lookahead.kind === "identifier") {
-      return this.parseIdentifierStart();
-    }
-    throw new Error(`Expected expression, found "${this.#lookahead.value}"`);
-  }
-
-  parseIdentifierStart(): ExprNode {
-    const identifier = this.consume("identifier").value;
-    if (this.matchPunct("(")) {
-      const args: ExprNode[] = [];
-      if (!this.matchPunct(")")) {
-        args.push(this.parseOr());
-        while (this.matchPunct(",")) args.push(this.parseOr());
-        this.consume("punct", ")");
-      }
-      return { kind: "call", name: identifier, args };
-    }
-    const segments: PathSegment[] = [identifier];
-    while (true) {
-      if (this.matchPunct(".")) {
-        const next = this.consume("identifier");
-        segments.push(next.value);
-        continue;
-      }
-      if (this.matchPunct("[")) {
-        const literal = this.parseLiteralToken();
-        segments.push(literal);
-        this.consume("punct", "]");
-        continue;
-      }
-      break;
-    }
-    return { kind: "ref", segments };
-  }
-
-  parseLiteralToken(): Primitive {
-    const token = this.#lookahead;
-    if (token.kind === "string") {
-      this.consume("string");
-      return token.value;
-    }
-    if (token.kind === "number") {
-      this.consume("number");
-      return Number(token.value);
-    }
-    if (token.kind === "boolean") {
-      this.consume("boolean");
-      return token.value === "true";
-    }
-    if (token.kind === "null") {
-      this.consume("null");
-      return null;
-    }
-    throw new Error(`Expected literal inside bracket access, found "${token.value}"`);
-  }
-
-  consume(kind: Token["kind"], value?: string): Token {
-    const token = this.#lookahead;
-    if (token.kind !== kind) throw new Error(`Expected ${kind}, found "${token.value}"`);
-    if (value !== undefined && token.value !== value) {
-      throw new Error(`Expected "${value}", found "${token.value}"`);
-    }
-    this.#lookahead = this.#tokenizer.next();
-    return token;
-  }
-
-  matchOperator(operator: string): boolean {
-    if (this.#lookahead.kind === "operator" && this.#lookahead.value === operator) {
-      this.consume("operator", operator);
-      return true;
-    }
-    return false;
-  }
-
-  matchPunct(punct: string): boolean {
-    if (this.#lookahead.kind === "punct" && this.#lookahead.value === punct) {
-      this.consume("punct", punct);
-      return true;
-    }
-    return false;
-  }
-}
-
-const collectRefNodes = (expr: ExprNode, refs: RefNode[] = []): RefNode[] => {
-  if (expr.kind === "ref") refs.push(expr);
-  if (expr.kind === "unary") collectRefNodes(expr.expr, refs);
-  if (expr.kind === "binary") {
-    collectRefNodes(expr.left, refs);
-    collectRefNodes(expr.right, refs);
-  }
-  if (expr.kind === "call") {
-    for (const arg of expr.args) collectRefNodes(arg, refs);
-  }
-  return refs;
-};
-
-interface RefUsage {
-  segments: PathSegment[];
-  hasStrictUsage: boolean;
-  hasDefinedProbeUsage: boolean;
-}
-
-const collectRefUsage = (
-  expr: ExprNode,
-  usage = new Map<string, RefUsage>(),
-  options: { inDefinedProbeArg: boolean } = { inDefinedProbeArg: false },
-): Map<string, RefUsage> => {
-  if (expr.kind === "ref") {
-    const key = refToString(expr.segments);
-    const existing = usage.get(key);
-    if (existing) {
-      if (options.inDefinedProbeArg) existing.hasDefinedProbeUsage = true;
-      else existing.hasStrictUsage = true;
-      return usage;
-    }
-    usage.set(key, {
-      segments: expr.segments,
-      hasStrictUsage: !options.inDefinedProbeArg,
-      hasDefinedProbeUsage: options.inDefinedProbeArg,
-    });
-    return usage;
-  }
-
-  if (expr.kind === "unary") {
-    collectRefUsage(expr.expr, usage, options);
-    return usage;
-  }
-
-  if (expr.kind === "binary") {
-    collectRefUsage(expr.left, usage, options);
-    collectRefUsage(expr.right, usage, options);
-    return usage;
-  }
-
-  if (expr.kind === "call") {
-    expr.args.forEach((arg, index) => {
-      const inDefinedProbeArg = expr.name === "defined" && index === 0 && arg.kind === "ref";
-      collectRefUsage(arg, usage, { inDefinedProbeArg });
-    });
-    return usage;
-  }
-
-  return usage;
-};
 
 const normalizePathSegment = (segment: PathSegment): string | number => {
   if (typeof segment === "number") return segment;
@@ -486,98 +111,6 @@ const suggestParamName = (ctx: ParseContext, paramName: string): string | undefi
   const best = ranked[0];
   if (!best) return undefined;
   return best.score <= 3 ? best.candidate : undefined;
-};
-
-const evalCall = (name: string, args: unknown[]): unknown => {
-  if (name === "contains") {
-    const [haystack, needle] = args;
-    if (typeof haystack === "string") return haystack.includes(String(needle ?? ""));
-    if (Array.isArray(haystack)) return haystack.includes(needle);
-    return false;
-  }
-  if (name === "startsWith") {
-    const [value, prefix] = args;
-    return typeof value === "string" && typeof prefix === "string"
-      ? value.startsWith(prefix)
-      : false;
-  }
-  if (name === "endsWith") {
-    const [value, suffix] = args;
-    return typeof value === "string" && typeof suffix === "string" ? value.endsWith(suffix) : false;
-  }
-  if (name === "format") {
-    const [template, ...rest] = args;
-    if (typeof template !== "string") return template;
-    return rest.reduce<string>(
-      (formatted, value, index) => formatted.replaceAll(`{${index}}`, String(value ?? "")),
-      template,
-    );
-  }
-  if (name === "defined") {
-    const [value] = args;
-    return value !== undefined && value !== null;
-  }
-  throw new Error(`Unknown function "${name}"`);
-};
-
-const evalExpr = (expr: ExprNode, refs: Map<string, unknown>): unknown => {
-  if (expr.kind === "literal") return expr.value;
-  if (expr.kind === "ref") {
-    return refs.get(refToString(expr.segments));
-  }
-  if (expr.kind === "call") {
-    return evalCall(
-      expr.name,
-      expr.args.map((arg) => evalExpr(arg, refs)),
-    );
-  }
-  if (expr.kind === "unary") {
-    const value = evalExpr(expr.expr, refs);
-    if (typeof value !== "boolean") throw new Error("Unary ! requires a boolean operand");
-    return !value;
-  }
-  const left = evalExpr(expr.left, refs);
-  const right = evalExpr(expr.right, refs);
-  switch (expr.op) {
-    case "||":
-      if (typeof left !== "boolean" || typeof right !== "boolean") {
-        throw new Error("|| requires boolean operands");
-      }
-      return left || right;
-    case "&&":
-      if (typeof left !== "boolean" || typeof right !== "boolean") {
-        throw new Error("&& requires boolean operands");
-      }
-      return left && right;
-    case "==":
-      return left === right;
-    case "!=":
-      return left !== right;
-    case "<":
-      if (!isComparable(left) || !isComparable(right))
-        throw new Error("< requires comparable operands");
-      return left < right;
-    case "<=":
-      if (!isComparable(left) || !isComparable(right))
-        throw new Error("<= requires comparable operands");
-      return left <= right;
-    case ">":
-      if (!isComparable(left) || !isComparable(right))
-        throw new Error("> requires comparable operands");
-      return left > right;
-    case ">=":
-      if (!isComparable(left) || !isComparable(right))
-        throw new Error(">= requires comparable operands");
-      return left >= right;
-  }
-};
-
-const parseExpression = (raw: string): ExprNode | undefined => {
-  try {
-    return new ExprParser(raw).parseExpression();
-  } catch {
-    return undefined;
-  }
 };
 
 const extractRuntimeWrapperExpression = (raw: string): string | undefined => {
@@ -704,7 +237,16 @@ const evaluateWhenCompile = (
 
   let value: unknown;
   try {
-    value = evalExpr(parsed, resolvedRefs);
+    const env: EvalEnv = {
+      resolveRef: (segments) => {
+        const key = refToString(segments);
+        return resolvedRefs.has(key)
+          ? { resolved: true, value: resolvedRefs.get(key) }
+          : { resolved: false };
+      },
+      scope: new Map(),
+    };
+    value = evalExpr(parsed, env);
   } catch (error) {
     const message = error instanceof Error ? error.message : "failed evaluation";
     pushDiagnostic(

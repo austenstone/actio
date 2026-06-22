@@ -22,6 +22,13 @@
       "description": "Actio macro. Typed compile-time parameters. References are resolved with `{{ params.<name> }}` or `{{ toJSON(params.<name>) }}` and stripped from emitted workflow YAML.",
       "additionalProperties": { "$ref": "#/definitions/actioParam" }
     },
+    "let": {
+      "type": "object",
+      "title": "let (Actio macro)",
+      "description": "Actio macro. File-local compile-time constants. Each value is a literal or a whole-value `{{ expression }}` evaluated at build time; reference results with `{{ let.<name> }}`. Constants may depend on earlier `params`/`let` entries. The `let` key is stripped from the generated workflow.",
+      "markdownDescription": "**Actio macro**: file-local compile-time constants.\n\nEach entry is a literal or a single whole-value `{{ expression }}` evaluated by the compile-time engine; the typed result is referenced elsewhere with `{{ let.<name> }}`. Entries may reference earlier `params`/`let` values. Only compile-time expressions are allowed: a `${{ }}` runtime expression or a runtime context (e.g. `github.*`) is rejected. The `let` key is stripped from the generated workflow.\n\n```yaml\nparams:\n  base: { type: number, default: 2 }\nlet:\n  doubled: \"{{ params.base * 2 }}\"\n  label: \"build-{{ let.doubled }}\"\n```",
+      "additionalProperties": true
+    },
     "_anchors": {
       "type": "object",
       "title": "_anchors (Actio macro)",

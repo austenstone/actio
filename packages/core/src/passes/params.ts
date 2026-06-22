@@ -1,13 +1,9 @@
 import type { ParamType, SymbolDef, SymbolKind } from "../ir.js";
 import type { ParseContext, Path } from "../parser.js";
-import { conservativeTaint } from "../symbols.js";
+import { conservativeTaint, RUNTIME_CONTEXT_ROOT_SET } from "../symbols.js";
+import { collectRefNodes, type EvalEnv, ExprError, evalExpr, parseExpression } from "./expr.js";
 import { expectMapping, isObject, pushDiagnostic, warnUnknownKeys } from "./helpers.js";
 import type { Pass } from "./registry.js";
-
-interface ParsedExpr {
-  segments: string[];
-  asJson: boolean;
-}
 
 export const PARAM_TYPES: ReadonlySet<ParamType> = new Set([
   "string",
@@ -52,28 +48,6 @@ export const validateEnumValues = (raw: unknown): string[] | undefined => {
   if (!Array.isArray(raw) || raw.length === 0) return undefined;
   if (!raw.every((value) => typeof value === "string")) return undefined;
   return [...raw];
-};
-
-const parseCompileExpr = (raw: string): ParsedExpr | undefined => {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return undefined;
-
-  let asJson = false;
-  let subject = trimmed;
-  if (trimmed.startsWith("toJSON(") && trimmed.endsWith(")")) {
-    asJson = true;
-    subject = trimmed.slice("toJSON(".length, -1).trim();
-    if (subject.length === 0) return undefined;
-  }
-
-  const segments = subject.split(".").map((segment) => segment.trim());
-  if (segments.length === 0 || segments.some((segment) => segment.length === 0)) return undefined;
-  if (
-    segments.some((segment) => !/^[A-Za-z_][A-Za-z0-9_-]*$/.test(segment) && !/^\d+$/.test(segment))
-  ) {
-    return undefined;
-  }
-  return { segments, asJson };
 };
 
 const collectParamSymbol = (
@@ -220,6 +194,19 @@ const lookupSymbolValue = (
   return { symbol, value: current, resolved: current !== undefined };
 };
 
+const EMPTY_SCOPE: ReadonlyMap<string, unknown> = new Map();
+
+const compileEvalEnv = (ctx: ParseContext): EvalEnv => ({
+  resolveRef: (segments) => {
+    const looked = lookupSymbolValue(
+      ctx,
+      segments.map((segment) => String(segment)),
+    );
+    return looked.resolved ? { resolved: true, value: looked.value } : { resolved: false };
+  },
+  scope: EMPTY_SCOPE,
+});
+
 export interface CompileTimeExpressionResolution {
   symbol?: SymbolDef;
   value?: unknown;
@@ -230,14 +217,24 @@ export const resolveCompileTimeExpressionValue = (
   ctx: ParseContext,
   expression: string,
 ): CompileTimeExpressionResolution => {
-  const parsed = parseCompileExpr(expression.trim());
+  const parsed = parseExpression(expression.trim());
   if (!parsed) return { resolved: false };
-  const lookedUp = lookupSymbolValue(ctx, parsed.segments);
-  return {
-    symbol: lookedUp.symbol,
-    value: lookedUp.value,
-    resolved: lookedUp.resolved,
-  };
+  const node =
+    parsed.kind === "call" && parsed.name === "toJSON" && parsed.args.length === 1
+      ? parsed.args[0]
+      : parsed;
+  if (node && node.kind === "ref") {
+    return lookupSymbolValue(
+      ctx,
+      node.segments.map((segment) => String(segment)),
+    );
+  }
+  try {
+    const value = evalExpr(parsed, compileEvalEnv(ctx));
+    return { resolved: value !== undefined, value };
+  } catch {
+    return { resolved: false };
+  }
 };
 
 const isIdentifierStart = (char: string): boolean => /[A-Za-z_]/.test(char);
@@ -358,6 +355,20 @@ export interface ResolveTextOptions {
   reportInterpolationErrors?: boolean;
 }
 
+const mapInterpolationError = (
+  error: unknown,
+  token: string,
+): { code: string; message: string } => {
+  if (error instanceof ExprError) {
+    if (error.code === "type") return { code: "expr-type-error", message: error.message };
+    if (error.code === "runtime-fn") return { code: "expr-runtime-fn", message: error.message };
+  }
+  return {
+    code: "interp-unresolved",
+    message: `Cannot resolve compile-time expression "${token}" from the symbol table`,
+  };
+};
+
 const interpolateCompileTokens = (
   ctx: ParseContext,
   value: string,
@@ -393,9 +404,10 @@ const interpolateCompileTokens = (
     }
 
     const token = value.slice(open + 2, close).trim();
-    const parsed = parseCompileExpr(token);
+    const report = options.reportInterpolationErrors !== false;
+    const parsed = parseExpression(token);
     if (!parsed) {
-      if (options.reportInterpolationErrors !== false) {
+      if (report) {
         pushDiagnostic(ctx, "error", `Cannot parse compile-time expression "${token}"`, path, {
           code: "interp-unresolved",
         });
@@ -405,46 +417,32 @@ const interpolateCompileTokens = (
       continue;
     }
 
-    const lookedUp = lookupSymbolValue(ctx, parsed.segments);
-    if (!lookedUp.resolved) {
-      if (options.reportInterpolationErrors !== false) {
-        pushDiagnostic(
-          ctx,
-          "error",
-          `Cannot resolve compile-time expression "${token}" from the symbol table`,
-          path,
-          { code: "interp-unresolved" },
-        );
+    let resolvedValue: unknown;
+    try {
+      resolvedValue = evalExpr(parsed, compileEvalEnv(ctx));
+    } catch (error) {
+      if (report) {
+        const mapped = mapInterpolationError(error, token);
+        pushDiagnostic(ctx, "error", mapped.message, path, { code: mapped.code });
       }
       output += value.slice(open, close + 2);
       cursor = close + 2;
       continue;
     }
 
-    const resolvedValue = lookedUp.value;
-    if (parsed.asJson) {
-      const json = JSON.stringify(resolvedValue);
-      if (json === undefined) {
-        if (options.reportInterpolationErrors !== false) {
-          pushDiagnostic(
-            ctx,
-            "error",
-            `Cannot serialize compile-time expression "${token}" with toJSON(...)`,
-            path,
-            { code: "interp-unresolved" },
-          );
-        }
-        output += value.slice(open, close + 2);
-        cursor = close + 2;
-        continue;
+    if (resolvedValue === undefined) {
+      if (report) {
+        pushDiagnostic(ctx, "error", `Cannot serialize compile-time expression "${token}"`, path, {
+          code: "interp-unresolved",
+        });
       }
-      output += json;
+      output += value.slice(open, close + 2);
       cursor = close + 2;
       continue;
     }
 
     if ((isObject(resolvedValue) || Array.isArray(resolvedValue)) && resolvedValue !== null) {
-      if (options.reportInterpolationErrors !== false) {
+      if (report) {
         pushDiagnostic(
           ctx,
           "error",
@@ -525,7 +523,7 @@ export interface TemplateArg {
   value: unknown;
 }
 
-const makeArgSymbol = (name: string, type: ParamType, value: unknown): SymbolDef => ({
+const makeBoundSymbol = (name: string, type: ParamType, value: unknown): SymbolDef => ({
   name,
   kind: symbolKindForType(type),
   type,
@@ -556,7 +554,7 @@ export const resolveArgsInBody = (
   for (const [name, arg] of Object.entries(args)) {
     const key = `args.${name}`;
     saved.set(key, ctx.symbols.get(key));
-    ctx.symbols.set(key, makeArgSymbol(key, arg.type, arg.value));
+    ctx.symbols.set(key, makeBoundSymbol(key, arg.type, arg.value));
   }
   try {
     return resolveCompileTimeTextBoundaries(ctx, body, path, {
@@ -579,10 +577,13 @@ const resolveBareStructuralExpression = (ctx: ParseContext, value: string, path:
   if (trimmed.length === 0) return value;
   if (trimmed.includes("{{") || trimmed.includes("}}")) return value;
 
-  const parsed = parseCompileExpr(trimmed);
-  if (!parsed || parsed.asJson) return value;
+  const parsed = parseExpression(trimmed);
+  if (parsed?.kind !== "ref") return value;
 
-  const lookedUp = lookupSymbolValue(ctx, parsed.segments);
+  const lookedUp = lookupSymbolValue(
+    ctx,
+    parsed.segments.map((segment) => String(segment)),
+  );
   if (!lookedUp.symbol) return value;
   if (!lookedUp.resolved) {
     pushDiagnostic(
@@ -630,28 +631,245 @@ const resolveStructuralExpressionsInTree = (
   return value;
 };
 
-/** Collect top-level typed params into the symbol table and resolve bare structural expressions. */
-export const paramsPass = (ctx: ParseContext): void => {
-  const rawParams = ctx.data.params;
-  if (rawParams === undefined) return;
+/** Infer the closest param type for a resolved compile-time value. */
+const paramTypeOfValue = (value: unknown): ParamType => {
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  if (Array.isArray(value)) return isStepList(value) ? "steps" : "object";
+  if (isObject(value)) return "object";
+  return "string";
+};
 
+/** Extract every compile-time `{{ ... }}` token body from a text value. */
+const compileTokensOf = (value: string): string[] => {
+  const tokens: string[] = [];
+  let cursor = 0;
+  while (cursor < value.length) {
+    const open = value.indexOf("{{", cursor);
+    if (open < 0) break;
+    if (open > 0 && value[open - 1] === "$") {
+      cursor = open + 2;
+      continue;
+    }
+    const close = value.indexOf("}}", open + 2);
+    if (close < 0) break;
+    tokens.push(value.slice(open + 2, close).trim());
+    cursor = close + 2;
+  }
+  return tokens;
+};
+
+/** Return the inner expression when a value is exactly one whole-value `{{ ... }}`. */
+const wholeValueToken = (value: string): string | undefined => {
+  const trimmed = value.trim();
+  if (trimmed.length < 4 || !trimmed.startsWith("{{") || !trimmed.endsWith("}}")) return undefined;
+  const inner = trimmed.slice(2, -2);
+  if (inner.includes("{{") || inner.includes("}}")) return undefined;
+  return inner.trim();
+};
+
+/** `let` names this value depends on, for topological ordering within the pass. */
+const letDependencies = (raw: string, letNames: ReadonlySet<string>): string[] => {
+  const deps = new Set<string>();
+  for (const token of compileTokensOf(raw)) {
+    const node = parseExpression(token);
+    if (!node) continue;
+    for (const ref of collectRefNodes(node)) {
+      const [head, second] = ref.segments;
+      if (head === "let" && typeof second === "string" && letNames.has(second)) deps.add(second);
+    }
+  }
+  return [...deps];
+};
+
+const mapLetEvalError = (error: unknown, expr: string): { code: string; message: string } => {
+  if (error instanceof ExprError) {
+    if (error.code === "parse") return { code: "expr-parse-error", message: error.message };
+    if (error.code === "type") return { code: "expr-type-error", message: error.message };
+    if (error.code === "runtime-fn") return { code: "expr-runtime-fn", message: error.message };
+    return { code: "expr-unknown-name", message: error.message };
+  }
+  return { code: "expr-unknown-name", message: `Cannot resolve compile-time expression "${expr}"` };
+};
+
+/** Resolve one `let` value to a typed compile-time constant, or undefined on error. */
+const resolveLetValue = (
+  ctx: ParseContext,
+  name: string,
+  raw: unknown,
+): { type: ParamType; value: unknown } | undefined => {
+  const path: Path = ["let", name];
+  if (typeof raw !== "string") return { type: paramTypeOfValue(raw), value: raw };
+
+  if (raw.includes("${{")) {
+    pushDiagnostic(
+      ctx,
+      "error",
+      `let.${name} must be compile-time; "\${{ }}" is a runtime expression`,
+      path,
+      { code: "let-not-compile-time" },
+    );
+    return undefined;
+  }
+
+  for (const token of compileTokensOf(raw)) {
+    const node = parseExpression(token);
+    if (!node) continue;
+    for (const ref of collectRefNodes(node)) {
+      const head = ref.segments[0];
+      if (typeof head === "string" && RUNTIME_CONTEXT_ROOT_SET.has(head)) {
+        pushDiagnostic(
+          ctx,
+          "error",
+          `let.${name} must be compile-time; "${head}" is a runtime context`,
+          path,
+          { code: "let-not-compile-time" },
+        );
+        return undefined;
+      }
+    }
+  }
+
+  if (!hasCompileToken(raw)) return { type: "string", value: raw };
+
+  const whole = wholeValueToken(raw);
+  if (whole !== undefined) {
+    const node = parseExpression(whole);
+    if (!node) {
+      pushDiagnostic(ctx, "error", `Cannot parse compile-time expression "${whole}"`, path, {
+        code: "expr-parse-error",
+      });
+      return undefined;
+    }
+    try {
+      const value = evalExpr(node, compileEvalEnv(ctx));
+      if (value === undefined) {
+        pushDiagnostic(
+          ctx,
+          "error",
+          `Cannot resolve compile-time expression "${whole}" from the symbol table`,
+          path,
+          { code: "expr-unknown-name" },
+        );
+        return undefined;
+      }
+      return { type: paramTypeOfValue(value), value };
+    } catch (error) {
+      const mapped = mapLetEvalError(error, whole);
+      pushDiagnostic(ctx, "error", mapped.message, path, { code: mapped.code });
+      return undefined;
+    }
+  }
+
+  const text = resolveCompileTimeText(ctx, raw, path, { validateRuntimeExpressions: false });
+  return { type: "string", value: text };
+};
+
+/**
+ * Bind top-level `let:` as file-local compile-time constants AFTER params bind.
+ * Values may reference earlier `let`/`params`, so resolution is topologically
+ * ordered over let -> let dependencies; a cycle is a compile-time error.
+ */
+const resolveLet = (ctx: ParseContext): void => {
+  const rawLet = ctx.data.let;
+  if (rawLet === undefined) return;
   if (
-    !expectMapping(ctx, rawParams, ["params"], {
-      message: "Top-level params must be a mapping",
-      code: "params-shape-invalid",
+    !expectMapping(ctx, rawLet, ["let"], {
+      message: "Top-level let must be a mapping",
+      code: "let-shape-invalid",
     })
   ) {
-    delete ctx.data.params;
+    delete ctx.data.let;
     return;
   }
 
-  for (const [name, rawDefinition] of Object.entries(rawParams)) {
-    const symbol = collectParamSymbol(ctx, name, rawDefinition, ["params", name]);
-    if (!symbol) continue;
-    ctx.symbols.set(symbol.name, symbol);
+  const names = new Set(Object.keys(rawLet));
+  const indegree = new Map<string, number>();
+  const dependents = new Map<string, string[]>();
+  for (const name of names) {
+    indegree.set(name, 0);
+    dependents.set(name, []);
+  }
+  for (const [name, raw] of Object.entries(rawLet)) {
+    const deps = typeof raw === "string" ? letDependencies(raw, names) : [];
+    indegree.set(name, deps.length);
+    for (const dep of deps) dependents.get(dep)?.push(name);
   }
 
-  delete ctx.data.params;
+  const ready = [...names].filter((name) => indegree.get(name) === 0);
+  const order: string[] = [];
+  while (ready.length > 0) {
+    const name = ready.shift();
+    if (name === undefined) break;
+    order.push(name);
+    for (const dependent of dependents.get(name) ?? []) {
+      const next = (indegree.get(dependent) ?? 0) - 1;
+      indegree.set(dependent, next);
+      if (next === 0) ready.push(dependent);
+    }
+  }
+
+  const resolvedOrder = new Set(order);
+  for (const name of names) {
+    if (resolvedOrder.has(name)) continue;
+    pushDiagnostic(
+      ctx,
+      "error",
+      `let.${name} has a circular compile-time dependency`,
+      ["let", name],
+      { code: "let-not-compile-time" },
+    );
+  }
+
+  for (const name of order) {
+    if (ctx.symbols.has(`params.${name}`)) {
+      pushDiagnostic(
+        ctx,
+        "error",
+        `let.${name} redeclares a param of the same name`,
+        ["let", name],
+        {
+          code: "let-redeclared",
+        },
+      );
+      continue;
+    }
+    const resolved = resolveLetValue(ctx, name, (rawLet as Record<string, unknown>)[name]);
+    if (resolved === undefined) continue;
+    ctx.symbols.set(`let.${name}`, makeBoundSymbol(`let.${name}`, resolved.type, resolved.value));
+  }
+
+  delete ctx.data.let;
+};
+
+/** Collect top-level typed params into the symbol table and resolve bare structural expressions. */
+export const paramsPass = (ctx: ParseContext): void => {
+  const rawParams = ctx.data.params;
+  const rawLet = ctx.data.let;
+  if (rawParams === undefined && rawLet === undefined) return;
+
+  let paramsInvalid = false;
+  if (rawParams !== undefined) {
+    if (
+      expectMapping(ctx, rawParams, ["params"], {
+        message: "Top-level params must be a mapping",
+        code: "params-shape-invalid",
+      })
+    ) {
+      for (const [name, rawDefinition] of Object.entries(rawParams)) {
+        const symbol = collectParamSymbol(ctx, name, rawDefinition, ["params", name]);
+        if (!symbol) continue;
+        ctx.symbols.set(symbol.name, symbol);
+      }
+    } else {
+      paramsInvalid = true;
+    }
+    delete ctx.data.params;
+  }
+
+  resolveLet(ctx);
+
+  if (paramsInvalid && rawLet === undefined) return;
   resolveStructuralExpressionsInTree(ctx, ctx.data, []);
 };
 

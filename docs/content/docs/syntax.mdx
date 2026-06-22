@@ -113,6 +113,32 @@ jobs:
 
 Full guide: [params](/docs/macros/params).
 
+{/* macro:let */}
+### `let` [#let]
+
+File-local compile-time constants. Each value is a literal or a single whole-value
+`{{ expression }}` evaluated at build time by the one compile-time engine; reference
+the typed result elsewhere with `{{ let.<name> }}`. Entries may build on earlier
+[`params`](#params) and `let` values, so `count: "{{ params.base * 2 }}"` stores the
+number `4`, not a string. Reference an earlier entry with `{{ let.<name> }}`. The
+`let` key is stripped from the generated workflow.
+
+- **Valid in:** top level
+- **Type:** map of name → literal or `"{{ expression }}"`
+- **Compiles to:** nothing; `{{ let.* }}` references are resolved and `let` is removed
+
+Only compile-time expressions are allowed. A `${{ }}` runtime expression or a runtime
+context head (`github.*`, `matrix.*`, `secrets.*`, ...) is rejected with
+`let-not-compile-time`; a circular reference between `let` entries is the same error.
+
+```yaml title=".actio.yml"
+params:
+  base: { type: number, default: 2 }
+let:
+  doubled: "{{ params.base * 2 }}"
+  label: "build-{{ let.doubled }}"
+```
+
 {/* macro:reusable */}
 ### `reusable` [#reusable]
 
