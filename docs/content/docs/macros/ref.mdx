@@ -1,16 +1,15 @@
 ---
 title: ref
-description: Reference any producer's output by a rename-safe handle and let Actio wire needs and outputs.
+description: Reference any producer's output by a rename-safe handle. Actio infers the producer and wires needs and outputs for you.
 ---
 
 Threading a value between jobs in raw YAML is the most error-prone hand-work in a
 workflow: give the producing step an `id`, declare `jobs.<id>.outputs`, add the
 consumer to `needs`, then read it back through `${{ needs.<job>.outputs.<name> }}`.
 Every piece is stringly-typed and silently breaks on a rename. `ref` collapses all of
-it. List the producing step's outputs with `ref: [..]`, reference them anywhere as
-`${{ ref.<handle>.<output> }}`, and Actio assigns the id, synthesizes `job.outputs`,
-and adds the `needs` edges for you. The handle derives from the step `name` (then its
-id); rename it explicitly with the `{ handle, outputs }` map form when you need to.
+it. Reference a producer's output anywhere as `${{ ref.<handle>.<output> }}` and Actio
+finds the producing step, assigns its id, synthesizes `job.outputs`, and adds the
+`needs` edges for you. No `ref:` key is required: the reference itself is the contract.
 
 Where [`share`](/docs/macros/share) wires outputs the compiler mints itself, `ref`
 generalizes that same engine to outputs the compiler did not mint: action `uses:`
@@ -28,7 +27,6 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         name: node
-        ref: [node-version]
   build:
     runs-on: ubuntu-latest
     steps:
@@ -58,13 +56,92 @@ jobs:
 
 </CodeCompare>
 
-The positional `ref: [node-version]` is the primary producer form: it declares the
-output and lets the handle derive from the step `name` (`node`), so the
-`${{ ref.node.node-version }}` reference in `build` resolves to
-`${{ needs.setup.outputs.node-version }}`, the `setup` step gains an `id`, its
-`node-version` output is published once on `jobs.setup.outputs`, and `needs: [setup]`
-is added. Rename the step and every reference moves with it; there is no string to
-keep in sync.
+The `setup` step carries no `ref:` at all. The `${{ ref.node.node-version }}` reference
+in `build` is what turns it into a producer: `node` matches the step `name`, so Actio
+gives the step an `id`, publishes `node-version` once on `jobs.setup.outputs`, adds
+`needs: [setup]`, and rewrites the reference to `${{ needs.setup.outputs.node-version }}`.
+Rename the step and every reference moves with it; there is no string to keep in sync.
+Omitting `ref:` is byte-identical to writing `ref: [node-version]` on the same step.
+
+## Inference is the default
+
+A step becomes a producer the moment a consumer references it. For each
+`${{ ref.<handle>.<output> }}`, Actio looks for the producing step by handle:
+
+1. A step whose `id` equals the handle (preferred, and must be unique in its job).
+2. Otherwise the first step whose `name` is a valid token (`^[A-Za-z_][A-Za-z0-9_-]*$`)
+   and slugifies to the handle.
+
+Only handles that are actually referenced are resolved, so unrelated named steps never
+collide. The output set accrues from the references themselves; the compiler emits the
+exact set you read. This covers both producer kinds:
+
+- **Action `uses:`** steps are unverifiable by design (Actio does not read `action.yml`
+  metadata), so a referenced output is always accepted and wired.
+- **Hand-written `run:`** steps are statically scanned for their `$GITHUB_OUTPUT`
+  writes. When that scan is authoritative, referencing an output the script never writes
+  is a hard `ref-output-unwritten` error. When it is not, Actio degrades to a single
+  `ref-output-unscannable` warning and wires the reference anyway (see
+  [Run-step scanning](#run-step-scanning)).
+
+## Run-step scanning
+
+For a `run:` producer Actio parses the script for the output names it writes to
+`$GITHUB_OUTPUT`, recognizing the common spellings:
+
+```yaml title=".actio.yml"
+- name: tag
+  run: |
+    echo "version=1.2.3" >> "$GITHUB_OUTPUT"          # simple assignment
+    echo "notes<<EOF" >> "$GITHUB_OUTPUT"             # multiline opener
+    echo "shipped" >> "$GITHUB_OUTPUT"
+    echo "EOF" >> "$GITHUB_OUTPUT"
+    printf "sha=%s\n" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+```
+
+The scan is deliberately conservative. It is **authoritative** only when every write is
+fully parseable and at least one name was resolved; then a reference to an unwritten
+output is a hard `ref-output-unwritten` error. If any write is dynamic or
+un-dissectable (`echo "$NAME=..."`, a piped or multi-redirect line, an unterminated
+heredoc), the scan **degrades**: Actio emits one `ref-output-unscannable` warning per
+producer and wires every referenced output anyway. The scanner never claims an output is
+absent from a script it could not fully parse, so it can never raise a false hard error.
+
+## Explicit `ref:` (escape hatch)
+
+Inference is the primary path. Reach for an explicit `ref:` only when you need to pin a
+contract the reference graph cannot derive:
+
+- **Rename the handle** so it does not track the step `name`/id.
+- **Declare an explicit output contract** on a `run:` step, e.g. to fail the build the
+  moment a reference drifts from a hand-maintained list rather than relying on the scan.
+
+`ref` takes a positional array or a `{ handle?, outputs }` map:
+
+```yaml title=".actio.yml"
+# pin a handle that does not match the step name
+- uses: actions/setup-node@v4
+  ref: { handle: node, outputs: [node-version] }
+
+# declare an explicit run output contract
+- id: tagger
+  run: echo "version=1.2.3" >> "$GITHUB_OUTPUT"
+  ref: [version]
+```
+
+<TypeTable
+  type={{
+    handle: { type: 'string', description: 'Explicit handle (map form only). Defaults to a slug of the step name, then the step id.' },
+    outputs: { type: 'string[]', description: 'Output names this step publishes. This is the value of the positional shorthand ref: [..].', required: true },
+  }}
+/>
+
+`ref: { handle: node, outputs: [node-version] }` is byte-identical to
+`ref: [node-version]` on a step named `node`; the explicit `handle:` simply wins over the
+derived one. With an explicit `ref:`, an action reference to an undeclared output warns
+(`ref-output-unknown-on-action`) and a `run` reference to an undeclared output is a hard
+`ref-unknown-output` error: the declared list is the contract, and the `run` script is
+not scanned.
 
 ## Handles
 
@@ -74,19 +151,9 @@ A producer's handle is how consumers address it. It is resolved explicit-first:
 2. A slug of the step `name`, when no handle is given.
 3. The synthesized step `id`, as a last resort.
 
-Reach for the `{ handle, outputs }` map form when you need to pin a handle that does
-not track the step `name`/id:
-
-```yaml title=".actio.yml"
-- uses: actions/setup-node@v4
-  ref: { handle: node, outputs: [node-version] }
-```
-
-This is byte-identical to `ref: [node-version]` on a step named `node`; the explicit
-`handle:` simply wins over the derived one. Two producers that resolve to the same
-handle in the same job is a `ref-ambiguous` compile error, never a silent pick. When a
-handle is reused across different jobs, qualify the reference with the job id:
-`${{ ref.<job>.<handle>.<output> }}`.
+Two producers that resolve to the same handle in the same job is a `ref-ambiguous`
+compile error, never a silent pick. When a handle is reused across different jobs,
+qualify the reference with the job id: `${{ ref.<job>.<handle>.<output> }}`.
 
 ## Same job vs cross job
 
@@ -98,45 +165,29 @@ The wiring follows the reference site:
   producer's `job.outputs` once (deduped across however many consumers read it), and
   merges a `needs` edge onto every consuming job.
 
-## Producer kinds
+## Reusable call-jobs
 
-A `ref` producer takes one of two equivalent forms. The positional shorthand
-`ref: [a, b]` is the primary form: it lists the output names and derives the handle
-from the step `name`, then its id. The `{ handle?, outputs }` map form is the
-escape hatch, used only when you need an explicit `handle:` that does not track the
-step `name`/id. Both feed the same reference graph; the map keys are:
-
-<TypeTable
-  type={{
-    handle: { type: 'string', description: 'Explicit handle (map form only). Defaults to a slug of the step name, then the step id.' },
-    outputs: { type: 'string[]', description: 'Output names this step publishes. Required for non-minted producers. This is the value of the positional shorthand ref: [..].', required: true },
-  }}
-/>
-
-- **Action `uses:`** outputs: declare them in `outputs:`; reference an undeclared one
-  and Actio warns (`ref-output-unknown-on-action`) but still wires it.
-- **Hand-written `run:`** writes to `$GITHUB_OUTPUT`: declare every name in `outputs:`.
-  Referencing an undeclared name is a hard `ref-unknown-output` error.
-- **Reusable call-jobs**: reference outputs as `${{ ref.job.<call_id>.<output> }}`. The
-  call-job already declares its own outputs, so Actio adds only the `needs` edge.
-
-Non-minted producers must list their `outputs:` explicitly. Sniffing
-`$GITHUB_OUTPUT` writes to infer outputs is deferred.
+Reference a reusable call-job's output as `${{ ref.job.<call_id>.<output> }}`. The
+call-job already declares its own outputs, so Actio adds only the `needs` edge.
 
 ## Diagnostics
 
 `ref` fails the build with a precise diagnostic instead of emitting broken YAML:
 
-- `ref-unknown-step` — the handle matches no producer.
-- `ref-unknown-output` — a `run` producer is missing the referenced output.
-- `ref-ambiguous` — a handle collides, on declaration or at a bare reference.
-- `ref-cycle` — the added `needs` edges would form a cycle.
-- `ref-self` — a step references its own handle.
-- `ref-output-undeclared` — a `ref` producer declares no `outputs:`.
-- `ref-matrix-clobber` — a cross-job reference targets a matrix-fanned producer, whose
+- `ref-unknown-step`: the handle matches no step.
+- `ref-output-unwritten`: an inferred `run` producer with an authoritative scan never
+  writes the referenced output.
+- `ref-output-unscannable` (warning): an inferred `run` producer's `$GITHUB_OUTPUT`
+  writes cannot be statically verified; the reference is wired anyway.
+- `ref-unknown-output`: an explicit `run` producer is missing the referenced output.
+- `ref-output-unknown-on-action` (warning): an explicit action producer is referenced
+  for an output it did not declare.
+- `ref-ambiguous`: a handle collides, on declaration or at a bare reference.
+- `ref-cycle`: the added `needs` edges would form a cycle.
+- `ref-self`: a step references its own handle.
+- `ref-output-undeclared`: an explicit `ref` producer declares no `outputs:`.
+- `ref-matrix-clobber`: a cross-job reference targets a matrix-fanned producer, whose
   per-leg outputs would clobber each other.
-- `ref-output-unknown-on-action` (warning) — an action producer is referenced for an
-  output it did not declare.
 
 ## Gotchas
 

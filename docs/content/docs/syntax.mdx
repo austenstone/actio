@@ -37,6 +37,7 @@ build` leaves behind.
 | [`for-each`](#for-each) | step | map | expanded into repeated steps (or a matrix) |
 | [`retry`](#retry) | step | integer or map | chain of conditional attempts |
 | [`share`](#share) | step | map of outputs | `job.outputs` + `needs` wiring |
+| [`ref`](#ref) | step | optional list or map | inferred producer; `job.outputs` + `needs` wiring |
 | [`fallback`](#fallback) | job, step | list or map | try/catch wiring |
 | [`soft_fail`](#soft_fail) | step | boolean or list | `continue-on-error`, or a build-time exit-code wrapper |
 | [`artifacts`](#artifacts) | step | map | trailing `actions/upload-artifact` step |
@@ -1029,31 +1030,40 @@ Full guide: [share](/docs/macros/share).
 {/* macro:ref */}
 ### `jobs.<job_id>.steps[*].ref` [#ref]
 
-Expose a step's outputs by a rename-safe logical handle. Reference anywhere with
-`${{ ref.<handle>.<output> }}`; Actio assigns the step id, synthesizes
-`jobs.<id>.outputs`, adds `needs` edges, and strips the `ref` key. Where `share`
-wires compiler-minted outputs, `ref` generalizes the same engine to outputs the
-compiler did not mint: action `uses:` outputs, hand-written `$GITHUB_OUTPUT` writes,
-and reusable call-job outputs.
+Expose a step's outputs by a rename-safe logical handle. `ref` is **optional**: a step
+becomes a producer the moment a consumer references it with
+`${{ ref.<handle>.<output> }}`. Actio finds the producing step by handle, assigns its
+id, synthesizes `jobs.<id>.outputs`, and adds `needs` edges. Where `share` wires
+compiler-minted outputs, `ref` generalizes the same engine to outputs the compiler did
+not mint: action `uses:` outputs, hand-written `$GITHUB_OUTPUT` writes, and reusable
+call-job outputs.
 
-- **Valid in:** `jobs.<job_id>.steps[*]`
-- **Type:** list of output names `[a, b]` (positional shorthand, primary), or a map with optional `handle` and a required `outputs` list
+- **Valid in:** `jobs.<job_id>.steps[*]` (optional; inference is the default)
+- **Type:** list of output names `[a, b]` (positional shorthand), or a map with optional `handle` and a required `outputs` list
 - **Compiles to:** `steps.<id>.outputs.<name>` (same job) or `needs.<job>.outputs.<name>` (cross job), plus synthesized `job.outputs` and `needs`
 
-Non-minted producers must declare their `outputs:` (auto-sniffing of
-`$GITHUB_OUTPUT` is deferred). The positional `ref: [a, b]` is the primary form and
-derives the handle from the step `name`, then its id; the `{ handle, outputs }` map
-form is the escape hatch for renaming the handle. Cross-job references resolve to
-`needs.<job>.outputs.<name>`; same-job references stay local as
+The producer is inferred from the reference: the handle matches a step `id` (preferred)
+or a slug of its `name`. Only referenced handles are resolved, so unrelated named steps
+never collide, and omitting `ref:` is byte-identical to writing the explicit
+`ref: [outputs]`. A `run:` producer is statically scanned for its `$GITHUB_OUTPUT`
+writes: an authoritative scan makes a reference to an unwritten output a hard
+`ref-output-unwritten` error, while a dynamic or un-dissectable write degrades to a
+`ref-output-unscannable` warning and wires anyway. Action producers are unverifiable
+and always wired.
+
+An explicit `ref:` is the escape hatch for renaming the handle or pinning an explicit
+output contract. The positional `ref: [a, b]` derives the handle from the step
+`name`/id; the `{ handle, outputs }` map form pins the handle. With an explicit `ref:`,
+the declared list is the contract and the `run` script is not scanned. Cross-job
+references resolve to `needs.<job>.outputs.<name>`; same-job references stay local as
 `steps.<id>.outputs.<name>` with no `needs` added. A dotted
-`${{ ref.<handle>.<output>.<field> }}` lowers to `fromJSON(...)`. Reusable
-call-jobs are referenced as `${{ ref.job.<call_id>.<output> }}` and add only a `needs`
-edge.
+`${{ ref.<handle>.<output>.<field> }}` lowers to `fromJSON(...)`. Reusable call-jobs are
+referenced as `${{ ref.job.<call_id>.<output> }}` and add only a `needs` edge.
 
 <TypeTable
   type={{
     handle: { type: 'string', description: 'Explicit handle (map form only). Defaults to a slug of the step name, then the step id. A same-job collision is a compile error.' },
-    outputs: { type: 'string[]', description: 'Output names this step publishes. Required for non-minted producers (action, hand-written run). The value of the positional shorthand ref: [..].', required: true },
+    outputs: { type: 'string[]', description: 'Output names this step publishes (explicit form only). The value of the positional shorthand ref: [..].', required: true },
   }}
 />
 
@@ -1064,7 +1074,6 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         name: node
-        ref: [node-version]
   build:
     runs-on: ubuntu-latest
     steps:
