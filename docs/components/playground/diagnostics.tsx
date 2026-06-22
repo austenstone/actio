@@ -1,4 +1,4 @@
-import type { Diagnostic } from 'actio-core';
+import type { Diagnostic } from 'actio-core/browser';
 
 const severityStyles: Record<Diagnostic['severity'], string> = {
   error: 'border-l-red-500 text-red-600 dark:text-red-400',

@@ -22,15 +22,6 @@ const config = {
   images: { unoptimized: true },
   turbopack: {
     root: turbopackRoot,
-    // actio-core's schema.ts imports node `fs`/`url` for the CLI and lint.ts
-    // imports `child_process` to invoke actionlint. The playground never
-    // exercises those paths, so stub them for the browser bundle only
-    // (server/SSG bundles keep the real builtins).
-    resolveAlias: {
-      fs: { browser: './lib/browser/fs-stub.ts' },
-      url: { browser: './lib/browser/url-stub.ts' },
-      child_process: { browser: './lib/browser/child_process-stub.ts' },
-    },
   },
   // Inline PAGES_BASE_PATH into client bundles too. Without this, basePath in
   // lib/shared.ts resolves to '' in the browser (Next only auto-inlines
