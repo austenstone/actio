@@ -40,6 +40,19 @@ function getFragments(ctx: ParseContext): FragmentMap {
     );
     return out;
   }
+  const names = Object.keys(frags);
+  if (names.length > 0) {
+    pushDiagnostic(
+      ctx,
+      "warning",
+      diagnosticMessage(
+        "fragment-deprecated",
+        `fragments is deprecated: use _anchors: + - *alias for same-file reuse, or templates: for params / cross-file (inject: ./lib#name). Affected: ${names.join(", ")}.`,
+      ),
+      ["fragments"],
+      { code: "fragment-deprecated" },
+    );
+  }
   for (const [name, steps] of Object.entries(frags)) {
     if (!Array.isArray(steps)) {
       pushDiagnostic(
