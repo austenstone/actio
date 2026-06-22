@@ -85,7 +85,9 @@ Interpolation: `{{ ... }}` is **compile-time** (resolved by `actio build`);
 | Keyword | Scope | What it does |
 | --- | --- | --- |
 | `params` | workflow | Typed compile-time inputs; reference with `{{ params.* }}` |
-| `fragments` + `inject` | workflow / step | Reusable named step lists, spliced in with `- inject: <name>` |
+| `_anchors` + `*alias` | workflow / step | Native YAML anchor library; a `- *alias` step list is flattened in place. Preferred for same-file, no-param reuse |
+| `templates` + `inject...with` | workflow / step | Parameterized named step lists; also resolves cross-file `inject: ./lib#name` |
+| `fragments` + `inject` | workflow / step | Deprecated (warning only): reusable named step lists, spliced in with `- inject: <name>`. Prefer `_anchors:`/`templates:` |
 | `job-defaults` | workflow | Job-level defaults merged into every job |
 | `executors` + `executor` | workflow / job | Named runner/container/service presets |
 | `call-templates` + `extends` | workflow / job | Named reusable-workflow call presets (`uses`/`with`/`needs`/`secrets`/`if`); jobs `extends:` and override deltas |
@@ -97,15 +99,15 @@ Interpolation: `{{ ... }}` is **compile-time** (resolved by `actio build`);
 ```yaml title=".actio.yml"
 params:
   env: { type: enum, values: [dev, staging, prod], default: staging }
-fragments:
-  setup:
+_anchors:
+  setup: &setup
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - inject: setup
+      - *setup
       - run: echo "deploying to {{ params.env }}"
         retry: { attempts: 3, delay: 10s }
 ```

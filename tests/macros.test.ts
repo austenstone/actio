@@ -41,6 +41,34 @@ jobs:
     ]);
   });
 
+  it("warns that fragments is deprecated but still expands identically", () => {
+    const { result, doc, errors } = build(`name: x
+on: [push]
+fragments:
+  s:
+    - uses: actions/checkout@v4
+    - run: echo hi
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: s
+      - run: echo done
+`);
+    const deprecations = result.diagnostics.filter((d) => d.code === "fragment-deprecated");
+    expect(deprecations).toHaveLength(1);
+    expect(deprecations[0].severity).toBe("warning");
+    expect(deprecations[0].message).toContain("Affected: s");
+    // Warning only: still compiles with no errors and the same expansion.
+    expect(errors).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(doc.jobs.a.steps).toEqual([
+      { uses: "actions/checkout@v4" },
+      { run: "echo hi" },
+      { run: "echo done" },
+    ]);
+  });
+
   it("errors on an unknown fragment", () => {
     const { result } = build(`name: x
 on: [push]

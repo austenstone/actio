@@ -3,6 +3,57 @@ title: fragments + inject
 description: Reusable step blocks spliced in with inject.
 ---
 
+<Callout type="warn" title="Deprecated: prefer _anchors: / templates:">
+  `fragments` still compiles and expands exactly as shown below, but native YAML
+  anchors now cover the same-file, no-param case: a `- *alias` whose anchor is a step
+  list is flattened in place at compile time. Compiling a file that uses `fragments:`
+  emits a `fragment-deprecated` warning. Migrate:
+
+  - **Same-file, no params:** move the list under [`_anchors:`](/docs/syntax#_anchors)
+    with a `&name` anchor and call it with `- *name` (see below).
+  - **Params or cross-file:** use [`templates:`](/docs/syntax#templates) +
+    `inject ... with`, or cross-file `inject: ./lib#name`.
+</Callout>
+
+## Migrating to `_anchors:`
+
+Same-file, no-param reuse maps one-to-one onto native anchors:
+
+<CodeCompare>
+
+```yaml title="before (fragments)"
+fragments:
+  setup:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - inject: setup
+      - run: npm test
+```
+
+```yaml title="after (_anchors)"
+_anchors:
+  setup: &setup
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - *setup
+      - run: npm test
+```
+
+</CodeCompare>
+
+Both compile to the identical workflow. If you need typed params or cross-file reuse,
+keep using `templates:` / `inject` instead.
+
+## Reference
+
 Define reusable step blocks at the top of the file; splice them in with
 `- inject: <name>`.
 

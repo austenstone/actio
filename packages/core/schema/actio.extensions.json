@@ -8,9 +8,10 @@
   "rootProperties": {
     "fragments": {
       "type": "object",
-      "title": "fragments (Actio macro)",
-      "description": "Actio macro. Reusable, named lists of steps. Splice a fragment into a job with `- inject: <name>`. The `fragments` key is stripped from the generated workflow.",
-      "markdownDescription": "**Actio macro**: reusable, named step lists.\n\nDefine ordered step lists once, then splice them into any job with `- inject: <name>`. The `fragments` key is stripped from the generated workflow.\n\n```yaml\nfragments:\n  setup:\n    - uses: actions/checkout@v4\n    - uses: actions/setup-node@v4\njobs:\n  build:\n    steps:\n      - inject: setup\n      - run: npm ci\n```",
+      "deprecated": true,
+      "title": "fragments (Actio macro, deprecated)",
+      "description": "Actio macro (deprecated). Reusable, named lists of steps spliced with `- inject: <name>`. Still compiles, but prefer `_anchors:` + `- *alias` for same-file reuse, or `templates:` for params / cross-file (`inject: ./lib#name`). The `fragments` key is stripped from the generated workflow.",
+      "markdownDescription": "**Actio macro (deprecated)**: reusable, named step lists.\n\n`fragments:` still compiles and expands as before, but it is dominated by two primitives:\n\n- **Same-file, no params** -> `_anchors:` + `- *alias` (native YAML, flattened at compile time)\n- **Params / cross-file** -> `templates:` + `- inject: <name>` (and `inject: ./lib#name`)\n\nThe `fragments` key is stripped from the generated workflow.\n\n```yaml\n# Prefer anchors for same-file reuse:\n_anchors:\n  setup: &setup\n    - uses: actions/checkout@v4\n    - uses: actions/setup-node@v4\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - *setup\n      - run: npm ci\n```",
       "additionalProperties": {
         "type": "array",
         "description": "An ordered list of steps to inject wherever this fragment is referenced.",
@@ -248,6 +249,14 @@
     }
   },
   "addDefinitions": {
+    "anchoredStepList": {
+      "title": "anchored step list (Actio macro)",
+      "description": "A `- *alias` whose anchor (`&name`, usually parked under `_anchors:`) is a step sequence. A JSON-schema validator resolves the alias to the underlying array, so a step list may contain a nested array of steps; Actio flattens it into the surrounding list at compile time.",
+      "type": "array",
+      "items": {
+        "oneOf": [{ "$ref": "#/definitions/step" }, { "$ref": "#/definitions/anchoredStepList" }]
+      }
+    },
     "ifChanged": {
       "title": "if-changed (Actio macro)",
       "description": "Actio macro. Gate this step or job on file changes. Runs only when files changed in the pull request or push match one of these glob patterns. Compiles to a single shared `dorny/paths-filter` setup job plus a `needs.<setup>.outputs.<flag> == 'true'` guard folded into the existing `if:`. Stripped from generated workflow YAML.",
