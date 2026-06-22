@@ -66,7 +66,7 @@ export function applyPasses(ctx: ParseContext, passes: Pass[]): void {
 /** Run pass transforms, then resolve final compile-time text boundaries. */
 export function runCompletePassPipeline(ctx: ParseContext, passes: Pass[]): void {
   applyPasses(ctx, passes);
-  resolveCompileTimeTextBoundaries(ctx, ctx.data, []);
+  resolveCompileTimeTextBoundaries(ctx, ctx.data, [], { guardrail: true });
 }
 
 /**

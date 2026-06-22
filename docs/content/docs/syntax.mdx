@@ -707,6 +707,43 @@ runtime `${{ fromJSON(...) }}` matrix is rejected (use
 [`dynamic-matrix`](#dynamic-matrix)), and >256 legs is a compile-time error (GitHub's
 per-run cap). Full guide: [expand-matrix](/docs/macros/expand-matrix).
 
+{/* macro:matrix-comprehension */}
+### `strategy.matrix` comprehension [#matrix-comprehension]
+
+Write a job's `strategy.matrix` as the one list comprehension `[expr for x in list]` and
+Actio evaluates it at build time into a concrete, native `matrix.include` array. Inputs
+come from compile-time [`params`](#params) and [`let`](#let), so nothing Actio-specific
+survives into the workflow (no setup job, no `fromJSON()`), unlike the runtime
+[`dynamic-matrix`](#dynamic-matrix). The comprehension runs through the same one
+compile-time engine as every other `{{ }}` expression.
+
+- **Valid in:** `jobs.<job_id>.strategy.matrix`
+- **Type:** a whole-value `"{{ [expr for x in list] }}"` comprehension
+- **Compiles to:** a plain `strategy.matrix.include` list of objects; the comprehension
+  source is erased
+
+```yaml title=".actio.yml"
+params:
+  versions: { type: object, default: [18, 20, 22] }
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: "{{ [ { node: v, label: format('node-{0}', v) } for v in params.versions ] }}"
+    steps:
+      - run: echo "building ${{ matrix.node }}"
+```
+
+A comprehension that does not evaluate to a list is rejected with `expr-type-error`. A
+static literal matrix is left untouched, and `${{ matrix.* }}` runtime references survive
+verbatim. Use this only when the legs are known at build time; for runtime-generated legs
+use [`dynamic-matrix`](#dynamic-matrix).
+
+Compile-time `{{ }}` tokens are erased once resolved; one that survives into emitted
+output is a build error. A leftover token in a `uses:` value is `uses-unresolved`, and a
+stray token anywhere else is `expr-stray`. Native `${{ }}` runtime expressions in
+`run:`/`if:`/`env:` are never inspected and always pass through unchanged.
+
 {/* macro:static-if */}
 ### `jobs.<job_id>.static-if` [#static-if]
 

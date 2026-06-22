@@ -70,7 +70,7 @@ const schemaMacros = new Set<string>([
 ]);
 
 /** Macros that ship as compiler passes but are not (yet) in the JSON Schema. */
-const KNOWN_SCHEMA_GAPS = new Set<string>();
+const KNOWN_SCHEMA_GAPS = new Set<string>(["matrix-comprehension"]);
 
 const canonicalMacros = new Set<string>([...schemaMacros, ...KNOWN_SCHEMA_GAPS]);
 
