@@ -11,6 +11,20 @@ discovery won't reach, like alongside your sources). Supported formats:
 `actio.config.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs`, `.json` (TS/ESM are
 loaded at runtime via [jiti](https://github.com/unjs/jiti) — no build step).
 
+<Files>
+  <Folder name="my-repo" defaultOpen>
+    <File name="actio.config.ts" className="text-fd-primary! bg-fd-primary/10!" />
+    <Folder name=".github" defaultOpen>
+      <Folder name="actio" defaultOpen>
+        <File name="ci.actio.yml" />
+      </Folder>
+    </Folder>
+  </Folder>
+</Files>
+
+Run `actio build` from anywhere — even inside `.github/actio/` — and discovery walks
+up to the `actio.config.ts` at the repo root.
+
 <Tabs items={['ts', 'js', 'json']}>
 
 <Tab value="ts">

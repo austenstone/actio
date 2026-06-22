@@ -43,6 +43,13 @@ error, missing tag, rate-limit `429`, or `5xx`) is a **real failure and hard-fai
 (exit `1`), never silently shipped unpinned. `--offline` likewise stays
 **fail-closed** (exit `2`) when the lock can't satisfy a ref.
 
+### Pinning config
+
+The [`pin` config key](/docs/configuration#pinning) accepts `"all"`, `"off"`, or a
+`PinConfig` object for per-class control:
+
+<AutoTypeTable path="../packages/core/src/config.ts" name="PinConfig" />
+
 ## The `pins` command
 
 ```bash

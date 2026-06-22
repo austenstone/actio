@@ -58,9 +58,19 @@ Param types reuse the [`params`](/docs/macros/params) type system (`string`, `nu
 ## Cross-file templates
 
 `inject` also pulls a template from another file with `inject: ./path#name`, so a team
-can keep a shared library of step sequences in one place:
+can keep a shared library of step sequences in one place. Define `#setup` once in a
+shared `lib.actio.yml` and inject it from any source file:
 
-```yaml title=".actio.yml"
+<Files>
+  <Folder name=".github" defaultOpen>
+    <Folder name="actio" defaultOpen>
+      <File name="ci.actio.yml" />
+      <File name="lib.actio.yml" className="text-fd-primary! bg-fd-primary/10!" />
+    </Folder>
+  </Folder>
+</Files>
+
+```yaml title="ci.actio.yml"
 jobs:
   build:
     runs-on: ubuntu-latest

@@ -1,6 +1,7 @@
 import { createFileSystemGeneratorCache, createGenerator } from 'fumadocs-typescript';
 import { AutoTypeTable } from 'fumadocs-typescript/ui';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { File, Files, Folder } from 'fumadocs-ui/components/files';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { TypeTable } from 'fumadocs-ui/components/type-table';
@@ -20,6 +21,9 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     Accordions,
     AutoTypeTable: (props) => <AutoTypeTable generator={generator} {...props} />,
     CodeCompare,
+    File,
+    Files,
+    Folder,
     Step,
     Steps,
     Tab,

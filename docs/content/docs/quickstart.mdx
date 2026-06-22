@@ -47,11 +47,20 @@ Keep sources in `.github/actio/` and compile them into `.github/workflows/` — 
 only directory GitHub reads. Sources can live anywhere and still get picked up, so
 this is just convention. Treat `.github/workflows/` as your `dist`:
 
-```text
-.github/
-  actio/        # source: *.actio.yml (+ actio.config.ts)
-  workflows/    # generated: *.yml — commit these
-```
+<Files>
+  <Folder name=".github" defaultOpen>
+    <Folder name="actio" defaultOpen>
+      <File name="ci.actio.yml" />
+      <File name="actio.config.ts" />
+    </Folder>
+    <Folder name="workflows" defaultOpen className="text-fd-primary! bg-fd-primary/10!">
+      <File name="ci.yml" />
+    </Folder>
+  </Folder>
+</Files>
+
+`actio/` holds your hand-written source; the highlighted `workflows/` holds the
+generated YAML — the only thing GitHub runs. Commit both.
 
 <Callout type="info">
   Commit the generated `.yml`. GitHub runs what's in `.github/workflows/`, and
