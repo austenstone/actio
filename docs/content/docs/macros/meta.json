@@ -19,6 +19,7 @@
     "lifecycle",
     "if-changed",
     "artifacts",
-    "injection-hoist"
+    "injection-hoist",
+    "permissions"
   ]
 }

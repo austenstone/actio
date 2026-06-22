@@ -21,6 +21,7 @@ import {
 } from "./jobDefaults.js";
 import { lifecycle } from "./lifecycle.js";
 import { params } from "./params.js";
+import { permissions } from "./permissions.js";
 import { referenceLower, referenceWire } from "./reference.js";
 import { type Pass, PassRegistry, runCompletePassPipeline } from "./registry.js";
 import { retry } from "./retry.js";
@@ -79,6 +80,7 @@ export const builtinPasses: Pass[] = [
   injectionHoist,
   shareMatrixCheck,
   referenceWire,
+  permissions,
 ];
 
 /**
@@ -135,6 +137,7 @@ export {
   jobDefaults,
   lifecycle,
   params,
+  permissions,
   referenceLower,
   referenceWire,
   retry,

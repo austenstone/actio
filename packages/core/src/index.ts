@@ -7,7 +7,14 @@ export {
   coercionTrapCategory,
   coercionWarning,
 } from "./coercion.js";
-export { type ActioConfig, type ActioTarget, defineConfig, type PinConfig } from "./config.js";
+export {
+  type ActioConfig,
+  type ActioTarget,
+  defineConfig,
+  type PermissionsConfig,
+  type PermissionsMode,
+  type PinConfig,
+} from "./config.js";
 export {
   ActioError,
   type Diagnostic,
@@ -98,6 +105,12 @@ export {
   runPasses,
   sortPasses,
 } from "./passes/index.js";
+export {
+  permissions,
+  permissionsPass,
+  type ScopeLevel,
+  type ScopeMap,
+} from "./passes/permissions.js";
 export {
   applyPins,
   type PinCommentStyle,

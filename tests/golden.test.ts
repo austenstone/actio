@@ -14,7 +14,7 @@ function fixtureNames(): string[] {
 }
 
 interface GoldenFixtureOptions
-  extends Pick<TranspileOptions, "validate" | "target" | "nativeDependencies"> {}
+  extends Pick<TranspileOptions, "validate" | "target" | "nativeDependencies" | "permissions"> {}
 
 function fixtureOptions(name: string): GoldenFixtureOptions {
   const optionsPath = join(fixturesDir, name, "options.json");

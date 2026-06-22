@@ -1,0 +1,175 @@
+---
+title: permissions
+description: "Infer the least-privilege GITHUB_TOKEN permissions each job needs from its steps."
+---
+
+GitHub Actions grants the `GITHUB_TOKEN` a set of scopes per job. Hand-maintaining
+a least-privilege [`permissions:`](https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication#permissions-for-the-github_token)
+block is tedious and drifts as steps change. The `permissions` pass computes the
+minimal scopes a job needs from the actions it runs, and either emits that block
+(`infer`) or audits your declared block against it (`check`).
+
+It is **off by default**: turning it on is an explicit choice, so it never silently
+rewrites the workflows you already ship. Enable it in
+[`actio.config`](/docs/configuration#permissions) or with `--permissions <mode>`.
+
+<CodeCompare>
+
+```yaml title=".actio.yml (permissions: infer)"
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/deploy-pages@v4
+```
+
+```yaml title="generated .yml"
+on:
+  push:
+    branches:
+      - main
+permissions: {}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/deploy-pages@v4
+```
+
+</CodeCompare>
+
+It runs **late**, after every step-producing macro (fragments, matrix, lifecycle,
+artifacts, ...) has expanded, so it sees the final step list. The pass is a pure IR
+transform with no Node built-ins, so it composes into the browser bundle.
+
+## Modes
+
+| Mode     | Behavior                                                                              |
+| -------- | ------------------------------------------------------------------------------------- |
+| `off`    | Do nothing (default). Output is unchanged, byte for byte.                              |
+| `infer`  | Emit the computed per-job block plus a top-level `permissions: {}` deny-all default.   |
+| `check`  | Diff declared vs computed; warn on over-grant (error under `--check`). Never rewrites. |
+
+In `infer` mode, when the root declares no `permissions:`, the pass adds a top-level
+`permissions: {}` deny-all so any job it did not write starts from zero scopes. If
+the root already manages permissions, that baseline is left alone.
+
+## Safety invariant: never silently under-grant
+
+The whole point is least privilege **without breaking your jobs**. An action the pass
+cannot map (not in the bundled table and not in your config overrides) is treated as
+**unknown**, never as "needs nothing":
+
+- A `permissions-unknown-action` diagnostic fires naming the action.
+- In `infer` mode the job is rescued to `permissions: write-all` (only when the pass
+  introduced the deny-all baseline), so an unmapped action never lands in a
+  confidently-narrow block that would fail at runtime. Map the action (below) or
+  declare the job's permissions explicitly to replace the rescue with a tight block.
+
+An explicit job-level `permissions:` always wins and is left untouched: it is the
+escape hatch for anything the pass cannot infer.
+
+## Mapping table
+
+Scopes come from a bundled first-party table keyed by `owner/repo[/path]` (no `@ref`).
+A few entries:
+
+| Action                            | Scopes                                              |
+| --------------------------------- | --------------------------------------------------- |
+| `actions/checkout`                | `contents: read`                                    |
+| `actions/setup-*` (prefix)        | `contents: read`                                    |
+| `actions/cache` (+ `/restore`, `/save`) | `contents: read`                              |
+| `actions/upload-artifact`, `actions/download-artifact` | `contents: read`               |
+| `actions/configure-pages`, `actions/upload-pages-artifact` | `contents: read`           |
+| `actions/deploy-pages`            | `pages: write`, `id-token: write`                   |
+| `actions/stale`                   | `issues: write`, `pull-requests: write`             |
+| `actions/labeler`                 | `contents: read`, `pull-requests: write`            |
+| `actions/dependency-review-action`| `contents: read`                                    |
+| `actions/attest-build-provenance` | `id-token: write`, `attestations: write`, `contents: read` |
+| `actions/add-to-project`          | `repository-projects: write`                        |
+| `github/codeql-action/*` (prefix) | `security-events: write`, `actions: read`, `contents: read` |
+
+When a job uses several actions, the pass takes the **union**, keeping the broader
+level per scope (`write` beats `read`).
+
+`actions/github-script` is deliberately **absent**: it can call any API, so leaving it
+unmapped forces an explicit declaration rather than a guess.
+
+### Extending and overriding
+
+Add or override entries via `config.permissions.actions`. An exact override wins over a
+bundled entry:
+
+```ts title="actio.config.ts"
+export default defineConfig({
+  permissions: {
+    mode: "infer",
+    actions: {
+      "my-org/deploy-action": { deployments: "write", "id-token": "write" },
+      "actions/checkout": { contents: "read" },
+    },
+  },
+});
+```
+
+## `run:` steps that use the token
+
+A `run:` step that references `gh`, `GITHUB_TOKEN`, or `github.token` is treated as
+**unknown** by default (it could hit any API), firing `permissions-unknown-action`.
+
+Opt into a coarse heuristic with `inferRunScopes: true`, which maps common
+`gh` subcommands to scopes (`gh pr` -> `pull-requests: write`, `gh issue` ->
+`issues: write`, `gh release` -> `contents: write`, `gh run`/`gh workflow` ->
+`actions: write`). It is off by default because it is a heuristic, not a contract:
+prefer an explicit job `permissions:` for token-using scripts.
+
+```ts title="actio.config.ts"
+export default defineConfig({
+  permissions: { mode: "infer", inferRunScopes: true },
+});
+```
+
+## `check` mode
+
+`check` audits a declared block against the computed minimum without ever editing your
+output. A scope granted beyond what the steps need raises `permissions-over-grant`:
+
+```yaml title=".actio.yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only checkout runs here, which needs contents: read
+    steps:
+      - uses: actions/checkout@v4
+```
+
+That warns at build time and **fails** under `actio check` / `--check`, so CI catches
+permission creep. `read-all` and `write-all` shorthands are expanded and compared the
+same way. A checked job whose steps include an unknown action is skipped (with a
+`permissions-unknown-action` note) rather than mis-audited.
+
+## Diagnostics
+
+| Code                          | When                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------- |
+| `permissions-unknown-action`  | A step's action (or token-using `run:`) has no known or configured scopes.   |
+| `permissions-over-grant`      | (`check`) A declared scope is broader than the computed minimum.             |
+| `permissions-reusable-call`   | A job calls a reusable workflow, whose needs cannot be inferred from here.   |
+
+## Out of scope
+
+Reusable-workflow **call** jobs (`uses: ./.github/workflows/x.yml`) are left untouched:
+the pass cannot read the called workflow's steps, so it emits
+`permissions-reusable-call` and declines to add a baseline that might starve the call.
+Declare those jobs' permissions explicitly. Runtime enforcement and fetching
+`action.yml` metadata over the network are also out of scope.

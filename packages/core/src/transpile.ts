@@ -4,7 +4,7 @@ import {
   coercionTrapCategory,
   coercionWarning,
 } from "./coercion.js";
-import type { ActioTarget } from "./config.js";
+import type { ActioTarget, PermissionsConfig, PermissionsMode } from "./config.js";
 import type { Diagnostic } from "./diagnostics.js";
 import { emitYaml, generatedHeader } from "./emit.js";
 import { type ActionlintRunner, type LintMode, lintWorkflowYaml } from "./lint.js";
@@ -101,6 +101,16 @@ export interface TranspileOptions {
    * Default "actions/upload-artifact@v4".
    */
   artifacts?: { uploader?: string };
+  /**
+   * Least-privilege permissions policy (string sugar or granular config). Default
+   * `off`. Resolved into `ctx.internal.permissions` for the late `permissions` pass.
+   */
+  permissions?: PermissionsMode | PermissionsConfig;
+  /**
+   * Escalate `check`-mode over-grant diagnostics from warning to error. Set by the
+   * CLI under `actio check` so a too-broad declared block fails CI.
+   */
+  permissionsStrict?: boolean;
   /**
    * Cross-file import seam (#161). Resolves `inject: ./lib#name` selectors to
    * module sources. Keeps `transpile()` pure string->string: when omitted, local
@@ -221,6 +231,16 @@ export function transpile(source: string, options: TranspileOptions = {}): Trans
   }
   if (options.artifacts !== undefined) {
     ctx.internal.artifacts = options.artifacts;
+  }
+  if (options.permissions !== undefined) {
+    const cfg =
+      typeof options.permissions === "string" ? { mode: options.permissions } : options.permissions;
+    ctx.internal.permissions = {
+      mode: cfg.mode ?? "infer",
+      actions: cfg.actions,
+      inferRunScopes: cfg.inferRunScopes ?? false,
+      strict: options.permissionsStrict ?? false,
+    };
   }
   if (options.modules !== undefined) {
     ctx.internal.modules = {

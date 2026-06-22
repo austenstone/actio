@@ -245,6 +245,46 @@ any other `uses:`, so under a pin policy it is rewritten to a SHA. Pin a tagged 
 default branch and cannot be pinned. Point `uploader` at a fork or a mirror when you
 need a different uploader, and it will be pinned the same way.
 
+## Least-privilege permissions (`permissions`) [#permissions]
+
+The [`permissions`](/docs/macros/permissions) policy computes the minimal
+`GITHUB_TOKEN` scopes each job needs from its steps. It is **off by default** so it
+never silently rewrites your output. Turn it on with a mode:
+
+```ts title="actio.config.ts"
+export default defineConfig({
+  permissions: "infer", // off (default) | infer | check
+});
+```
+
+- **`off`** (default): no-op. The pass does nothing and the generated YAML is byte
+  for byte what it was before.
+- **`infer`**: emit the computed per-job `permissions:` block, and (when the root
+  declares none) a top-level `permissions: {}` deny-all default so unlisted jobs
+  start from zero.
+- **`check`**: audit a declared block against the computed minimum. An over-grant
+  raises a `permissions-over-grant` warning, escalated to a build-failing error
+  under `actio check` / `--check`. `check` never edits your output.
+
+Extend or override the bundled action mapping with the object form:
+
+```ts title="actio.config.ts"
+export default defineConfig({
+  permissions: {
+    mode: "infer",
+    inferRunScopes: false, // opt-in gh/GITHUB_TOKEN run: heuristic (default off)
+    actions: {
+      "my-org/deploy-action": { deployments: "write", "id-token": "write" },
+      "actions/checkout": { contents: "read" }, // override a bundled entry
+    },
+  },
+});
+```
+
+See the [permissions macro page](/docs/macros/permissions) for the full mapping
+table, the diagnostics, and the safety invariant (unknown actions are never
+silently narrowed). The CLI mirrors the mode with `--permissions <mode>`.
+
 ## Custom passes
 
 The `passes` field is the headline feature: a pass you supply is **merged** into
