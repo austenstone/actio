@@ -1,5 +1,5 @@
-import { type Job, visitJobs } from "../ir.js";
 import type { PermissionsMode } from "../config.js";
+import { type Job, visitJobs } from "../ir.js";
 import { type ParseContext, type Path, setKeyOrder } from "../parser.js";
 import { isObject, pushDiagnostic } from "./helpers.js";
 import type { Pass } from "./registry.js";
@@ -65,11 +65,14 @@ const BUNDLED_ACTIONS: ReadonlyMap<string, ScopeMap> = new Map<string, ScopeMap>
   ["actions/stale", { issues: "write", "pull-requests": "write" }],
   ["actions/labeler", { contents: "read", "pull-requests": "write" }],
   ["actions/dependency-review-action", { contents: "read" }],
-  ["actions/attest-build-provenance", {
-    "id-token": "write",
-    attestations: "write",
-    contents: "read",
-  }],
+  [
+    "actions/attest-build-provenance",
+    {
+      "id-token": "write",
+      attestations: "write",
+      contents: "read",
+    },
+  ],
   ["actions/add-to-project", { "repository-projects": "write" }],
 ]);
 
@@ -80,11 +83,14 @@ const BUNDLED_ACTIONS: ReadonlyMap<string, ScopeMap> = new Map<string, ScopeMap>
  */
 const BUNDLED_PREFIXES: ReadonlyArray<readonly [string, ScopeMap]> = [
   ["actions/setup-", { contents: "read" }],
-  ["github/codeql-action/", {
-    "security-events": "write",
-    actions: "read",
-    contents: "read",
-  }],
+  [
+    "github/codeql-action/",
+    {
+      "security-events": "write",
+      actions: "read",
+      contents: "read",
+    },
+  ],
 ];
 
 const rank: Record<ScopeLevel, number> = { read: 1, write: 2 };
@@ -121,7 +127,10 @@ function actionId(uses: string): string | undefined {
 }
 
 /** Look up an action id in user overrides, then the bundled exact/prefix tables. */
-function lookupAction(id: string, overrides: Record<string, ScopeMap> | undefined): ScopeMap | undefined {
+function lookupAction(
+  id: string,
+  overrides: Record<string, ScopeMap> | undefined,
+): ScopeMap | undefined {
   const override = overrides?.[id];
   if (override) return override;
   const exact = BUNDLED_ACTIONS.get(id);

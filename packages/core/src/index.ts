@@ -106,6 +106,12 @@ export {
   sortPasses,
 } from "./passes/index.js";
 export {
+  permissions,
+  permissionsPass,
+  type ScopeLevel,
+  type ScopeMap,
+} from "./passes/permissions.js";
+export {
   applyPins,
   type PinCommentStyle,
   type PinOptions,
@@ -116,12 +122,6 @@ export {
   pinCommentText,
   shouldPinTarget,
 } from "./passes/pin.js";
-export {
-  permissions,
-  permissionsPass,
-  type ScopeLevel,
-  type ScopeMap,
-} from "./passes/permissions.js";
 export {
   ACTIO_SCHEMA_URL,
   actioSchema,

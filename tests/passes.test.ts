@@ -131,6 +131,7 @@ describe("sortPasses", () => {
       "injection-hoist",
       "share-matrix-check",
       "reference-wire",
+      "permissions",
     ]);
   });
 });
@@ -187,6 +188,7 @@ describe("PassRegistry", () => {
       "injection-hoist",
       "share-matrix-check",
       "reference-wire",
+      "permissions",
       "post",
     ]);
   });
@@ -242,6 +244,7 @@ describe("createRegistry", () => {
       "injection-hoist",
       "share-matrix-check",
       "reference-wire",
+      "permissions",
     ]);
   });
 

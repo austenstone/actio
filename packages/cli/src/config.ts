@@ -170,7 +170,13 @@ function resolvePinPolicy(raw: ActioConfig["pin"], passed: (name: string) => boo
  */
 export function resolveBuildOptions(args: {
   files: string[];
-  flags: { outDir?: string; target?: string; coercion?: string; lint?: string; permissions?: string };
+  flags: {
+    outDir?: string;
+    target?: string;
+    coercion?: string;
+    lint?: string;
+    permissions?: string;
+  };
   forceCheck: boolean;
   argv: string[];
   config: ActioConfig;

@@ -104,7 +104,10 @@ describe("permissions: infer", () => {
   });
 
   it("respects an explicit job-level permissions block (escape hatch wins)", () => {
-    const src = wf("      - uses: actions/checkout@v4", "    permissions:\n      contents: write\n");
+    const src = wf(
+      "      - uses: actions/checkout@v4",
+      "    permissions:\n      contents: write\n",
+    );
     const { doc } = build(src, infer);
     expect(job(doc).permissions).toEqual({ contents: "write" });
     // The only job opted out, so no deny-all baseline is introduced.
@@ -129,10 +132,7 @@ jobs:
 
 describe("permissions: unknown actions (safety invariant)", () => {
   it("fires permissions-unknown-action and rescues the job to write-all", () => {
-    const { doc, warnings, codes } = build(
-      wf("      - uses: actions/github-script@v7"),
-      infer,
-    );
+    const { doc, warnings, codes } = build(wf("      - uses: actions/github-script@v7"), infer);
     expect(codes).toContain("permissions-unknown-action");
     expect(warnings.length).toBeGreaterThan(0);
     expect(job(doc).permissions).toBe("write-all");
@@ -184,7 +184,8 @@ describe("permissions: user overrides", () => {
 });
 
 describe("permissions: run-step token heuristic", () => {
-  const tokenStep = "      - run: gh pr edit\n        env:\n          GITHUB_TOKEN: ${{ github.token }}";
+  const tokenStep =
+    "      - run: gh pr edit\n        env:\n          GITHUB_TOKEN: ${{ github.token }}";
 
   it("marks a token-touching run step unknown when inferRunScopes is off", () => {
     const { codes } = build(wf(tokenStep), infer);
@@ -315,7 +316,9 @@ jobs:
   });
 
   it("warns permissions-unknown-action and skips the comparison for unknown actions", () => {
-    const { codes } = checked(withPerms("      contents: write\n", "      - uses: actions/github-script@v7"));
+    const { codes } = checked(
+      withPerms("      contents: write\n", "      - uses: actions/github-script@v7"),
+    );
     expect(codes).toContain("permissions-unknown-action");
     expect(codes).not.toContain("permissions-over-grant");
   });
