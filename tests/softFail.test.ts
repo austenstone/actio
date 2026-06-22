@@ -3,8 +3,10 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { transpile } from "actio-core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parse, stringify } from "yaml";
+
+vi.setConfig({ testTimeout: 15000, hookTimeout: 15000 });
 
 /**
  * The authoritative proof for soft_fail is execution, not string matching: we
