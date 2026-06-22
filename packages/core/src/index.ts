@@ -1,3 +1,4 @@
+export { defaultActionlintRunner, type SpawnSync } from "./actionlint.js";
 export {
   COERCION_CATEGORY_HINTS,
   COERCION_MODES,
@@ -43,7 +44,6 @@ export {
   type Workflow,
   workflow,
 } from "./ir.js";
-export { defaultActionlintRunner, type SpawnSync } from "./actionlint.js";
 export {
   type ActionlintFinding,
   type ActionlintRun,

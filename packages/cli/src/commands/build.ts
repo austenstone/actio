@@ -3,11 +3,11 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
-  type ActioTarget,
   type ActionlintRunner,
+  type ActioTarget,
   type CoercionMode,
-  defaultActionlintRunner,
   type Diagnostic,
+  defaultActionlintRunner,
   formatDiagnostic,
   formatGithubAnnotation,
   type LintMode,
