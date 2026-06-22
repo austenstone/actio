@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: ./lint.sh
-        continue-on-error: true
+        continue-on-error: true # [!code highlight]
 ```
 
 </CodeCompare>
@@ -73,7 +73,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: |-
+      - run: |- # [!code highlight:8]
           __actio_sf_file="$(mktemp)"
           printf '%s\n' './flaky-check.sh' > "$__actio_sf_file"
           __actio_sf_code=0

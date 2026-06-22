@@ -78,11 +78,26 @@ Anything outside that shape is rejected with exit `2`.
 
 Use a two-phase workflow split:
 
-1. **Phase 1 (`pull_request`, read-only token):** run `pins update --no-exec` on
-   the PR head and upload the delta artifact.
-2. **Phase 2 (`workflow_run`, write token):** download the trusted artifact and run
-   `pins apply --constrained`; never run `build` or `pins update` in this
-   privileged phase.
+<Steps>
+
+<Step>
+
+### Phase 1 — `pull_request`, read-only token
+
+Run `pins update --no-exec` on the PR head and upload the delta artifact.
+
+</Step>
+
+<Step>
+
+### Phase 2 — `workflow_run`, write token
+
+Download the trusted artifact and run `pins apply --constrained`; never run `build`
+or `pins update` in this privileged phase.
+
+</Step>
+
+</Steps>
 
 This avoids executing PR-controlled config/passes in a write-privileged context
 while still keeping source, lockfile, and generated pins aligned.

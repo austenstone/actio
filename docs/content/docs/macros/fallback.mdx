@@ -8,6 +8,33 @@ when it fails. To simply *tolerate* a failure and continue, see
 [`soft_fail`](/docs/macros/soft-fail); for teardown that runs regardless of outcome,
 see [`lifecycle`](/docs/macros/lifecycle).
 
+## Options
+
+`fallback:` is either a **list of steps** (the catch body, shown below) or an object
+with these keys:
+
+<TypeTable
+  type={{
+    recover: {
+      description: 'Swallow the failure (continue-on-error) instead of just notifying. See "recover: true".',
+      type: 'boolean',
+      default: 'false',
+    },
+    retry: {
+      description: 'Re-run the same step once in a sibling job on a different runner. See "retry: different runner".',
+      type: 'boolean | object',
+    },
+    'retry.runs-on': {
+      description: 'The runner for the retry job (e.g. a bigger box).',
+      type: 'string',
+    },
+    'retry.when-exit-code': {
+      description: 'Only retry on these exit codes (e.g. 137 = OOM). Number or list.',
+      type: 'number | number[]',
+    },
+  }}
+/>
+
 ## Default = notify
 
 The error is *not* swallowed; fallback runs via `if: failure()`, the job still fails.
@@ -32,10 +59,10 @@ jobs:
 steps:
   - name: Deploy
     run: ./deploy.sh
-    id: step_deploy
+    id: step_deploy # [!code highlight]
   - name: Notify
     run: ./notify.sh failure
-    if: failure() && steps.step_deploy.conclusion == 'failure'
+    if: failure() && steps.step_deploy.conclusion == 'failure' # [!code highlight]
 ```
 
 </CodeCompare>
@@ -91,7 +118,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Build
         run: ./build.sh
-  build_retry:
+  build_retry: # [!code highlight:9]
     name: Retry "Build" on ubuntu-latest-8-cores
     needs:
       - build
@@ -130,10 +157,10 @@ jobs:
         run: |-
           trap 'echo "exit_code=$?" >> "$GITHUB_OUTPUT"' EXIT
           ./run-tests.sh
-        id: step_run_tests
-    outputs:
+        id: step_run_tests # [!code highlight]
+    outputs: # [!code highlight:2]
       step_run_tests_exit_code: ${{ steps.step_run_tests.outputs.exit_code }}
-  test_retry:
+  test_retry: # [!code highlight:9]
     name: Retry "Run tests" on ubuntu-latest-16-cores
     needs:
       - test

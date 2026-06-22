@@ -51,7 +51,7 @@ jobs:
     steps:
       - run: ./build --arch arm64
   deploy:
-    needs: build-linux-x64
+    needs: build-linux-x64 # [!code highlight]
     runs-on: ubuntu-latest
     steps:
       - run: ./deploy.sh

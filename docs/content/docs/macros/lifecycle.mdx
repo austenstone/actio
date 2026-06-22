@@ -53,11 +53,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: ./start-db.sh
-      - run: ./stop-db.sh
+      - run: ./stop-db.sh # [!code highlight:2]
         if: always()
       - run: ./build.sh
-        id: actio_test_step_2
-      - run: ./upload-logs.sh
+        id: actio_test_step_2 # [!code highlight]
+      - run: ./upload-logs.sh # [!code highlight:2]
         if: "!cancelled() && steps.actio_test_step_2.outcome == 'failure'"
 ```
 
@@ -101,9 +101,9 @@ jobs:
       - run: ./deploy.sh
   page:
     runs-on: ubuntu-latest
-    needs:
+    needs: # [!code highlight:2]
       - deploy
-    if: failure()
+    if: failure() # [!code highlight]
     steps:
       - run: ./page-oncall.sh
 ```
