@@ -1,6 +1,6 @@
 'use client';
 
-import { transpile, type TranspileResult } from 'actio-core';
+import { transpile, type TranspileResult } from 'actio-core/browser';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Diagnostics } from './diagnostics';
 import { Editor } from './editor';

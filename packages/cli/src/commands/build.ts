@@ -3,9 +3,11 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  type ActionlintRunner,
   type ActioTarget,
   type CoercionMode,
   type Diagnostic,
+  defaultActionlintRunner,
   formatDiagnostic,
   formatGithubAnnotation,
   type LintMode,
@@ -45,6 +47,12 @@ export interface BuildOptions {
   coercion: CoercionMode;
   /** actionlint output-lint severity (`off | warn | error`). Default `off`. */
   lint: LintMode;
+  /**
+   * Injectable actionlint runner. The CLI defaults to the spawn-based
+   * `defaultActionlintRunner`; `transpile` itself stays runner-agnostic so its
+   * import graph never pulls in `node:child_process` (#155). Tests can override.
+   */
+  actionlintRunner?: ActionlintRunner;
   /**
    * Optional override for native dependency resolution (tests inject this to
    * avoid network calls).
@@ -634,6 +642,7 @@ export async function buildOne(file: string, cwd: string, opts: BuildOptions): P
     artifacts: opts.artifacts,
     coercion: opts.coercion,
     lint: opts.lint,
+    actionlintRunner: opts.actionlintRunner ?? defaultActionlintRunner,
     modules: opts.moduleResolver ?? createFilesystemModuleResolver(cwd),
   };
   let result = transpile(source, baseOptions);
